@@ -21,14 +21,14 @@ set -e
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-BMAD_DIR="$PROJECT_ROOT/bmad"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+BMAD_DIR="$PROJECT_ROOT/_bmad"
 
-STORIES_DIR="$PROJECT_ROOT/docs/stories"
-SPRINT_ARTIFACTS_DIR="$PROJECT_ROOT/docs/sprint-artifacts"
-SPRINTS_DIR="$PROJECT_ROOT/docs/sprints"
-EPICS_DIR="$PROJECT_ROOT/docs/epics"
-UAT_DIR="$PROJECT_ROOT/docs/uat"
+STORIES_DIR="$PROJECT_ROOT/_bmad-output/implementation-artifacts"
+SPRINT_ARTIFACTS_DIR="$PROJECT_ROOT/_bmad-output/implementation-artifacts"
+SPRINTS_DIR="$PROJECT_ROOT/_bmad-output/sprints"
+EPICS_DIR="$PROJECT_ROOT/_bmad-output/planning-artifacts"
+UAT_DIR="$PROJECT_ROOT/_bmad-output/uat"
 
 LOG_FILE="/tmp/bmad-epic-execute-$$.log"
 

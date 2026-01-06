@@ -37,14 +37,14 @@ set -e
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-BMAD_DIR="$PROJECT_ROOT/.bmad"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+BMAD_DIR="$PROJECT_ROOT/_bmad"
 
-STORIES_DIR="$PROJECT_ROOT/docs/stories"
-SPRINT_ARTIFACTS_DIR="$PROJECT_ROOT/docs/sprint-artifacts"
-EPICS_DIR="$PROJECT_ROOT/docs/epics"
-UAT_DIR="$PROJECT_ROOT/docs/uat"
-HANDOFF_DIR="$PROJECT_ROOT/docs/handoffs"
+STORIES_DIR="$PROJECT_ROOT/_bmad-output/implementation-artifacts"
+SPRINT_ARTIFACTS_DIR="$PROJECT_ROOT/_bmad-output/implementation-artifacts"
+EPICS_DIR="$PROJECT_ROOT/_bmad-output/planning-artifacts"
+UAT_DIR="$PROJECT_ROOT/_bmad-output/uat"
+HANDOFF_DIR="$PROJECT_ROOT/_bmad-output/handoffs"
 
 LOG_FILE="/tmp/bmad-epic-chain-$$.log"
 CHAIN_PLAN_FILE="$SPRINT_ARTIFACTS_DIR/chain-plan.yaml"

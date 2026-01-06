@@ -25,14 +25,14 @@ set -e
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-BMAD_DIR="$PROJECT_ROOT/.bmad"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+BMAD_DIR="$PROJECT_ROOT/_bmad"
 
-UAT_DIR="$PROJECT_ROOT/docs/uat"
-SPRINT_ARTIFACTS_DIR="$PROJECT_ROOT/docs/sprint-artifacts"
+UAT_DIR="$PROJECT_ROOT/_bmad-output/uat"
+SPRINT_ARTIFACTS_DIR="$PROJECT_ROOT/_bmad-output/implementation-artifacts"
 METRICS_DIR="$SPRINT_ARTIFACTS_DIR/metrics"
 FIX_DIR="$SPRINT_ARTIFACTS_DIR/uat-fixes"
-STORIES_DIR="$PROJECT_ROOT/docs/stories"
+STORIES_DIR="$PROJECT_ROOT/_bmad-output/implementation-artifacts"
 
 LOG_FILE="/tmp/bmad-uat-validate-$$.log"
 
