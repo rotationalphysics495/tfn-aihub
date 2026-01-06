@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 
@@ -10,6 +11,7 @@ import { Badge } from "@/components/ui/badge"
  * Uses mode="live" Card variant for vibrant styling per Industrial Clarity design.
  *
  * @see Story 1.7 - Command Center UI Shell
+ * @see Story 2.3 - Throughput Dashboard (now links to production throughput)
  */
 export function LivePulseSection() {
   return (
@@ -29,11 +31,39 @@ export function LivePulseSection() {
             <Badge variant="live">Real-time</Badge>
           </div>
         </CardHeader>
-        <CardContent className="flex flex-col items-center justify-center py-8">
-          <div className="flex flex-col items-center gap-4 text-center">
-            <div className="w-12 h-12 rounded-full bg-live-primary/20 flex items-center justify-center">
+        <CardContent className="py-4">
+          <div className="flex flex-col gap-4">
+            {/* Production Intelligence Link */}
+            <Link
+              href="/dashboard/production/throughput"
+              className="group flex items-center gap-3 p-4 rounded-lg bg-live-surface/50 dark:bg-live-surface-dark/50 border border-live-border dark:border-live-border-dark hover:bg-live-surface dark:hover:bg-live-surface-dark transition-colors"
+            >
+              <div className="w-10 h-10 rounded-full bg-live-primary/20 flex items-center justify-center group-hover:bg-live-primary/30 transition-colors">
+                <svg
+                  className="w-5 h-5 text-live-primary"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                  />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-foreground group-hover:text-live-primary transition-colors">
+                  Throughput Dashboard
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Actual vs target production metrics
+                </p>
+              </div>
               <svg
-                className="w-6 h-6 text-live-primary"
+                className="w-5 h-5 text-muted-foreground group-hover:text-live-primary transition-colors"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -43,16 +73,44 @@ export function LivePulseSection() {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M13 10V3L4 14h7v7l9-11h-7z"
+                  d="M9 5l7 7-7 7"
                 />
               </svg>
+            </Link>
+
+            {/* Placeholder for OEE Metrics (Story 2.4) */}
+            <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50 border border-border opacity-60">
+              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                <svg
+                  className="w-5 h-5 text-muted-foreground"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"
+                  />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-foreground">
+                  OEE Metrics
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Coming in Story 2.4
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="body-text text-muted-foreground">
-                Real-time plant status and monitoring data
-              </p>
-            </div>
-            <Badge variant="secondary">Coming in Epic 2</Badge>
           </div>
         </CardContent>
       </Card>
