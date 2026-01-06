@@ -1,0 +1,245 @@
+# Epic Chain Execution Plan
+# Generated: 2026-01-06
+# Project: tfn-aihub
+
+epics: [1, 2, 3, 4]
+total_stories: 26
+analysis_depth: standard
+
+execution_order:
+  - epic: 1
+    title: "Project Foundation & Infrastructure"
+    stories:
+      - "1-1-turborepo-monorepo-scaffold"
+      - "1-2-supabase-auth-integration"
+      - "1-3-plant-object-model-schema"
+      - "1-4-analytical-cache-schema"
+      - "1-5-mssql-readonly-connection"
+      - "1-6-industrial-clarity-design-system"
+      - "1-7-command-center-ui-shell"
+    story_count: 7
+    estimated_complexity: medium
+    dependencies: []
+    notes: "Foundation epic - no dependencies. Must complete before all others."
+
+  - epic: 2
+    title: "Data Pipelines & Production Intelligence"
+    stories:
+      - "2-1-batch-data-pipeline-t1"
+      - "2-2-polling-data-pipeline"
+      - "2-3-throughput-dashboard"
+      - "2-4-oee-metrics-view"
+      - "2-5-downtime-pareto-analysis"
+      - "2-6-safety-alert-system"
+      - "2-7-financial-impact-calculator"
+      - "2-8-cost-of-loss-widget"
+      - "2-9-live-pulse-ticker"
+    story_count: 9
+    estimated_complexity: high
+    dependencies:
+      - epic: 1
+        reason: "Requires monorepo structure, Supabase auth, database schemas, MSSQL connection, and UI shell"
+        critical_stories: ["1-1", "1-2", "1-3", "1-4", "1-5", "1-6", "1-7"]
+    notes: "Largest epic. Pipeline A (batch) must complete before Pipeline B (polling). UI stories depend on design system."
+
+  - epic: 3
+    title: "Action Engine & AI Synthesis"
+    stories:
+      - "3-1-action-engine-logic"
+      - "3-2-daily-action-list-api"
+      - "3-3-action-list-primary-view"
+      - "3-4-insight-evidence-cards"
+      - "3-5-smart-summary-generator"
+    story_count: 5
+    estimated_complexity: high
+    dependencies:
+      - epic: 1
+        reason: "Requires assets table, analytical cache schemas, UI shell"
+        critical_stories: ["1-3", "1-4", "1-7"]
+      - epic: 2
+        reason: "Requires daily_summaries, safety_events data from pipelines"
+        critical_stories: ["2-1", "2-6", "2-7"]
+    notes: "First AI story. Action Engine Logic is foundational for all Epic 3 stories."
+
+  - epic: 4
+    title: "AI Chat & Memory"
+    stories:
+      - "4-1-mem0-vector-memory-integration"
+      - "4-2-langchain-text-to-sql"
+      - "4-3-chat-sidebar-ui"
+      - "4-4-asset-history-memory"
+      - "4-5-cited-response-generation"
+    story_count: 5
+    estimated_complexity: high
+    dependencies:
+      - epic: 1
+        reason: "Requires Supabase, auth, assets table, UI shell"
+        critical_stories: ["1-1", "1-2", "1-3", "1-7"]
+      - epic: 2
+        reason: "Requires production data to query via Text-to-SQL"
+        critical_stories: ["2-1", "2-2"]
+      - epic: 3
+        reason: "Can reference action items in conversational queries"
+        critical_stories: ["3-1", "3-2"]
+    notes: "Most complex AI integration. Mem0 setup is foundational for all Epic 4 stories."
+
+cross_cutting_concerns:
+  - name: "Database Migration Sequencing"
+    affects: [1, 2]
+    recommendation: "Run all migrations in Epic 1 before Epic 2 data ingestion. Order: Plant Object Model (1.3) → Analytical Cache (1.4) → Vector schema (4.1)"
+    severity: high
+
+  - name: "Supabase Configuration"
+    affects: [1, 2, 3, 4]
+    recommendation: "Complete Supabase project setup in Story 1.2/1.3 before other stories. Verify RLS policies early."
+    severity: high
+
+  - name: "MSSQL Connection Validation"
+    affects: [1, 2]
+    recommendation: "Story 1.5 must verify MSSQL connection before Story 2.1 attempts data extraction."
+    severity: high
+
+  - name: "Design System Consistency"
+    affects: [1, 2, 3, 4]
+    recommendation: "Story 1.6 (Industrial Clarity) must complete before any UI stories. Establishes color tokens, including Safety Red."
+    severity: medium
+
+  - name: "OpenAI API Key Configuration"
+    affects: [3, 4]
+    recommendation: "Configure OPENAI_API_KEY in Railway secrets before Epic 3 Story 3.5 and Epic 4 Story 4.1."
+    severity: medium
+
+  - name: "Authentication Flow Consistency"
+    affects: [1, 2, 3, 4]
+    recommendation: "All API endpoints must use Supabase JWT auth established in Story 1.2. Verify auth middleware before Epic 2 pipelines."
+    severity: high
+
+parallel_opportunities:
+  - scope: "within-epic"
+    epic: 1
+    stories: ["1-3", "1-4"]
+    reason: "Plant Object Model and Analytical Cache schemas can be created simultaneously (no FK dependencies between them)"
+
+  - scope: "within-epic"
+    epic: 1
+    stories: ["1-6", "1-5"]
+    reason: "Design System (frontend) and MSSQL Connection (backend) have no dependency on each other"
+
+  - scope: "within-epic"
+    epic: 2
+    stories: ["2-3", "2-4", "2-5"]
+    reason: "Dashboard views can be developed in parallel once Pipeline A (2.1) provides data"
+
+  - scope: "within-epic"
+    epic: 2
+    stories: ["2-7", "2-6"]
+    reason: "Financial calculator and Safety alert system work on different data domains"
+
+  - scope: "within-epic"
+    epic: 3
+    stories: ["3-3", "3-4"]
+    reason: "Action List View and Evidence Cards are UI components that can develop in parallel"
+
+  - scope: "within-epic"
+    epic: 4
+    stories: ["4-3", "4-2"]
+    reason: "Chat UI (frontend) and Text-to-SQL (backend) can develop in parallel after Mem0 setup"
+
+risk_areas:
+  - epic: 1
+    story: "1-5"
+    risk: "MSSQL connection may be blocked by network policies or credentials"
+    severity: high
+    mitigation: "Verify network access and credentials early. Have mock data fallback ready."
+
+  - epic: 2
+    story: "2-1"
+    risk: "MSSQL query performance may impact batch pipeline execution time"
+    severity: medium
+    mitigation: "Implement query timeouts and pagination. Test with production data volume estimates."
+
+  - epic: 2
+    story: "2-2"
+    risk: "15-minute polling may impact MSSQL source database performance"
+    severity: medium
+    mitigation: "Implement connection pooling. Coordinate with DBA on acceptable query frequency."
+
+  - epic: 3
+    story: "3-5"
+    risk: "LLM response quality depends on prompt engineering and context window limits"
+    severity: medium
+    mitigation: "Test with various production scenarios. Implement fallback to rule-based summaries."
+
+  - epic: 4
+    story: "4-1"
+    risk: "Mem0/Supabase pgvector configuration may require troubleshooting"
+    severity: medium
+    mitigation: "Follow official Mem0 Supabase documentation closely. Test vector operations in isolation first."
+
+  - epic: 4
+    story: "4-2"
+    risk: "LangChain Text-to-SQL may generate invalid or slow queries"
+    severity: high
+    mitigation: "Implement query validation and timeout. Review generated SQL before execution. Add rate limiting."
+
+estimated_execution:
+  total_stories: 26
+  complex_stories: 12  # Stories with high complexity or dependencies
+  low_risk_stories: 8
+  high_risk_stories: 6
+
+story_dependency_graph:
+  epic_1:
+    "1-1": []
+    "1-2": ["1-1"]
+    "1-3": ["1-1"]
+    "1-4": ["1-1"]
+    "1-5": ["1-1"]
+    "1-6": ["1-1"]
+    "1-7": ["1-1", "1-6"]
+
+  epic_2:
+    "2-1": ["1-1", "1-4", "1-5"]
+    "2-2": ["2-1"]
+    "2-3": ["2-1", "1-7"]
+    "2-4": ["2-1", "1-7"]
+    "2-5": ["2-1", "1-7"]
+    "2-6": ["1-4", "2-1"]
+    "2-7": ["1-3", "2-1"]
+    "2-8": ["2-7", "1-7"]
+    "2-9": ["2-2", "1-7"]
+
+  epic_3:
+    "3-1": ["1-3", "1-4", "2-1", "2-6", "2-7"]
+    "3-2": ["3-1"]
+    "3-3": ["3-2", "1-7"]
+    "3-4": ["3-2", "1-6"]
+    "3-5": ["3-1"]
+
+  epic_4:
+    "4-1": ["1-1", "1-2", "1-3"]
+    "4-2": ["4-1", "2-1"]
+    "4-3": ["4-1", "1-7"]
+    "4-4": ["4-1", "1-3"]
+    "4-5": ["4-1", "4-2"]
+
+context_handoff:
+  enabled: true
+  handoff_location: "{sprint_artifacts}/handoffs/"
+  template: |
+    # Epic {id} → Epic {next_id} Handoff
+
+    ## Patterns Established
+    - {patterns}
+
+    ## Key Decisions
+    - {decisions}
+
+    ## Gotchas & Lessons Learned
+    - {lessons}
+
+    ## Files to Reference
+    - {key_files}
+
+    ## Test Patterns
+    - {test_patterns}

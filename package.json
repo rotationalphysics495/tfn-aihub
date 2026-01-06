@@ -1,5 +1,5 @@
 {
-  "name": "manufacturing-assistant",
+  "name": "tfn-aihub",
   "private": true,
   "scripts": {
     "dev": "turbo dev",
