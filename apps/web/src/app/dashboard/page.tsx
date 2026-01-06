@@ -1,6 +1,16 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { LogoutButton } from './logout-button'
+import {
+  ActionListSection,
+  LivePulseSection,
+  FinancialWidgetsSection,
+} from '@/components/dashboard'
+
+export const metadata = {
+  title: 'Command Center | TFN AI Hub',
+  description: 'Manufacturing Performance Command Center - Your home base for critical manufacturing intelligence',
+}
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -24,6 +34,7 @@ export default async function DashboardPage() {
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
+                  aria-hidden="true"
                 >
                   <path
                     strokeLinecap="round"
@@ -37,117 +48,43 @@ export default async function DashboardPage() {
                 Manufacturing Performance Assistant
               </span>
             </div>
-            <div className="flex items-center gap-4">
+            <nav className="flex items-center gap-4" aria-label="Main navigation">
               <span className="text-sm text-muted-foreground">
                 {user.email}
               </span>
               <LogoutButton />
-            </div>
+            </nav>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Page Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground">
+          <h1 className="page-title text-foreground">
             Command Center
           </h1>
-          <p className="text-muted-foreground mt-1">
+          <p className="body-text text-muted-foreground mt-2">
             Welcome back. Here&apos;s your plant overview.
           </p>
         </div>
 
-        {/* Placeholder Content */}
+        {/* Dashboard Grid - Responsive layout */}
+        {/* Mobile: 1 column, Tablet (md): 2 columns, Desktop (lg): 3 columns */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Status Cards */}
-          <div className="bg-card border border-border rounded-lg p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                <svg
-                  className="w-5 h-5 text-green-600 dark:text-green-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 13l4 4L19 7"
-                  />
-                </svg>
-              </div>
-              <h2 className="text-lg font-semibold text-foreground">
-                Authentication Status
-              </h2>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              You are securely authenticated via Supabase Auth. Your session will persist across browser refreshes.
-            </p>
-          </div>
+          {/* Action List - Primary section spanning 2 columns on desktop */}
+          <ActionListSection />
 
-          <div className="bg-card border border-border rounded-lg p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                <svg
-                  className="w-5 h-5 text-blue-600 dark:text-blue-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                  />
-                </svg>
-              </div>
-              <h2 className="text-lg font-semibold text-foreground">
-                User Info
-              </h2>
-            </div>
-            <div className="space-y-2 text-sm">
-              <p className="text-muted-foreground">
-                <span className="text-foreground font-medium">ID:</span>{' '}
-                {user.id.slice(0, 8)}...
-              </p>
-              <p className="text-muted-foreground">
-                <span className="text-foreground font-medium">Email:</span>{' '}
-                {user.email}
-              </p>
-              <p className="text-muted-foreground">
-                <span className="text-foreground font-medium">Role:</span>{' '}
-                {user.role || 'authenticated'}
-              </p>
-            </div>
-          </div>
+          {/* Live Pulse - Real-time status section */}
+          <LivePulseSection />
 
-          <div className="bg-card border border-border rounded-lg p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                <svg
-                  className="w-5 h-5 text-amber-600 dark:text-amber-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-              </div>
-              <h2 className="text-lg font-semibold text-foreground">
-                Next Steps
-              </h2>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              Dashboard features coming soon. This page demonstrates successful authentication flow.
-            </p>
+          {/* Financial Widgets - Financial impact section */}
+          <FinancialWidgetsSection />
+
+          {/* Second Financial Widget slot for future expansion */}
+          <div className="hidden lg:block" aria-hidden="true">
+            {/* Reserved space for additional widgets */}
           </div>
         </div>
       </div>
