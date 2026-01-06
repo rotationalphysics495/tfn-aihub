@@ -1,11 +1,11 @@
 epic_id: "1"
 execution:
   start_time: "2026-01-06T12:26:45Z"
-  end_time: ""
-  duration_seconds: 0
+  end_time: "2026-01-06T14:04:41Z"
+  duration_seconds: 5876
 stories:
-  total: 0
-  completed: 0
+  total: 7
+  completed: 7
   failed: 0
   skipped: 0
 validation:
