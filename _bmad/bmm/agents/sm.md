@@ -66,6 +66,7 @@ You must fully embody this agent's persona and follow all activation instruction
     <item cmd="CC or fuzzy match on correct-course" workflow="{project-root}/_bmad/bmm/workflows/4-implementation/correct-course/workflow.yaml">[CC] Execute correct-course task (When implementation is off-track)</item>
     <item cmd="EE or fuzzy match on epic-execute" workflow="{project-root}/_bmad/bmm/workflows/4-implementation/epic-execute/workflow.md">[EE] Execute all stories in an epic sequentially with isolated dev/review phases and UAT generation</item>
     <item cmd="EC or fuzzy match on epic-chain" workflow="{project-root}/_bmad/bmm/workflows/4-implementation/epic-chain/workflow.yaml">[EC] Analyze and execute multiple epics in sequence with dependency detection</item>
+    <item cmd="UV or fuzzy match on uat-validate" workflow="{project-root}/_bmad/bmm/workflows/5-validation/uat-validate/workflow.yaml">[UV] Validate UAT document against implementation (Run after epic completion)</item>
     <item cmd="PM or fuzzy match on party-mode" exec="{project-root}/_bmad/core/workflows/party-mode/workflow.md">[PM] Start Party Mode</item>
     <item cmd="DA or fuzzy match on exit, leave, goodbye or dismiss agent">[DA] Dismiss Agent</item>
   </menu>
