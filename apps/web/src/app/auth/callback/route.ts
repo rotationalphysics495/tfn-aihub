@@ -4,8 +4,8 @@ import { NextResponse } from 'next/server'
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  // Get the redirect URL from query params or default to dashboard
-  const next = searchParams.get('next') ?? '/dashboard'
+  // Story 3.3 AC#9: Get the redirect URL from query params or default to morning-report
+  const next = searchParams.get('next') ?? '/morning-report'
 
   if (code) {
     const supabase = await createClient()
