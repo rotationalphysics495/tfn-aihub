@@ -231,6 +231,179 @@ class TestAssetFinancialContextEndpoint:
             assert data["is_estimated"] is True
 
 
+class TestCostOfLossEndpoint:
+    """Tests for GET /api/financial/cost-of-loss (Story 2.8, AC #7)."""
+
+    def test_cost_of_loss_requires_auth(self, client):
+        """Cost of loss endpoint requires authentication."""
+        response = client.get("/api/financial/cost-of-loss")
+        assert response.status_code == 401
+
+    def test_cost_of_loss_returns_correct_structure(self, client, mock_verify_jwt):
+        """AC#7: Response includes required fields."""
+        with patch('app.api.financial.get_supabase_client') as mock_supabase:
+            with patch('app.api.financial.get_financial_service') as mock_service:
+                mock_client = MagicMock()
+                mock_supabase.return_value = mock_client
+
+                # Mock daily_summaries response
+                mock_client.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [
+                    {
+                        "asset_id": "asset-1",
+                        "downtime_minutes": 60,
+                        "waste": 10,
+                        "financial_loss": 500.00,
+                        "oee_percentage": 75.0,
+                        "created_at": "2026-01-05T06:00:00Z",
+                    },
+                ]
+
+                mock_instance = MagicMock()
+                mock_instance.load_cost_centers = MagicMock()
+                mock_instance.get_hourly_rate = MagicMock(return_value=(Decimal("150.00"), False))
+                mock_instance.get_cost_per_unit = MagicMock(return_value=(Decimal("25.00"), False))
+                mock_instance.calculate_downtime_loss = MagicMock(return_value=Decimal("150.00"))
+                mock_instance.calculate_waste_loss = MagicMock(return_value=Decimal("250.00"))
+                mock_service.return_value = mock_instance
+
+                response = client.get(
+                    "/api/financial/cost-of-loss",
+                    headers={"Authorization": "Bearer test-token"}
+                )
+
+                assert response.status_code == 200
+                data = response.json()
+
+                # AC#7: Check required fields
+                assert "total_loss" in data
+                assert "breakdown" in data
+                assert "downtime_cost" in data["breakdown"]
+                assert "waste_cost" in data["breakdown"]
+                assert "oee_loss_cost" in data["breakdown"]
+                assert "period" in data
+                assert "last_updated" in data
+                assert data["period"] == "daily"
+
+    def test_cost_of_loss_with_period_daily(self, client, mock_verify_jwt):
+        """AC#7: Supports period=daily parameter for T-1 data."""
+        with patch('app.api.financial.get_supabase_client') as mock_supabase:
+            with patch('app.api.financial.get_financial_service') as mock_service:
+                mock_client = MagicMock()
+                mock_supabase.return_value = mock_client
+
+                mock_client.table.return_value.select.return_value.eq.return_value.execute.return_value.data = []
+
+                mock_instance = MagicMock()
+                mock_instance.load_cost_centers = MagicMock()
+                mock_service.return_value = mock_instance
+
+                response = client.get(
+                    "/api/financial/cost-of-loss?period=daily",
+                    headers={"Authorization": "Bearer test-token"}
+                )
+
+                assert response.status_code == 200
+                data = response.json()
+                assert data["period"] == "daily"
+
+    def test_cost_of_loss_with_period_live(self, client, mock_verify_jwt):
+        """AC#7: Supports period=live parameter for rolling data."""
+        with patch('app.api.financial.get_supabase_client') as mock_supabase:
+            with patch('app.api.financial.get_financial_service') as mock_service:
+                mock_client = MagicMock()
+                mock_supabase.return_value = mock_client
+
+                # Mock live_snapshots response
+                mock_client.table.return_value.select.return_value.order.return_value.execute.return_value.data = [
+                    {
+                        "asset_id": "asset-1",
+                        "financial_loss_dollars": 350.00,
+                        "snapshot_timestamp": "2026-01-06T10:00:00Z",
+                    },
+                ]
+
+                mock_instance = MagicMock()
+                mock_instance.load_cost_centers = MagicMock()
+                mock_service.return_value = mock_instance
+
+                response = client.get(
+                    "/api/financial/cost-of-loss?period=live",
+                    headers={"Authorization": "Bearer test-token"}
+                )
+
+                assert response.status_code == 200
+                data = response.json()
+                assert data["period"] == "live"
+                assert data["total_loss"] == 350.00
+
+    def test_cost_of_loss_with_asset_filter(self, client, mock_verify_jwt):
+        """AC#7: Supports optional asset_id filter."""
+        with patch('app.api.financial.get_supabase_client') as mock_supabase:
+            with patch('app.api.financial.get_financial_service') as mock_service:
+                mock_client = MagicMock()
+                mock_supabase.return_value = mock_client
+
+                mock_client.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = []
+
+                mock_instance = MagicMock()
+                mock_instance.load_cost_centers = MagicMock()
+                mock_service.return_value = mock_instance
+
+                response = client.get(
+                    "/api/financial/cost-of-loss?period=daily&asset_id=test-asset-id",
+                    headers={"Authorization": "Bearer test-token"}
+                )
+
+                assert response.status_code == 200
+
+    def test_cost_of_loss_calculates_breakdown(self, client, mock_verify_jwt):
+        """AC#1: Returns breakdown by loss category."""
+        with patch('app.api.financial.get_supabase_client') as mock_supabase:
+            with patch('app.api.financial.get_financial_service') as mock_service:
+                mock_client = MagicMock()
+                mock_supabase.return_value = mock_client
+
+                mock_client.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [
+                    {
+                        "asset_id": "asset-1",
+                        "downtime_minutes": 120,
+                        "waste": 20,
+                        "financial_loss": 800.00,
+                        "oee_percentage": 80.0,
+                        "created_at": "2026-01-05T06:00:00Z",
+                    },
+                ]
+
+                mock_instance = MagicMock()
+                mock_instance.load_cost_centers = MagicMock()
+                mock_instance.get_hourly_rate = MagicMock(return_value=(Decimal("150.00"), False))
+                mock_instance.get_cost_per_unit = MagicMock(return_value=(Decimal("25.00"), False))
+                mock_instance.calculate_downtime_loss = MagicMock(return_value=Decimal("300.00"))
+                mock_instance.calculate_waste_loss = MagicMock(return_value=Decimal("500.00"))
+                mock_service.return_value = mock_instance
+
+                response = client.get(
+                    "/api/financial/cost-of-loss",
+                    headers={"Authorization": "Bearer test-token"}
+                )
+
+                assert response.status_code == 200
+                data = response.json()
+                breakdown = data["breakdown"]
+
+                # Verify breakdown structure
+                assert "downtime_cost" in breakdown
+                assert "waste_cost" in breakdown
+                assert "oee_loss_cost" in breakdown
+
+                # Total should be sum of breakdown components
+                assert data["total_loss"] == (
+                    breakdown["downtime_cost"] +
+                    breakdown["waste_cost"] +
+                    breakdown["oee_loss_cost"]
+                )
+
+
 class TestFinancialAPIErrorHandling:
     """Tests for error handling in financial API."""
 
@@ -265,3 +438,15 @@ class TestFinancialAPIErrorHandling:
             )
 
             assert response.status_code == 503
+
+    def test_cost_of_loss_handles_service_error(self, client, mock_verify_jwt):
+        """Cost of loss returns 500 on service error."""
+        with patch('app.api.financial.get_supabase_client') as mock_supabase:
+            mock_supabase.side_effect = Exception("Database connection failed")
+
+            response = client.get(
+                "/api/financial/cost-of-loss",
+                headers={"Authorization": "Bearer test-token"}
+            )
+
+            assert response.status_code == 500

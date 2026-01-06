@@ -10,6 +10,8 @@ import {
   type ThroughputCardData,
   type ThroughputStatus,
 } from '@/components/production'
+import { CostOfLossWidget } from '@/components/financial'
+import { useCostOfLoss } from '@/hooks/useCostOfLoss'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -18,8 +20,10 @@ import { cn } from '@/lib/utils'
  * Throughput Dashboard Client Component
  *
  * Handles data fetching, state management, auto-refresh, and filtering.
+ * Includes Cost of Loss widget for financial context.
  *
  * @see Story 2.3 - Throughput Dashboard
+ * @see Story 2.8 - Cost of Loss Widget (AC #4 - Integration into Production Views)
  * @see AC #5 - Real-time Data Binding
  * @see NFR2 - 60 second latency requirement
  */
@@ -46,6 +50,13 @@ export function ThroughputDashboard() {
   // Filter state
   const [selectedArea, setSelectedArea] = useState<string | null>(null)
   const [selectedStatus, setSelectedStatus] = useState<ThroughputStatus | null>(null)
+
+  // Cost of Loss data - Live mode for throughput dashboard (Story 2.8, AC #4)
+  const costOfLoss = useCostOfLoss({
+    period: 'live',
+    autoFetch: true,
+    autoRefresh: true,
+  })
 
   const fetchThroughputData = useCallback(async (showRefreshing = false) => {
     if (showRefreshing) {
@@ -228,6 +239,17 @@ export function ThroughputDashboard() {
           isRefreshing={isRefreshing}
         />
       </div>
+
+      {/* Cost of Loss Widget - Story 2.8, AC #4 */}
+      <CostOfLossWidget
+        period="live"
+        data={costOfLoss.data}
+        isLoading={costOfLoss.isLoading}
+        error={costOfLoss.error}
+        lastUpdated={costOfLoss.lastUpdated}
+        showBreakdown={true}
+        autoRefresh={true}
+      />
 
       {/* Main Content */}
       {data?.assets && data.assets.length > 0 ? (

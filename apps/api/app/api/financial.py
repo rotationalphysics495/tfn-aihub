@@ -376,6 +376,181 @@ async def get_financial_summary(
         )
 
 
+# =============================================================================
+# Cost of Loss Widget Endpoint (Story 2.8)
+# =============================================================================
+
+
+class CostOfLossBreakdown(BaseModel):
+    """Breakdown of cost of loss by category."""
+
+    downtime_cost: float = Field(0.0, description="Loss from downtime events in dollars")
+    waste_cost: float = Field(0.0, description="Loss from waste/scrap in dollars")
+    oee_loss_cost: float = Field(0.0, description="Loss from OEE below target in dollars")
+
+
+class CostOfLossResponse(BaseModel):
+    """Response model for Cost of Loss widget data."""
+
+    total_loss: float = Field(0.0, description="Total financial loss in dollars")
+    breakdown: CostOfLossBreakdown = Field(default_factory=CostOfLossBreakdown, description="Breakdown by loss category")
+    period: str = Field(..., description="Period type: 'daily' or 'live'")
+    last_updated: str = Field(..., description="ISO timestamp of data freshness")
+
+
+@router.get(
+    "/cost-of-loss",
+    response_model=CostOfLossResponse,
+    summary="Get Cost of Loss Widget Data",
+    description="Get aggregated cost of loss data for the widget display. Supports daily (T-1) and live periods."
+)
+async def get_cost_of_loss(
+    period: Optional[str] = Query(
+        "daily",
+        description="Period type: 'daily' for T-1 data from daily_summaries, 'live' for rolling data from live_snapshots"
+    ),
+    asset_id: Optional[str] = Query(
+        None,
+        description="Optional asset ID filter for context-specific queries"
+    ),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> CostOfLossResponse:
+    """
+    Get cost of loss data for the widget.
+
+    Returns aggregated financial loss data including:
+    - Total loss across all categories
+    - Breakdown by downtime, waste, and OEE loss
+    - Period type and last updated timestamp
+
+    Query Parameters:
+        - period: 'daily' (default) or 'live'
+        - asset_id: Optional filter for specific asset
+
+    Returns:
+        CostOfLossResponse with total loss, breakdown, and metadata
+
+    Story: 2.8 - Cost of Loss Widget
+    AC: #7 - API Endpoint for Widget Data
+    """
+    from datetime import datetime
+
+    try:
+        settings = get_settings()
+        client = await get_supabase_client()
+        service = get_financial_service()
+        service.load_cost_centers()
+
+        use_live = period == "live"
+        yesterday = date.today() - timedelta(days=1)
+
+        total_downtime_cost = 0.0
+        total_waste_cost = 0.0
+        total_oee_loss_cost = 0.0
+        last_updated_ts = datetime.utcnow().isoformat() + "Z"
+
+        if use_live:
+            # Query live_snapshots for rolling data
+            query = client.table("live_snapshots").select(
+                "asset_id, financial_loss_dollars, snapshot_timestamp"
+            )
+
+            if asset_id:
+                query = query.eq("asset_id", asset_id)
+
+            # Get the latest snapshot per asset
+            response = query.order("snapshot_timestamp", desc=True).execute()
+
+            # Aggregate by asset (take latest per asset)
+            seen_assets = set()
+            for record in response.data or []:
+                rec_asset_id = record.get("asset_id")
+                if rec_asset_id in seen_assets:
+                    continue
+                seen_assets.add(rec_asset_id)
+
+                financial_loss = record.get("financial_loss_dollars") or 0.0
+                # For live snapshots, we only have total loss - attribute to downtime primarily
+                total_downtime_cost += financial_loss
+
+                # Update last_updated if we have a timestamp
+                ts = record.get("snapshot_timestamp")
+                if ts:
+                    last_updated_ts = ts
+
+        else:
+            # Query daily_summaries for T-1 data
+            query = client.table("daily_summaries").select(
+                "asset_id, downtime_minutes, waste, financial_loss, oee_percentage, created_at"
+            ).eq("date", yesterday.isoformat())
+
+            if asset_id:
+                query = query.eq("asset_id", asset_id)
+
+            response = query.execute()
+
+            for record in response.data or []:
+                rec_asset_id = record.get("asset_id")
+                downtime_minutes = record.get("downtime_minutes") or 0
+                waste_count = record.get("waste") or 0
+                oee_percentage = record.get("oee_percentage") or 0.0
+
+                # Get rates for this asset
+                from decimal import Decimal
+                hourly_rate, _ = service.get_hourly_rate(rec_asset_id)
+                cost_per_unit, _ = service.get_cost_per_unit(rec_asset_id)
+
+                # Calculate downtime cost
+                downtime_cost = service.calculate_downtime_loss(downtime_minutes, hourly_rate)
+                total_downtime_cost += float(downtime_cost)
+
+                # Calculate waste cost
+                waste_cost = service.calculate_waste_loss(waste_count, cost_per_unit)
+                total_waste_cost += float(waste_cost)
+
+                # Calculate OEE loss cost (loss due to OEE below 100%)
+                # OEE loss represents the opportunity cost of not running at full efficiency
+                # We calculate this as: (1 - OEE) * potential_value
+                # For simplicity, we use a fraction of hourly rate as proxy
+                if oee_percentage < 100:
+                    oee_gap = (100 - oee_percentage) / 100
+                    # Assume 8-hour shift basis for daily calculation
+                    potential_hours = 8.0
+                    oee_loss = oee_gap * float(hourly_rate) * potential_hours * 0.25  # 25% attribution
+                    total_oee_loss_cost += oee_loss
+
+                # Update last_updated from record
+                ts = record.get("created_at")
+                if ts:
+                    last_updated_ts = ts
+
+            # If no records, default timestamp to yesterday 6 AM
+            if not response.data:
+                last_updated_ts = f"{yesterday.isoformat()}T06:00:00Z"
+
+        total_loss = total_downtime_cost + total_waste_cost + total_oee_loss_cost
+
+        return CostOfLossResponse(
+            total_loss=round(total_loss, 2),
+            breakdown=CostOfLossBreakdown(
+                downtime_cost=round(total_downtime_cost, 2),
+                waste_cost=round(total_waste_cost, 2),
+                oee_loss_cost=round(total_oee_loss_cost, 2),
+            ),
+            period=period or "daily",
+            last_updated=last_updated_ts,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching cost of loss: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch cost of loss data"
+        )
+
+
 @router.get(
     "/context/{asset_id}",
     response_model=AssetFinancialContext,

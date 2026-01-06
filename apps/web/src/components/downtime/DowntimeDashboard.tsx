@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/badge'
 import { ParetoChart, type ParetoItem } from './ParetoChart'
 import { DowntimeTable, type DowntimeEvent } from './DowntimeTable'
 import { CostOfLossWidget, type CostOfLossSummaryData } from './CostOfLossWidget'
+import { CostOfLossWidget as FinancialCostOfLossWidget } from '@/components/financial'
+import { useCostOfLoss } from '@/hooks/useCostOfLoss'
 import { TimeWindowToggle } from './TimeWindowToggle'
 import { DowntimeFilterBar } from './DowntimeFilterBar'
 import { SafetyEventModal, type SafetyEventDetail } from './SafetyEventModal'
@@ -17,8 +19,10 @@ import { SafetyEventModal, type SafetyEventDetail } from './SafetyEventModal'
  *
  * Main container for Downtime Pareto Analysis.
  * Handles data fetching, state management, auto-refresh, and filtering.
+ * Includes Financial Cost of Loss widget for breakdown view.
  *
  * @see Story 2.5 - Downtime Pareto Analysis
+ * @see Story 2.8 - Cost of Loss Widget (AC #4 - Integration into Production Views)
  * @see AC #7 - Time Window Toggle with auto-refresh for Live view
  */
 
@@ -58,6 +62,13 @@ export function DowntimeDashboard() {
 
   const [activeView, setActiveView] = useState<DataView>('yesterday')
   const [selectedArea, setSelectedArea] = useState<string | null>(null)
+
+  // Financial Cost of Loss data - matches activeView (Story 2.8, AC #4)
+  const financialCostOfLoss = useCostOfLoss({
+    period: activeView === 'live' ? 'live' : 'daily',
+    autoFetch: true,
+    autoRefresh: activeView === 'live',
+  })
 
   // Safety modal state
   const [selectedSafetyEvent, setSelectedSafetyEvent] = useState<SafetyEventDetail | null>(null)
@@ -324,12 +335,26 @@ export function DowntimeDashboard() {
         </div>
       </div>
 
-      {/* Cost of Loss Summary Widget */}
-      <CostOfLossWidget
-        data={summaryData}
-        isLive={isLive}
-        isLoading={isLoading}
-      />
+      {/* Cost of Loss Widgets - Grid layout for both summary and breakdown views */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Downtime Summary Widget (from Story 2.5) */}
+        <CostOfLossWidget
+          data={summaryData}
+          isLive={isLive}
+          isLoading={isLoading}
+        />
+
+        {/* Financial Breakdown Widget (Story 2.8, AC #4) */}
+        <FinancialCostOfLossWidget
+          period={isLive ? 'live' : 'daily'}
+          data={financialCostOfLoss.data}
+          isLoading={financialCostOfLoss.isLoading}
+          error={financialCostOfLoss.error}
+          lastUpdated={financialCostOfLoss.lastUpdated}
+          showBreakdown={true}
+          autoRefresh={isLive}
+        />
+      </div>
 
       {/* Filter Bar */}
       <DowntimeFilterBar
