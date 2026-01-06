@@ -12,6 +12,8 @@ import { Badge } from "@/components/ui/badge"
  *
  * @see Story 1.7 - Command Center UI Shell
  * @see Story 2.3 - Throughput Dashboard (now links to production throughput)
+ * @see Story 2.4 - OEE Metrics View
+ * @see Story 2.5 - Downtime Pareto Analysis
  */
 export function LivePulseSection() {
   return (
@@ -78,11 +80,14 @@ export function LivePulseSection() {
               </svg>
             </Link>
 
-            {/* Placeholder for OEE Metrics (Story 2.4) */}
-            <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50 border border-border opacity-60">
-              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+            {/* OEE Metrics Link */}
+            <Link
+              href="/dashboard/production/oee"
+              className="group flex items-center gap-3 p-4 rounded-lg bg-live-surface/50 dark:bg-live-surface-dark/50 border border-live-border dark:border-live-border-dark hover:bg-live-surface dark:hover:bg-live-surface-dark transition-colors"
+            >
+              <div className="w-10 h-10 rounded-full bg-live-primary/20 flex items-center justify-center group-hover:bg-live-primary/30 transition-colors">
                 <svg
-                  className="w-5 h-5 text-muted-foreground"
+                  className="w-5 h-5 text-live-primary"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -103,14 +108,73 @@ export function LivePulseSection() {
                 </svg>
               </div>
               <div className="flex-1">
-                <p className="font-semibold text-foreground">
+                <p className="font-semibold text-foreground group-hover:text-live-primary transition-colors">
                   OEE Metrics
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Coming in Story 2.4
+                  Availability, performance &amp; quality
                 </p>
               </div>
-            </div>
+              <svg
+                className="w-5 h-5 text-muted-foreground group-hover:text-live-primary transition-colors"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
+            </Link>
+
+            {/* Downtime Analysis Link */}
+            <Link
+              href="/dashboard/production/downtime"
+              className="group flex items-center gap-3 p-4 rounded-lg bg-live-surface/50 dark:bg-live-surface-dark/50 border border-live-border dark:border-live-border-dark hover:bg-live-surface dark:hover:bg-live-surface-dark transition-colors"
+            >
+              <div className="w-10 h-10 rounded-full bg-live-primary/20 flex items-center justify-center group-hover:bg-live-primary/30 transition-colors">
+                <svg
+                  className="w-5 h-5 text-live-primary"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-foreground group-hover:text-live-primary transition-colors">
+                  Downtime Analysis
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Pareto charts by reason code
+                </p>
+              </div>
+              <svg
+                className="w-5 h-5 text-muted-foreground group-hover:text-live-primary transition-colors"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5l7 7-7 7"
+                />
+              </svg>
+            </Link>
           </div>
         </CardContent>
       </Card>
