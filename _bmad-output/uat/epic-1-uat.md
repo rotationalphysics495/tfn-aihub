@@ -174,10 +174,15 @@ You will need a test account to perform these tests. Contact your IT administrat
 
 **Objective:** Verify the system health status endpoint is accessible.
 
+**Automated Verification:**
+```bash
+npm run test:run --prefix apps/web -- --reporter=verbose src/app/api/health/route.test.ts
+```
+
 | Step | Action | Expected Result |
 |------|--------|-----------------|
-| 8.1 | In a new browser tab, navigate to: `[application-url]/api/health` | A response appears (may show as JSON text) |
-| 8.2 | Look for status information | Response includes `"status": "healthy"` or similar positive indicator |
+| 8.1 | In a new browser tab, navigate to: {YOUR-APP-URL}/api/health | A response appears (may show as JSON text) |
+| 8.2 | Look for status information | Response includes "status": "healthy" or similar positive indicator |
 | 8.3 | If database status is shown, note it | Database status shows "healthy", "not configured", or connection information |
 
 **Pass Criteria:** Health endpoint responds and shows system is operational.
