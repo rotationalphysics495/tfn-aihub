@@ -1,8 +1,10 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from functools import lru_cache
 
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(env_file=".env")
+
     # Application
     app_name: str = "Manufacturing Performance Assistant"
     debug: bool = False
@@ -19,9 +21,6 @@ class Settings(BaseSettings):
 
     # OpenAI (for LangChain)
     openai_api_key: str = ""
-
-    class Config:
-        env_file = ".env"
 
 
 @lru_cache()

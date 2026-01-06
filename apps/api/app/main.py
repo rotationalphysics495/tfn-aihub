@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import health, assets, summaries, actions
+from app.api import health, assets, summaries, actions, auth
 
 app = FastAPI(
     title="Manufacturing Performance Assistant API",
@@ -23,6 +23,7 @@ app.include_router(health.router, tags=["Health"])
 app.include_router(assets.router, prefix="/api/assets", tags=["Assets"])
 app.include_router(summaries.router, prefix="/api/summaries", tags=["Summaries"])
 app.include_router(actions.router, prefix="/api/actions", tags=["Actions"])
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 
 
 @app.get("/")
