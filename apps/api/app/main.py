@@ -2,7 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import health, assets, summaries, actions, auth
+from app.api import health, assets, summaries, actions, auth, pipelines
 from app.core.database import initialize_database, shutdown_database
 
 
@@ -38,6 +38,7 @@ app.include_router(assets.router, prefix="/api/assets", tags=["Assets"])
 app.include_router(summaries.router, prefix="/api/summaries", tags=["Summaries"])
 app.include_router(actions.router, prefix="/api/actions", tags=["Actions"])
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
+app.include_router(pipelines.router, prefix="/api/pipelines", tags=["Pipelines"])
 
 
 @app.get("/")

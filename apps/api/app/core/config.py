@@ -35,6 +35,12 @@ class Settings(BaseSettings):
     # OpenAI (for LangChain)
     openai_api_key: str = ""
 
+    # Pipeline Configuration
+    pipeline_timezone: str = "America/Chicago"
+    safety_reason_code: str = "Safety Issue"
+    pipeline_retry_count: int = 3
+    pipeline_log_level: str = "INFO"
+
     @property
     def mssql_connection_string(self) -> str:
         """Build MSSQL connection string with proper URL encoding for special characters."""
