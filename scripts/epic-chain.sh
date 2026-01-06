@@ -596,7 +596,7 @@ for current_idx in "${!EXECUTION_ORDER[@]}"; do
                     if [ "$UAT_GATE_ENABLED" = true ]; then
                         if echo "$uat_output" | grep -q "UAT_GATE_RESULT: PASS"; then
                             uat_status="PASS"
-                            local fix_count=$(echo "$uat_output" | grep -oE "UAT_FIX_ATTEMPTS: [0-9]+" | grep -oE "[0-9]+" || echo "0")
+                            fix_count=$(echo "$uat_output" | grep -oE "UAT_FIX_ATTEMPTS: [0-9]+" | grep -oE "[0-9]+" || echo "0")
                             if [ "$fix_count" -gt 0 ]; then
                                 uat_status="PASS (after $fix_count fix attempts)"
                                 uat_fix_info="Self-healing fixes were applied. Review fix contexts at:

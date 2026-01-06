@@ -46,6 +46,14 @@ class Settings(BaseSettings):
     default_cost_per_unit: float = 10.00
     financial_currency: str = "USD"
 
+    # Action Engine Configuration (Story 3.1)
+    target_oee_percentage: float = 85.0
+    financial_loss_threshold: float = 1000.0
+    oee_high_gap_threshold: float = 20.0
+    oee_medium_gap_threshold: float = 10.0
+    financial_high_threshold: float = 5000.0
+    financial_medium_threshold: float = 2000.0
+
     @property
     def mssql_connection_string(self) -> str:
         """Build MSSQL connection string with proper URL encoding for special characters."""

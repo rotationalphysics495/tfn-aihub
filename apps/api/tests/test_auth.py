@@ -108,13 +108,29 @@ class TestProtectedActionEndpoints:
 
     def test_list_actions_without_token(self, client):
         """AC#4: Should reject unauthenticated requests to actions with 401."""
-        response = client.get("/api/actions/")
+        response = client.get("/api/actions/daily")
         assert response.status_code == 401
 
-    def test_list_actions_with_valid_token(self, client, mock_verify_jwt):
+    def test_list_actions_with_valid_token(self, client, mock_verify_jwt, mock_action_engine):
         """AC#3: Should allow access with valid token."""
+        from unittest.mock import AsyncMock, MagicMock
+        from datetime import date, datetime, timedelta
+        from app.schemas.action import ActionListResponse
+
+        # Mock the action engine response
+        mock_action_engine.generate_action_list = AsyncMock(
+            return_value=ActionListResponse(
+                actions=[],
+                generated_at=datetime.utcnow(),
+                report_date=date.today() - timedelta(days=1),
+                total_count=0,
+                counts_by_category={"safety": 0, "oee": 0, "financial": 0}
+            )
+        )
+        mock_action_engine._get_config = MagicMock(return_value=MagicMock())
+
         response = client.get(
-            "/api/actions/", headers={"Authorization": "Bearer valid-token"}
+            "/api/actions/daily", headers={"Authorization": "Bearer valid-token"}
         )
         assert response.status_code == 200
 

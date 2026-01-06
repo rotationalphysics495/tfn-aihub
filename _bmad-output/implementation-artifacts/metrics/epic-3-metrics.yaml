@@ -1,0 +1,15 @@
+epic_id: "3"
+execution:
+  start_time: "2026-01-06T19:43:18Z"
+  end_time: ""
+  duration_seconds: 0
+stories:
+  total: 0
+  completed: 0
+  failed: 0
+  skipped: 0
+validation:
+  gate_executed: false
+  gate_status: "PENDING"
+  fix_attempts: 0
+issues: []

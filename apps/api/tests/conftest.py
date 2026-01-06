@@ -93,3 +93,12 @@ def mock_verify_jwt_invalid():
             headers={"WWW-Authenticate": "Bearer"},
         )
         yield mock
+
+
+@pytest.fixture
+def mock_action_engine():
+    """Mock ActionEngine for API tests."""
+    with patch('app.api.actions.get_action_engine') as mock_get:
+        mock_engine = MagicMock()
+        mock_get.return_value = mock_engine
+        yield mock_engine
