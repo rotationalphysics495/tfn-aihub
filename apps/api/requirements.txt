@@ -14,6 +14,7 @@ langchain>=0.1.0
 langchain-openai>=0.0.5
 mem0ai>=0.0.5
 arq>=0.25.0
+APScheduler>=3.10.0
 pandas>=2.0.0
 tenacity>=8.2.0
 pytz>=2024.1

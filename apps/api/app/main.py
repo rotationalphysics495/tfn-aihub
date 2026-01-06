@@ -1,9 +1,15 @@
+import logging
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import health, assets, summaries, actions, auth, pipelines
 from app.core.database import initialize_database, shutdown_database
+from app.services.scheduler import get_scheduler
+from app.services.pipelines.live_pulse import run_live_pulse_poll
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -11,7 +17,25 @@ async def lifespan(app: FastAPI):
     """Application lifespan handler for startup and shutdown events."""
     # Startup: Initialize database connections
     initialize_database()
+
+    # Startup: Initialize and start the polling scheduler
+    scheduler = get_scheduler()
+    scheduler.set_poll_job(run_live_pulse_poll)
+    try:
+        await scheduler.start()
+        logger.info("Live Pulse polling scheduler started")
+    except Exception as e:
+        logger.warning(f"Failed to start polling scheduler: {e}")
+
     yield
+
+    # Shutdown: Stop the polling scheduler
+    try:
+        await scheduler.shutdown(wait=True)
+        logger.info("Live Pulse polling scheduler stopped")
+    except Exception as e:
+        logger.warning(f"Error shutting down scheduler: {e}")
+
     # Shutdown: Clean up database connections
     shutdown_database()
 

@@ -9,6 +9,8 @@ import os
 # Set test environment variables before importing app
 os.environ["SUPABASE_URL"] = "https://test-project.supabase.co"
 os.environ["SUPABASE_KEY"] = "test-key"
+# Disable scheduler startup on test to avoid blocking
+os.environ["POLL_RUN_ON_STARTUP"] = "false"
 
 from app.main import app
 
@@ -25,8 +27,24 @@ def client():
             "message": "MSSQL connection not configured",
             "connected": False,
         }
-        with TestClient(app) as test_client:
-            yield test_client
+        # Mock the scheduler to avoid starting it during tests
+        with patch("app.services.scheduler.get_scheduler") as mock_sched:
+            mock_scheduler = MagicMock()
+            mock_scheduler.start = AsyncMock()
+            mock_scheduler.shutdown = AsyncMock()
+            mock_scheduler.status.to_dict.return_value = {
+                "status": "stopped",
+                "last_poll_timestamp": None,
+                "last_poll_success": True,
+                "last_poll_duration_seconds": None,
+                "last_error_message": None,
+                "polls_executed": 0,
+                "polls_failed": 0,
+                "next_poll_scheduled": None,
+            }
+            mock_sched.return_value = mock_scheduler
+            with TestClient(app) as test_client:
+                yield test_client
 
 
 @pytest.fixture
