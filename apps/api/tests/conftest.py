@@ -3,7 +3,7 @@ Pytest configuration and fixtures for API tests.
 """
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch, AsyncMock
+from unittest.mock import patch, AsyncMock, MagicMock
 import os
 
 # Set test environment variables before importing app
@@ -16,7 +16,17 @@ from app.main import app
 @pytest.fixture
 def client():
     """Create a test client for the FastAPI app."""
-    return TestClient(app)
+    # Mock the database initialization to avoid actual connection attempts
+    with patch("app.core.database.mssql_db") as mock_db:
+        mock_db.initialize = MagicMock()
+        mock_db.dispose = MagicMock()
+        mock_db.check_health.return_value = {
+            "status": "not_configured",
+            "message": "MSSQL connection not configured",
+            "connected": False,
+        }
+        with TestClient(app) as test_client:
+            yield test_client
 
 
 @pytest.fixture

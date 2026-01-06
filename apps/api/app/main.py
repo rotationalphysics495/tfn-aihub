@@ -1,12 +1,26 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import health, assets, summaries, actions, auth
+from app.core.database import initialize_database, shutdown_database
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan handler for startup and shutdown events."""
+    # Startup: Initialize database connections
+    initialize_database()
+    yield
+    # Shutdown: Clean up database connections
+    shutdown_database()
+
 
 app = FastAPI(
     title="Manufacturing Performance Assistant API",
     description="Backend API for plant performance monitoring and insights",
     version="0.1.0",
+    lifespan=lifespan,
 )
 
 # CORS configuration

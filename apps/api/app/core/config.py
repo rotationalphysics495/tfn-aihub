@@ -1,5 +1,8 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import field_validator
 from functools import lru_cache
+from urllib.parse import quote_plus
+from typing import Optional
 
 
 class Settings(BaseSettings):
@@ -13,14 +16,51 @@ class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_key: str = ""
 
-    # MSSQL (Read-Only)
-    mssql_connection_string: str = ""
+    # MSSQL (Read-Only) - Individual environment variables
+    mssql_server: str = ""
+    mssql_database: str = ""
+    mssql_user: str = ""
+    mssql_password: str = ""
+    mssql_port: int = 1433
+    mssql_driver: str = "ODBC Driver 18 for SQL Server"
+
+    # Connection Pool Settings
+    mssql_pool_size: int = 5
+    mssql_max_overflow: int = 10
+    mssql_pool_timeout: int = 30
 
     # Mem0
     mem0_api_key: str = ""
 
     # OpenAI (for LangChain)
     openai_api_key: str = ""
+
+    @property
+    def mssql_connection_string(self) -> str:
+        """Build MSSQL connection string with proper URL encoding for special characters."""
+        if not all([self.mssql_server, self.mssql_database, self.mssql_user, self.mssql_password]):
+            return ""
+
+        # URL-encode password to handle special characters
+        encoded_password = quote_plus(self.mssql_password)
+        encoded_user = quote_plus(self.mssql_user)
+        encoded_driver = quote_plus(self.mssql_driver)
+
+        return (
+            f"mssql+pyodbc://{encoded_user}:{encoded_password}"
+            f"@{self.mssql_server}:{self.mssql_port}/{self.mssql_database}"
+            f"?driver={encoded_driver}&TrustServerCertificate=yes"
+        )
+
+    @property
+    def mssql_configured(self) -> bool:
+        """Check if MSSQL connection is properly configured."""
+        return all([
+            self.mssql_server,
+            self.mssql_database,
+            self.mssql_user,
+            self.mssql_password
+        ])
 
 
 @lru_cache()
