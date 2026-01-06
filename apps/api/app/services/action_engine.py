@@ -45,7 +45,7 @@ class ActionEngine:
     """
     Action Engine for prioritizing operational issues.
 
-    Processes daily_summaries, safety_events, and cost_centers data
+    Processes daily_summaries, safety_events, shift_targets, and cost_centers data
     to generate a prioritized action list.
 
     Priority tiers (absolute ordering):
@@ -56,6 +56,10 @@ class ActionEngine:
     Within each tier, items are sorted by their respective severity/impact.
     Assets appearing in multiple categories are deduplicated, keeping
     the highest priority category with evidence refs from other categories.
+
+    Story 3.2 AC#2: Queries daily_summaries, safety_events, shift_targets, and cost_centers.
+    Story 3.2 AC#4: Compares OEE against shift_targets per asset.
+    Story 3.2 AC#6: Sorts by safety first, then by financial_impact_usd descending.
     """
 
     def __init__(
@@ -73,6 +77,8 @@ class ActionEngine:
         self._client = supabase_client
         self._config = config
         self._assets_cache: Dict[str, dict] = {}
+        self._shift_targets_cache: Dict[str, dict] = {}
+        self._cost_centers_cache: Dict[str, dict] = {}
         self._cache_timestamp: Optional[datetime] = None
         self._cache_ttl_seconds: int = 300  # 5 minute cache
 
@@ -146,6 +152,79 @@ class ActionEngine:
 
         except Exception as e:
             logger.error(f"Failed to load assets: {e}")
+            return {}
+
+    async def _load_shift_targets(self, force: bool = False) -> Dict[str, dict]:
+        """
+        Load shift target information from Supabase with caching.
+
+        Story 3.2 AC#4: Queries shift_targets table for per-asset OEE targets.
+
+        Returns:
+            Dictionary mapping asset_id to shift target info (target_oee, target_output)
+        """
+        if not force and self._is_cache_valid() and self._shift_targets_cache:
+            return self._shift_targets_cache
+
+        try:
+            client = self._get_client()
+            response = client.table("shift_targets").select(
+                "id, asset_id, target_output, target_oee, shift, effective_date"
+            ).execute()
+
+            self._shift_targets_cache = {}
+            for target in response.data or []:
+                asset_id = target.get("asset_id")
+                if asset_id:
+                    # Use most recent effective_date per asset
+                    if asset_id not in self._shift_targets_cache:
+                        self._shift_targets_cache[asset_id] = target
+                    else:
+                        current_date = self._shift_targets_cache[asset_id].get("effective_date")
+                        new_date = target.get("effective_date")
+                        if new_date and (not current_date or new_date > current_date):
+                            self._shift_targets_cache[asset_id] = target
+
+            logger.debug(f"Loaded {len(self._shift_targets_cache)} shift targets for Action Engine")
+            return self._shift_targets_cache
+
+        except Exception as e:
+            logger.error(f"Failed to load shift targets: {e}")
+            return {}
+
+    async def _load_cost_centers(self, force: bool = False) -> Dict[str, dict]:
+        """
+        Load cost center information from Supabase with caching.
+
+        Story 3.2 AC#2: Queries cost_centers table for financial calculations.
+
+        Returns:
+            Dictionary mapping asset_id to cost center info (standard_hourly_rate)
+        """
+        if not force and self._is_cache_valid() and self._cost_centers_cache:
+            return self._cost_centers_cache
+
+        try:
+            client = self._get_client()
+            response = client.table("cost_centers").select(
+                "id, asset_id, standard_hourly_rate, cost_per_unit"
+            ).execute()
+
+            self._cost_centers_cache = {}
+            for center in response.data or []:
+                asset_id = center.get("asset_id")
+                if asset_id:
+                    self._cost_centers_cache[asset_id] = {
+                        "id": center.get("id"),
+                        "standard_hourly_rate": center.get("standard_hourly_rate", 100.0),
+                        "cost_per_unit": center.get("cost_per_unit", 10.0),
+                    }
+
+            logger.debug(f"Loaded {len(self._cost_centers_cache)} cost centers for Action Engine")
+            return self._cost_centers_cache
+
+        except Exception as e:
+            logger.error(f"Failed to load cost centers: {e}")
             return {}
 
     def _generate_action_id(self, category: ActionCategory, asset_id: str) -> str:
@@ -265,37 +344,49 @@ class ActionEngine:
         target_date: date,
         assets_map: Dict[str, dict],
         config: Optional[ActionEngineConfig] = None,
+        shift_targets_map: Optional[Dict[str, dict]] = None,
+        cost_centers_map: Optional[Dict[str, dict]] = None,
     ) -> List[ActionItem]:
         """
         Get action items for assets with OEE below target (Tier 2).
 
-        AC #3: Assets with OEE below target are included, sorted by gap magnitude.
+        Story 3.1 AC#3: Assets with OEE below target are included, sorted by gap magnitude.
+        Story 3.2 AC#4: Compares OEE against shift_targets per asset.
+        Story 3.2 AC#6: Includes financial_impact_usd for sorting.
 
         Args:
             target_date: The report date to query
             assets_map: Asset ID to info mapping
             config: Optional config to use (defaults to instance config)
+            shift_targets_map: Optional shift targets per asset (loaded if not provided)
+            cost_centers_map: Optional cost centers per asset (loaded if not provided)
 
         Returns:
-            List of ActionItems for OEE gaps, sorted by gap (worst first)
+            List of ActionItems for OEE gaps, sorted by financial impact (highest first)
         """
         try:
             client = self._get_client()
             config = config if config is not None else self._get_config()
-            target_oee = config.target_oee_percentage
+            default_target_oee = config.target_oee_percentage
 
-            # Query daily_summaries for the target date with OEE below target
+            # Load shift targets and cost centers if not provided (Story 3.2 AC#2, AC#4)
+            if shift_targets_map is None:
+                shift_targets_map = await self._load_shift_targets()
+            if cost_centers_map is None:
+                cost_centers_map = await self._load_cost_centers()
+
+            # Query all daily_summaries for the target date (filter by per-asset target later)
             query = client.table("daily_summaries").select(
-                "id, asset_id, report_date, oee_percentage, actual_output, target_output"
+                "id, asset_id, report_date, oee_percentage, actual_output, target_output, "
+                "financial_loss_dollars, downtime_minutes"
             )
             query = query.eq("report_date", target_date.isoformat())
-            query = query.lt("oee_percentage", target_oee)
 
             response = query.execute()
             records = response.data or []
 
             if not records:
-                logger.debug(f"No OEE below target for {target_date}")
+                logger.debug(f"No daily summaries for {target_date}")
                 return []
 
             actions = []
@@ -304,11 +395,38 @@ class ActionEngine:
                 asset_info = assets_map.get(asset_id, {"name": "Unknown"})
 
                 oee_pct = record.get("oee_percentage", 0) or 0
-                gap = target_oee - oee_pct
-                actual_output = record.get("actual_output", 0)
-                target_output = record.get("target_output", 0)
 
-                # Determine priority based on gap severity (AC #3)
+                # Story 3.2 AC#4: Get target from shift_targets per asset
+                shift_target = shift_targets_map.get(asset_id, {})
+                target_oee = shift_target.get("target_oee") or default_target_oee
+
+                # Only include if OEE is below this asset's target
+                if oee_pct >= target_oee:
+                    continue
+
+                gap = target_oee - oee_pct
+                actual_output = record.get("actual_output", 0) or 0
+                target_output = record.get("target_output") or shift_target.get("target_output", 0) or 0
+
+                # Calculate financial impact based on lost production (Story 3.2 AC#6)
+                cost_center = cost_centers_map.get(asset_id, {})
+                hourly_rate = cost_center.get("standard_hourly_rate", 100.0)
+                cost_per_unit = cost_center.get("cost_per_unit", 10.0)
+
+                # Financial impact = (target - actual) * cost_per_unit
+                # Or use existing financial_loss_dollars if available
+                existing_loss = record.get("financial_loss_dollars", 0) or 0
+                if existing_loss > 0:
+                    financial_impact = existing_loss
+                elif target_output > 0 and actual_output < target_output:
+                    units_lost = target_output - actual_output
+                    financial_impact = units_lost * cost_per_unit
+                else:
+                    # Estimate based on downtime
+                    downtime_minutes = record.get("downtime_minutes", 0) or 0
+                    financial_impact = (downtime_minutes / 60) * hourly_rate
+
+                # Determine priority based on gap severity (Story 3.1 AC#3)
                 if gap >= config.oee_high_gap_threshold:
                     priority = PriorityLevel.HIGH
                 elif gap >= config.oee_medium_gap_threshold:
@@ -316,14 +434,28 @@ class ActionEngine:
                 else:
                     priority = PriorityLevel.LOW
 
-                # Build evidence reference
-                evidence_ref = EvidenceRef(
-                    source_table="daily_summaries",
-                    record_id=str(record.get("id", "")),
-                    metric_name="oee_gap",
-                    metric_value=f"{gap:.1f}%",
-                    context=f"OEE {oee_pct:.1f}% vs target {target_oee:.1f}%",
-                )
+                # Build evidence references (Story 3.2 AC#9)
+                evidence_refs = [
+                    EvidenceRef(
+                        source_table="daily_summaries",
+                        record_id=str(record.get("id", "")),
+                        metric_name="oee_percentage",
+                        metric_value=f"{oee_pct:.1f}%",
+                        context=f"OEE {oee_pct:.1f}% vs target {target_oee:.1f}%",
+                    )
+                ]
+
+                # Add shift_target evidence if available (Story 3.2 AC#9)
+                if shift_target.get("id"):
+                    evidence_refs.append(
+                        EvidenceRef(
+                            source_table="shift_targets",
+                            record_id=str(shift_target.get("id", "")),
+                            metric_name="target_oee",
+                            metric_value=f"{target_oee:.1f}%",
+                            context=f"Target for {asset_info.get('name', 'Unknown')}",
+                        )
+                    )
 
                 action = ActionItem(
                     id=self._generate_action_id(ActionCategory.OEE, asset_id),
@@ -334,12 +466,13 @@ class ActionEngine:
                     primary_metric_value=f"OEE: {oee_pct:.1f}%",
                     recommendation_text=f"Review performance on {asset_info.get('name', 'Unknown')} - {gap:.1f}% below target",
                     evidence_summary=f"OEE {gap:.1f}% below {target_oee:.1f}% target",
-                    evidence_refs=[evidence_ref],
+                    evidence_refs=evidence_refs,
                     created_at=datetime.utcnow(),
+                    financial_impact_usd=round(financial_impact, 2),  # Story 3.2 AC#6, AC#7
                 )
-                actions.append((action, gap))
+                actions.append((action, financial_impact))
 
-            # Sort by gap descending (worst performers first) - AC #3
+            # Story 3.2 AC#6: Sort by financial impact descending (highest first)
             actions.sort(key=lambda x: x[1], reverse=True)
 
             result = [a[0] for a in actions]
@@ -426,6 +559,7 @@ class ActionEngine:
                     evidence_summary=f"Financial loss ${loss:,.2f} above ${threshold:,.2f} threshold",
                     evidence_refs=[evidence_ref],
                     created_at=datetime.utcnow(),
+                    financial_impact_usd=round(loss, 2),  # Story 3.2 AC#6, AC#7
                 )
                 actions.append((action, loss))
 
@@ -534,12 +668,17 @@ class ActionEngine:
         effective_config = config_override if config_override is not None else self._get_config()
 
         try:
-            # Load assets
+            # Load assets, shift targets, and cost centers (Story 3.2 AC#2)
             assets_map = await self._load_assets()
+            shift_targets_map = await self._load_shift_targets()
+            cost_centers_map = await self._load_cost_centers()
 
             # Gather actions from each category (pass effective config)
             safety_actions = await self._get_safety_actions(target_date, assets_map)
-            oee_actions = await self._get_oee_actions(target_date, assets_map, effective_config)
+            oee_actions = await self._get_oee_actions(
+                target_date, assets_map, effective_config,
+                shift_targets_map, cost_centers_map
+            )
             financial_actions = await self._get_financial_actions(target_date, assets_map, effective_config)
 
             # Apply category filter if specified
@@ -626,6 +765,8 @@ class ActionEngine:
     def clear_cache(self) -> None:
         """Clear all caches."""
         self._assets_cache.clear()
+        self._shift_targets_cache.clear()
+        self._cost_centers_cache.clear()
         self._action_list_cache.clear()
         self._cache_timestamp = None
         logger.debug("Action engine caches cleared")

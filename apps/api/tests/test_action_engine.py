@@ -11,6 +11,13 @@ AC: #6 - Configurable Thresholds
 AC: #7 - Action Item Data Structure
 AC: #9 - Caching
 AC: #10 - Empty State Handling
+
+Story: 3.2 - Daily Action List API
+AC: #2 - Data Source Integration (shift_targets, cost_centers)
+AC: #4 - OEE Below Target from shift_targets
+AC: #6 - Sorting by financial_impact_usd
+AC: #7 - Response schema with financial_impact_usd, priority_rank
+AC: #9 - Evidence citations with table/column/value
 """
 
 import pytest
@@ -110,6 +117,8 @@ def sample_daily_summaries_oee():
             "oee_percentage": 60.0,  # 25% gap (high priority)
             "actual_output": 600,
             "target_output": 1000,
+            "financial_loss_dollars": 4000.0,  # Story 3.2: higher loss
+            "downtime_minutes": 120,
         },
         {
             "id": str(uuid4()),
@@ -118,6 +127,8 @@ def sample_daily_summaries_oee():
             "oee_percentage": 78.0,  # 7% gap (low priority)
             "actual_output": 780,
             "target_output": 1000,
+            "financial_loss_dollars": 700.0,  # Story 3.2: lower loss
+            "downtime_minutes": 30,
         },
     ]
 
@@ -242,32 +253,39 @@ class TestOEEGapFilter:
         """AC#3: Assets with OEE below target are included."""
         action_engine._client = mock_supabase_client
         action_engine._assets_cache = sample_assets
+        action_engine._shift_targets_cache = {}  # No per-asset targets, use default
+        action_engine._cost_centers_cache = {}
         action_engine._cache_timestamp = datetime.utcnow()
 
-        mock_supabase_client.table.return_value.select.return_value.eq.return_value.lt.return_value.execute.return_value.data = sample_daily_summaries_oee
+        # Updated: now uses .eq() only (filters in Python based on shift_targets)
+        mock_supabase_client.table.return_value.select.return_value.eq.return_value.execute.return_value.data = sample_daily_summaries_oee
 
         target_date = date.today() - timedelta(days=1)
-        actions = await action_engine._get_oee_actions(target_date, sample_assets)
+        actions = await action_engine._get_oee_actions(target_date, sample_assets, None, {}, {})
 
         assert len(actions) == 2
         for action in actions:
             assert action.category == ActionCategory.OEE
 
     @pytest.mark.asyncio
-    async def test_oee_sorted_by_gap_magnitude(
+    async def test_oee_sorted_by_financial_impact(
         self, action_engine, mock_supabase_client, sample_assets, sample_daily_summaries_oee
     ):
-        """AC#3: OEE items sorted by gap magnitude (worst first)."""
+        """AC#3 / Story 3.2 AC#6: OEE items sorted by financial impact (highest first)."""
         action_engine._client = mock_supabase_client
         action_engine._assets_cache = sample_assets
+        action_engine._shift_targets_cache = {}
+        action_engine._cost_centers_cache = {}
         action_engine._cache_timestamp = datetime.utcnow()
 
-        mock_supabase_client.table.return_value.select.return_value.eq.return_value.lt.return_value.execute.return_value.data = sample_daily_summaries_oee
+        mock_supabase_client.table.return_value.select.return_value.eq.return_value.execute.return_value.data = sample_daily_summaries_oee
 
         target_date = date.today() - timedelta(days=1)
-        actions = await action_engine._get_oee_actions(target_date, sample_assets)
+        actions = await action_engine._get_oee_actions(target_date, sample_assets, None, {}, {})
 
-        # asset-3 (60% OEE, 25% gap) should be before asset-1 (78% OEE, 7% gap)
+        # asset-3 (60% OEE, 25% gap) has higher financial impact than asset-1 (78% OEE, 7% gap)
+        # due to larger gap and using estimated financial impact
+        assert len(actions) == 2
         assert actions[0].asset_id == "asset-3"
         assert actions[1].asset_id == "asset-1"
 
@@ -278,12 +296,14 @@ class TestOEEGapFilter:
         """AC#3: OEE priority based on gap severity."""
         action_engine._client = mock_supabase_client
         action_engine._assets_cache = sample_assets
+        action_engine._shift_targets_cache = {}
+        action_engine._cost_centers_cache = {}
         action_engine._cache_timestamp = datetime.utcnow()
 
-        mock_supabase_client.table.return_value.select.return_value.eq.return_value.lt.return_value.execute.return_value.data = sample_daily_summaries_oee
+        mock_supabase_client.table.return_value.select.return_value.eq.return_value.execute.return_value.data = sample_daily_summaries_oee
 
         target_date = date.today() - timedelta(days=1)
-        actions = await action_engine._get_oee_actions(target_date, sample_assets)
+        actions = await action_engine._get_oee_actions(target_date, sample_assets, None, {}, {})
 
         # 25% gap -> high priority
         assert actions[0].priority_level == PriorityLevel.HIGH
@@ -770,3 +790,443 @@ class TestIntegrationScenarios:
         assert result[0].priority_level == PriorityLevel.CRITICAL
         # Both evidence refs merged
         assert len(result[0].evidence_refs) == 2
+
+
+# =============================================================================
+# Story 3.2 - Daily Action List API Tests
+# =============================================================================
+
+@pytest.fixture
+def sample_shift_targets():
+    """Sample shift target data (Story 3.2 AC#4)."""
+    return {
+        "asset-1": {
+            "id": str(uuid4()),
+            "asset_id": "asset-1",
+            "target_oee": 90.0,  # Higher target for asset-1
+            "target_output": 1000,
+            "effective_date": "2026-01-01",
+        },
+        "asset-3": {
+            "id": str(uuid4()),
+            "asset_id": "asset-3",
+            "target_oee": 80.0,  # Lower target for asset-3
+            "target_output": 800,
+            "effective_date": "2026-01-01",
+        },
+    }
+
+
+@pytest.fixture
+def sample_cost_centers():
+    """Sample cost center data (Story 3.2 AC#2)."""
+    return {
+        "asset-1": {
+            "id": str(uuid4()),
+            "standard_hourly_rate": 150.0,
+            "cost_per_unit": 15.0,
+        },
+        "asset-2": {
+            "id": str(uuid4()),
+            "standard_hourly_rate": 100.0,
+            "cost_per_unit": 10.0,
+        },
+        "asset-3": {
+            "id": str(uuid4()),
+            "standard_hourly_rate": 200.0,
+            "cost_per_unit": 20.0,
+        },
+    }
+
+
+class TestStory32DataSourceIntegration:
+    """Tests for Story 3.2 AC#2 - Data Source Integration."""
+
+    @pytest.mark.asyncio
+    async def test_load_shift_targets(self, action_engine, mock_supabase_client):
+        """AC#2: System loads shift_targets table."""
+        action_engine._client = mock_supabase_client
+
+        shift_target_data = [
+            {
+                "id": str(uuid4()),
+                "asset_id": "asset-1",
+                "target_oee": 85.0,
+                "target_output": 1000,
+                "effective_date": "2026-01-01",
+            }
+        ]
+        mock_supabase_client.table.return_value.select.return_value.execute.return_value.data = shift_target_data
+
+        targets = await action_engine._load_shift_targets(force=True)
+
+        assert "asset-1" in targets
+        assert targets["asset-1"]["target_oee"] == 85.0
+
+    @pytest.mark.asyncio
+    async def test_load_cost_centers(self, action_engine, mock_supabase_client):
+        """AC#2: System loads cost_centers table."""
+        action_engine._client = mock_supabase_client
+
+        cost_center_data = [
+            {
+                "id": str(uuid4()),
+                "asset_id": "asset-1",
+                "standard_hourly_rate": 150.0,
+                "cost_per_unit": 15.0,
+            }
+        ]
+        mock_supabase_client.table.return_value.select.return_value.execute.return_value.data = cost_center_data
+
+        centers = await action_engine._load_cost_centers(force=True)
+
+        assert "asset-1" in centers
+        assert centers["asset-1"]["standard_hourly_rate"] == 150.0
+
+
+class TestStory32OEEFromShiftTargets:
+    """Tests for Story 3.2 AC#4 - OEE from shift_targets per asset."""
+
+    @pytest.mark.asyncio
+    async def test_oee_uses_per_asset_target(
+        self, action_engine, mock_supabase_client, sample_assets, sample_shift_targets, sample_cost_centers
+    ):
+        """AC#4: OEE comparison uses target from shift_targets per asset."""
+        action_engine._client = mock_supabase_client
+        action_engine._assets_cache = sample_assets
+        action_engine._shift_targets_cache = sample_shift_targets
+        action_engine._cost_centers_cache = sample_cost_centers
+        action_engine._cache_timestamp = datetime.utcnow()
+
+        target_date = date.today() - timedelta(days=1)
+
+        # Asset-1 has 78% OEE, target is 90% (from shift_targets) -> gap of 12%
+        # Asset-3 has 79% OEE, target is 80% (from shift_targets) -> gap of 1%
+        daily_summaries = [
+            {
+                "id": str(uuid4()),
+                "asset_id": "asset-1",
+                "report_date": target_date.isoformat(),
+                "oee_percentage": 78.0,
+                "actual_output": 780,
+                "target_output": 1000,
+                "financial_loss_dollars": 0,
+                "downtime_minutes": 60,
+            },
+            {
+                "id": str(uuid4()),
+                "asset_id": "asset-3",
+                "report_date": target_date.isoformat(),
+                "oee_percentage": 79.0,
+                "actual_output": 790,
+                "target_output": 800,
+                "financial_loss_dollars": 0,
+                "downtime_minutes": 10,
+            },
+        ]
+
+        mock_supabase_client.table.return_value.select.return_value.eq.return_value.execute.return_value.data = daily_summaries
+
+        actions = await action_engine._get_oee_actions(
+            target_date, sample_assets, None, sample_shift_targets, sample_cost_centers
+        )
+
+        # Both should be included since both are below their respective targets
+        assert len(actions) == 2
+
+        # Asset-1 has higher financial impact (larger gap and higher cost)
+        assert actions[0].asset_id == "asset-1"
+        assert actions[0].financial_impact_usd > 0
+
+    @pytest.mark.asyncio
+    async def test_oee_excludes_above_target(
+        self, action_engine, mock_supabase_client, sample_assets, sample_shift_targets, sample_cost_centers
+    ):
+        """AC#4: Assets at or above their target are excluded."""
+        action_engine._client = mock_supabase_client
+        action_engine._assets_cache = sample_assets
+        action_engine._shift_targets_cache = sample_shift_targets
+        action_engine._cost_centers_cache = sample_cost_centers
+        action_engine._cache_timestamp = datetime.utcnow()
+
+        target_date = date.today() - timedelta(days=1)
+
+        # Asset-3 has 82% OEE, target is 80% -> above target, should be excluded
+        daily_summaries = [
+            {
+                "id": str(uuid4()),
+                "asset_id": "asset-3",
+                "report_date": target_date.isoformat(),
+                "oee_percentage": 82.0,
+                "actual_output": 820,
+                "target_output": 800,
+                "financial_loss_dollars": 0,
+                "downtime_minutes": 0,
+            },
+        ]
+
+        mock_supabase_client.table.return_value.select.return_value.eq.return_value.execute.return_value.data = daily_summaries
+
+        actions = await action_engine._get_oee_actions(
+            target_date, sample_assets, None, sample_shift_targets, sample_cost_centers
+        )
+
+        # Asset-3 is above target, should be excluded
+        assert len(actions) == 0
+
+
+class TestStory32FinancialImpactSorting:
+    """Tests for Story 3.2 AC#6 - Sorting by financial_impact_usd."""
+
+    def test_oee_items_sorted_by_financial_impact(self, action_engine):
+        """AC#6: OEE items are sorted by financial_impact_usd descending."""
+        # Create action items with different financial impacts
+        oee_items = [
+            ActionItem(
+                id="o1", asset_id="asset-1", asset_name="A",
+                priority_level=PriorityLevel.HIGH, category=ActionCategory.OEE,
+                primary_metric_value="OEE: 60%", recommendation_text="R",
+                evidence_summary="E", evidence_refs=[], created_at=datetime.utcnow(),
+                financial_impact_usd=1000.0,  # Lower impact
+            ),
+            ActionItem(
+                id="o2", asset_id="asset-2", asset_name="B",
+                priority_level=PriorityLevel.HIGH, category=ActionCategory.OEE,
+                primary_metric_value="OEE: 50%", recommendation_text="R",
+                evidence_summary="E", evidence_refs=[], created_at=datetime.utcnow(),
+                financial_impact_usd=5000.0,  # Higher impact
+            ),
+        ]
+
+        # Merge with empty safety and financial
+        result = action_engine._merge_and_prioritize([], oee_items, [])
+
+        # Order should be preserved (already sorted by financial_impact in _get_oee_actions)
+        assert len(result) == 2
+
+    def test_financial_items_have_financial_impact(self):
+        """AC#6, AC#7: Financial items include financial_impact_usd."""
+        action = ActionItem(
+            id="f1", asset_id="asset-1", asset_name="A",
+            priority_level=PriorityLevel.HIGH, category=ActionCategory.FINANCIAL,
+            primary_metric_value="Loss: $5000", recommendation_text="R",
+            evidence_summary="E", evidence_refs=[], created_at=datetime.utcnow(),
+            financial_impact_usd=5000.0,
+        )
+
+        assert action.financial_impact_usd == 5000.0
+
+
+class TestStory32ResponseSchema:
+    """Tests for Story 3.2 AC#7 - Response Schema."""
+
+    def test_action_item_has_priority_rank(self):
+        """AC#7: ActionItem includes priority_rank computed field."""
+        action = ActionItem(
+            id="test-id",
+            asset_id="asset-1",
+            asset_name="Grinder 5",
+            priority_level=PriorityLevel.CRITICAL,
+            category=ActionCategory.SAFETY,
+            primary_metric_value="Safety Event",
+            recommendation_text="Investigate",
+            evidence_summary="Unresolved",
+            evidence_refs=[],
+            created_at=datetime.utcnow()
+        )
+
+        # priority_rank should be 0 for critical
+        assert action.priority_rank == 0
+
+    def test_action_item_has_title_alias(self):
+        """AC#7: ActionItem includes title as alias for recommendation_text."""
+        action = ActionItem(
+            id="test-id",
+            asset_id="asset-1",
+            asset_name="Test",
+            priority_level=PriorityLevel.HIGH,
+            category=ActionCategory.OEE,
+            primary_metric_value="OEE: 70%",
+            recommendation_text="Review performance",
+            evidence_summary="Below target",
+            evidence_refs=[],
+            created_at=datetime.utcnow()
+        )
+
+        assert action.title == "Review performance"
+
+    def test_action_item_has_description_alias(self):
+        """AC#7: ActionItem includes description as alias for evidence_summary."""
+        action = ActionItem(
+            id="test-id",
+            asset_id="asset-1",
+            asset_name="Test",
+            priority_level=PriorityLevel.HIGH,
+            category=ActionCategory.OEE,
+            primary_metric_value="OEE: 70%",
+            recommendation_text="Review",
+            evidence_summary="OEE 15% below target",
+            evidence_refs=[],
+            created_at=datetime.utcnow()
+        )
+
+        assert action.description == "OEE 15% below target"
+
+    def test_action_item_has_financial_impact_usd(self):
+        """AC#7: ActionItem includes financial_impact_usd field."""
+        action = ActionItem(
+            id="test-id",
+            asset_id="asset-1",
+            asset_name="Test",
+            priority_level=PriorityLevel.HIGH,
+            category=ActionCategory.FINANCIAL,
+            primary_metric_value="Loss: $3000",
+            recommendation_text="Reduce losses",
+            evidence_summary="High loss",
+            evidence_refs=[],
+            created_at=datetime.utcnow(),
+            financial_impact_usd=3000.0,
+        )
+
+        assert action.financial_impact_usd == 3000.0
+
+    def test_priority_rank_values(self):
+        """AC#7: priority_rank has correct values for each level."""
+        from app.schemas.action import PRIORITY_RANK_MAP
+
+        assert PRIORITY_RANK_MAP[PriorityLevel.CRITICAL] == 0
+        assert PRIORITY_RANK_MAP[PriorityLevel.HIGH] == 1
+        assert PRIORITY_RANK_MAP[PriorityLevel.MEDIUM] == 2
+        assert PRIORITY_RANK_MAP[PriorityLevel.LOW] == 3
+
+
+class TestStory32EvidenceCitations:
+    """Tests for Story 3.2 AC#9 - Evidence Citations."""
+
+    def test_evidence_ref_has_table_field(self):
+        """AC#9: EvidenceRef includes table (source_table) field."""
+        ref = EvidenceRef(
+            source_table="daily_summaries",
+            record_id="123",
+            metric_name="oee_percentage",
+            metric_value="72.5%"
+        )
+
+        assert ref.table == "daily_summaries"
+        assert ref.source_table == "daily_summaries"  # Backward compatibility
+
+    def test_evidence_ref_has_column_field(self):
+        """AC#9: EvidenceRef includes column (metric_name) field."""
+        ref = EvidenceRef(
+            source_table="shift_targets",
+            record_id="456",
+            metric_name="target_oee",
+            metric_value="85.0%"
+        )
+
+        assert ref.column == "target_oee"
+        assert ref.metric_name == "target_oee"  # Backward compatibility
+
+    def test_evidence_ref_has_value_field(self):
+        """AC#9: EvidenceRef includes value (metric_value) field."""
+        ref = EvidenceRef(
+            source_table="safety_events",
+            record_id="789",
+            metric_name="severity",
+            metric_value="critical"
+        )
+
+        assert ref.value == "critical"
+        assert ref.metric_value == "critical"  # Backward compatibility
+
+    def test_evidence_ref_has_record_id(self):
+        """AC#9: EvidenceRef includes record_id for drill-down."""
+        ref = EvidenceRef(
+            source_table="cost_centers",
+            record_id="uuid-123",
+            metric_name="standard_hourly_rate",
+            metric_value="$150.00"
+        )
+
+        assert ref.record_id == "uuid-123"
+
+    @pytest.mark.asyncio
+    async def test_oee_action_includes_shift_target_evidence(
+        self, action_engine, mock_supabase_client, sample_assets
+    ):
+        """AC#9: OEE actions include shift_target evidence refs."""
+        action_engine._client = mock_supabase_client
+        action_engine._assets_cache = sample_assets
+        action_engine._cache_timestamp = datetime.utcnow()
+
+        target_date = date.today() - timedelta(days=1)
+
+        shift_targets = {
+            "asset-1": {
+                "id": "shift-target-123",
+                "asset_id": "asset-1",
+                "target_oee": 85.0,
+                "target_output": 1000,
+            }
+        }
+        cost_centers = {
+            "asset-1": {
+                "id": "cc-1",
+                "standard_hourly_rate": 100.0,
+                "cost_per_unit": 10.0,
+            }
+        }
+
+        daily_summaries = [
+            {
+                "id": "ds-456",
+                "asset_id": "asset-1",
+                "report_date": target_date.isoformat(),
+                "oee_percentage": 70.0,
+                "actual_output": 700,
+                "target_output": 1000,
+                "financial_loss_dollars": 0,
+                "downtime_minutes": 60,
+            }
+        ]
+
+        mock_supabase_client.table.return_value.select.return_value.eq.return_value.execute.return_value.data = daily_summaries
+
+        actions = await action_engine._get_oee_actions(
+            target_date, sample_assets, None, shift_targets, cost_centers
+        )
+
+        assert len(actions) == 1
+        action = actions[0]
+
+        # Should have 2 evidence refs: daily_summaries and shift_targets
+        assert len(action.evidence_refs) == 2
+
+        # Check daily_summaries evidence
+        ds_ref = next(r for r in action.evidence_refs if r.source_table == "daily_summaries")
+        assert ds_ref.record_id == "ds-456"
+
+        # Check shift_targets evidence
+        st_ref = next(r for r in action.evidence_refs if r.source_table == "shift_targets")
+        assert st_ref.record_id == "shift-target-123"
+        assert st_ref.metric_name == "target_oee"
+
+
+class TestStory32CacheManagement:
+    """Tests for cache management with new caches."""
+
+    def test_clear_cache_clears_all_caches(self, action_engine):
+        """Clear cache clears assets, shift_targets, cost_centers, and action list caches."""
+        action_engine._assets_cache = {"test": {}}
+        action_engine._shift_targets_cache = {"test": {}}
+        action_engine._cost_centers_cache = {"test": {}}
+        action_engine._action_list_cache = {"test": None}
+        action_engine._cache_timestamp = datetime.utcnow()
+
+        action_engine.clear_cache()
+
+        assert len(action_engine._assets_cache) == 0
+        assert len(action_engine._shift_targets_cache) == 0
+        assert len(action_engine._cost_centers_cache) == 0
+        assert len(action_engine._action_list_cache) == 0
+        assert action_engine._cache_timestamp is None

@@ -3,6 +3,11 @@ Tests for Action List API Endpoints.
 
 Story: 3.1 - Action Engine Logic
 AC: #8 - API Endpoint for Action List
+
+Story: 3.2 - Daily Action List API
+AC: #1 - Action List Endpoint at /api/v1/actions/daily
+AC: #7 - Response schema with all required fields
+AC: #8 - Authentication required (401 for missing token)
 """
 
 import pytest
@@ -492,3 +497,180 @@ class TestQueryParameterValidation:
         )
 
         assert response.status_code == 422  # Validation error
+
+
+# =============================================================================
+# Story 3.2 - Versioned API Endpoint Tests
+# =============================================================================
+
+class TestVersionedDailyActionListEndpoint:
+    """Tests for Story 3.2 AC#1 - GET /api/v1/actions/daily endpoint."""
+
+    def test_v1_daily_endpoint_exists(self, client, mock_verify_jwt, mock_action_engine, sample_action_response):
+        """AC#1: /api/v1/actions/daily endpoint exists and returns 200."""
+        mock_action_engine.generate_action_list = AsyncMock(
+            return_value=sample_action_response
+        )
+        mock_action_engine._get_config = MagicMock(return_value=MagicMock())
+
+        response = client.get(
+            "/api/v1/actions/daily",
+            headers={"Authorization": "Bearer test-token"}
+        )
+
+        assert response.status_code == 200
+
+    def test_v1_daily_endpoint_requires_auth(self, client):
+        """AC#8: /api/v1/actions/daily requires authentication."""
+        response = client.get("/api/v1/actions/daily")
+        assert response.status_code == 401
+
+    def test_v1_daily_endpoint_returns_json(
+        self, client, mock_verify_jwt, mock_action_engine, sample_action_response
+    ):
+        """AC#1: /api/v1/actions/daily returns JSON response."""
+        mock_action_engine.generate_action_list = AsyncMock(
+            return_value=sample_action_response
+        )
+        mock_action_engine._get_config = MagicMock(return_value=MagicMock())
+
+        response = client.get(
+            "/api/v1/actions/daily",
+            headers={"Authorization": "Bearer test-token"}
+        )
+
+        assert response.headers["content-type"] == "application/json"
+        data = response.json()
+        assert "actions" in data
+
+    def test_v1_daily_response_has_required_fields(
+        self, client, mock_verify_jwt, mock_action_engine, sample_action_response
+    ):
+        """AC#7: Response contains all required fields per schema."""
+        mock_action_engine.generate_action_list = AsyncMock(
+            return_value=sample_action_response
+        )
+        mock_action_engine._get_config = MagicMock(return_value=MagicMock())
+
+        response = client.get(
+            "/api/v1/actions/daily",
+            headers={"Authorization": "Bearer test-token"}
+        )
+
+        data = response.json()
+        action = data["actions"][0]
+
+        # Story 3.2 AC#7 required fields
+        assert "id" in action
+        assert "priority_rank" in action
+        assert "category" in action
+        assert "asset_id" in action
+        assert "asset_name" in action
+        assert "title" in action
+        assert "description" in action
+        assert "financial_impact_usd" in action
+        assert "evidence_refs" in action
+        assert "created_at" in action
+
+    def test_v1_daily_with_date_param(
+        self, client, mock_verify_jwt, mock_action_engine, sample_action_response
+    ):
+        """AC#1: Endpoint accepts date parameter."""
+        mock_action_engine.generate_action_list = AsyncMock(
+            return_value=sample_action_response
+        )
+        mock_action_engine._get_config = MagicMock(return_value=MagicMock())
+
+        target_date = "2026-01-05"
+        response = client.get(
+            f"/api/v1/actions/daily?date={target_date}",
+            headers={"Authorization": "Bearer test-token"}
+        )
+
+        assert response.status_code == 200
+        mock_action_engine.generate_action_list.assert_called_once()
+
+
+class TestStory32ResponseSchemaCompliance:
+    """Tests for Story 3.2 AC#7 - Complete response schema compliance."""
+
+    def test_action_item_priority_rank_is_numeric(
+        self, client, mock_verify_jwt, mock_action_engine, sample_action_response
+    ):
+        """AC#7: priority_rank is a numeric value."""
+        mock_action_engine.generate_action_list = AsyncMock(
+            return_value=sample_action_response
+        )
+        mock_action_engine._get_config = MagicMock(return_value=MagicMock())
+
+        response = client.get(
+            "/api/v1/actions/daily",
+            headers={"Authorization": "Bearer test-token"}
+        )
+
+        data = response.json()
+        for action in data["actions"]:
+            assert isinstance(action["priority_rank"], int)
+
+    def test_action_item_financial_impact_is_numeric(
+        self, client, mock_verify_jwt, mock_action_engine, sample_action_response
+    ):
+        """AC#7: financial_impact_usd is a numeric value."""
+        mock_action_engine.generate_action_list = AsyncMock(
+            return_value=sample_action_response
+        )
+        mock_action_engine._get_config = MagicMock(return_value=MagicMock())
+
+        response = client.get(
+            "/api/v1/actions/daily",
+            headers={"Authorization": "Bearer test-token"}
+        )
+
+        data = response.json()
+        for action in data["actions"]:
+            assert isinstance(action["financial_impact_usd"], (int, float))
+
+    def test_evidence_refs_structure(
+        self, client, mock_verify_jwt, mock_action_engine, sample_action_response
+    ):
+        """AC#7, AC#9: evidence_refs array has correct structure."""
+        mock_action_engine.generate_action_list = AsyncMock(
+            return_value=sample_action_response
+        )
+        mock_action_engine._get_config = MagicMock(return_value=MagicMock())
+
+        response = client.get(
+            "/api/v1/actions/daily",
+            headers={"Authorization": "Bearer test-token"}
+        )
+
+        data = response.json()
+        action = data["actions"][0]
+
+        assert isinstance(action["evidence_refs"], list)
+        if action["evidence_refs"]:
+            ref = action["evidence_refs"][0]
+            # Story 3.2 AC#9 fields (using alias names)
+            assert "table" in ref or "source_table" in ref
+            assert "column" in ref or "metric_name" in ref
+            assert "value" in ref or "metric_value" in ref
+            assert "record_id" in ref
+
+    def test_category_enum_values(
+        self, client, mock_verify_jwt, mock_action_engine, sample_action_response
+    ):
+        """AC#7: category is one of safety|oee|financial."""
+        mock_action_engine.generate_action_list = AsyncMock(
+            return_value=sample_action_response
+        )
+        mock_action_engine._get_config = MagicMock(return_value=MagicMock())
+
+        response = client.get(
+            "/api/v1/actions/daily",
+            headers={"Authorization": "Bearer test-token"}
+        )
+
+        data = response.json()
+        valid_categories = {"safety", "oee", "financial"}
+        for action in data["actions"]:
+            assert action["category"] in valid_categories
