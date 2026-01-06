@@ -654,8 +654,9 @@ class TestPipelineIntegration:
         self, pipeline, sample_asset_id, mock_supabase_client
     ):
         """Integration test: Safety event detection and storage."""
-        # Mock no existing event
-        mock_supabase_client.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = []
+        # Mock no existing event using source_record_id deduplication (Story 2.6 update)
+        # The new code uses .eq(source_record_id) for deduplication
+        mock_supabase_client.table.return_value.select.return_value.eq.return_value.execute.return_value.data = []
         mock_supabase_client.table.return_value.insert.return_value.execute.return_value.data = [{"id": "new-id"}]
 
         pipeline._supabase_client = mock_supabase_client
@@ -669,6 +670,7 @@ class TestPipelineIntegration:
                 "duration_minutes": 15,
                 "reason_code": "Safety Issue",
                 "description": "Emergency stop",
+                "record_id": "DT_12345",  # MSSQL record ID for deduplication
             }
         ]
 

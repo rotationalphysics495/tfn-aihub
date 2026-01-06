@@ -5,6 +5,8 @@ import {
   ActionListSection,
   LivePulseSection,
   FinancialWidgetsSection,
+  SafetyAlertsSection,
+  SafetyHeaderIndicator,
 } from '@/components/dashboard'
 
 export const metadata = {
@@ -49,6 +51,8 @@ export default async function DashboardPage() {
               </span>
             </div>
             <nav className="flex items-center gap-4" aria-label="Main navigation">
+              {/* Safety Alert Indicator - AC #9 */}
+              <SafetyHeaderIndicator />
               <span className="text-sm text-muted-foreground">
                 {user.email}
               </span>
@@ -60,6 +64,9 @@ export default async function DashboardPage() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Safety Alert Banner - AC #4 Prominent display */}
+        <SafetyAlertsSection className="mb-6" />
+
         {/* Page Header */}
         <div className="mb-8">
           <h1 className="page-title text-foreground">

@@ -102,6 +102,7 @@ class SafetyEventData:
         reason_code: str,
         description: Optional[str] = None,
         duration_minutes: Optional[int] = None,
+        source_record_id: Optional[str] = None,
     ):
         self.asset_id = asset_id
         self.source_id = source_id
@@ -109,17 +110,23 @@ class SafetyEventData:
         self.reason_code = reason_code
         self.description = description
         self.duration_minutes = duration_minutes
+        self.source_record_id = source_record_id
 
     def to_dict(self) -> dict:
         """Convert to dictionary for Supabase insertion."""
-        return {
+        data = {
             "asset_id": str(self.asset_id),
+            "event_timestamp": self.event_timestamp.isoformat(),
             "occurred_at": self.event_timestamp.isoformat(),
             "reason_code": self.reason_code,
             "severity": "critical",  # Safety issues are always critical
             "description": self.description,
             "duration_minutes": self.duration_minutes,
+            "is_resolved": False,  # New safety events start unacknowledged
         }
+        if self.source_record_id:
+            data["source_record_id"] = self.source_record_id
+        return data
 
 
 class LivePulseResult:
@@ -395,13 +402,24 @@ class LivePulsePipeline:
                 asset_id = self._get_asset_id(source_id)
 
                 if asset_id:
+                    # Generate source_record_id for deduplication (AC #6 - anti-pattern #6)
+                    # Combine source_id and timestamp to create unique identifier
+                    event_timestamp = record.get("event_timestamp", datetime.utcnow())
+                    record_id = record.get("record_id")  # MSSQL record ID if available
+                    if record_id:
+                        source_record_id = f"MSSQL_{record_id}"
+                    else:
+                        # Fallback: use source_id + timestamp
+                        source_record_id = f"{source_id}_{event_timestamp.isoformat()}"
+
                     event = SafetyEventData(
                         asset_id=asset_id,
                         source_id=source_id,
-                        event_timestamp=record.get("event_timestamp", datetime.utcnow()),
+                        event_timestamp=event_timestamp,
                         reason_code=reason_code,
                         description=record.get("description"),
                         duration_minutes=record.get("duration_minutes", 0),
+                        source_record_id=source_record_id,
                     )
                     safety_events.append(event)
 
@@ -498,6 +516,8 @@ class LivePulsePipeline:
         """
         Write safety events to Supabase with deduplication.
 
+        Uses source_record_id for deduplication per AC#6 anti-pattern #6.
+
         Args:
             safety_events: List of safety events to write
 
@@ -512,16 +532,23 @@ class LivePulsePipeline:
             written = 0
 
             for event in safety_events:
-                # Check for existing event (deduplication)
-                existing = client.table("safety_events").select("id").eq(
-                    "asset_id", str(event.asset_id)
-                ).eq(
-                    "occurred_at", event.event_timestamp.isoformat()
-                ).execute()
+                # Check for existing event using source_record_id (preferred)
+                # or fall back to asset_id + timestamp for deduplication
+                if event.source_record_id:
+                    existing = client.table("safety_events").select("id").eq(
+                        "source_record_id", event.source_record_id
+                    ).execute()
+                else:
+                    existing = client.table("safety_events").select("id").eq(
+                        "asset_id", str(event.asset_id)
+                    ).eq(
+                        "event_timestamp", event.event_timestamp.isoformat()
+                    ).execute()
 
                 if existing.data:
                     logger.debug(
-                        f"Safety event already exists for asset {event.asset_id}"
+                        f"Safety event already exists for asset {event.asset_id} "
+                        f"(source_record_id: {event.source_record_id})"
                     )
                     continue
 

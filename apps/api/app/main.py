@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import health, assets, summaries, actions, auth, pipelines, production, oee, downtime
+from app.api import health, assets, summaries, actions, auth, pipelines, production, oee, downtime, safety
 from app.core.database import initialize_database, shutdown_database
 from app.services.scheduler import get_scheduler
 from app.services.pipelines.live_pulse import run_live_pulse_poll
@@ -66,6 +66,7 @@ app.include_router(pipelines.router, prefix="/api/pipelines", tags=["Pipelines"]
 app.include_router(production.router, prefix="/api/production", tags=["Production"])
 app.include_router(oee.router, prefix="/api/oee", tags=["OEE"])
 app.include_router(downtime.router, prefix="/api/v1/downtime", tags=["Downtime"])
+app.include_router(safety.router, prefix="/api/safety", tags=["Safety"])
 
 
 @app.get("/")
