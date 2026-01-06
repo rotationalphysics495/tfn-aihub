@@ -264,10 +264,12 @@ class TestFinancialCalculation:
     def test_downtime_cost_calculation(self, calculator, sample_production_data):
         """AC#5: Downtime cost = minutes * (hourly_rate / 60)."""
         hourly_rate = Decimal("300.00")  # $300/hour
+        unit_cost = Decimal("5.00")  # Provide unit_cost to avoid cost center lookup
 
         financial = calculator.calculate_financial_impact(
             sample_production_data,
-            hourly_rate=hourly_rate
+            hourly_rate=hourly_rate,
+            unit_cost=unit_cost
         )
 
         # 45 minutes downtime * ($300 / 60) = $225
@@ -333,14 +335,22 @@ class TestFinancialCalculation:
         assert financial.total_financial_loss_dollars == Decimal("0")
 
     def test_financial_uses_default_unit_cost(self, calculator, sample_production_data):
-        """AC#5: Uses default unit cost when not provided."""
-        financial = calculator.calculate_financial_impact(
-            sample_production_data,
-            hourly_rate=Decimal("0")  # Focus on waste cost
-        )
+        """AC#5: Uses default unit cost when not provided (via cost center fallback)."""
+        from unittest.mock import patch, MagicMock
+        from app.services.pipelines.calculator import _get_default_unit_cost
 
-        expected_waste = sample_production_data.units_scrapped * DEFAULT_UNIT_COST
-        assert financial.waste_cost_dollars == expected_waste.quantize(Decimal("0.01"))
+        # Mock the cost center lookup to return defaults
+        with patch.object(calculator, 'get_cost_per_unit') as mock_cost:
+            default_cost = _get_default_unit_cost()
+            mock_cost.return_value = (default_cost, True)  # Using default
+
+            financial = calculator.calculate_financial_impact(
+                sample_production_data,
+                hourly_rate=Decimal("0")  # Focus on waste cost
+            )
+
+            expected_waste = sample_production_data.units_scrapped * default_cost
+            assert financial.waste_cost_dollars == expected_waste.quantize(Decimal("0.01"))
 
 
 class TestCalculateAll:

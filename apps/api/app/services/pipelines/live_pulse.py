@@ -53,12 +53,14 @@ class LiveSnapshotData:
         output_actual: int,
         output_target: int,
         oee_current: Optional[Decimal] = None,
+        financial_loss_dollars: Optional[Decimal] = None,
     ):
         self.asset_id = asset_id
         self.source_id = source_id
         self.output_actual = output_actual
         self.output_target = output_target
         self.oee_current = oee_current
+        self.financial_loss_dollars = financial_loss_dollars  # Story 2.7 - AC #7
         self.snapshot_timestamp = datetime.utcnow()
 
         # Calculate variance
@@ -80,7 +82,7 @@ class LiveSnapshotData:
 
     def to_dict(self) -> dict:
         """Convert to dictionary for Supabase insertion."""
-        return {
+        data = {
             "asset_id": str(self.asset_id),
             "snapshot_timestamp": self.snapshot_timestamp.isoformat(),
             "output_actual": self.output_actual,
@@ -89,6 +91,10 @@ class LiveSnapshotData:
             "status": self.status,
             "oee_current": float(self.oee_current) if self.oee_current else None,
         }
+        # Story 2.7 - AC #7: Add financial loss to live snapshots
+        if self.financial_loss_dollars is not None:
+            data["financial_loss_dollars"] = float(self.financial_loss_dollars)
+        return data
 
 
 class SafetyEventData:
@@ -158,14 +164,16 @@ class LivePulsePipeline:
         1. Fetch 30-minute rolling window data from MSSQL
         2. Detect safety events (reason_code = 'Safety Issue')
         3. Calculate output vs target variance
-        4. Write live snapshots to Supabase
-        5. Cleanup old snapshots (24h retention)
+        4. Calculate financial impact (Story 2.7 - AC #7)
+        5. Write live snapshots to Supabase
+        6. Cleanup old snapshots (24h retention)
     """
 
     def __init__(self):
         self._supabase_client: Optional[Client] = None
         self._asset_cache: Dict[str, UUID] = {}
         self._target_cache: Dict[UUID, int] = {}
+        self._cost_center_cache: Dict[UUID, Dict] = {}  # Story 2.7: Cache for financial calc
 
         # Configuration from environment
         self._poll_window_minutes: int = int(
@@ -251,6 +259,81 @@ class LivePulsePipeline:
     def _get_target_output(self, asset_id: UUID) -> int:
         """Get target output for an asset."""
         return self._target_cache.get(asset_id, 0)
+
+    def _load_cost_centers(self) -> Dict[UUID, Dict]:
+        """
+        Load cost center data for financial calculations (Story 2.7 - AC #7).
+
+        Returns:
+            Dictionary mapping asset_id to cost center info
+        """
+        try:
+            client = self._get_supabase_client()
+            response = client.table("cost_centers").select(
+                "asset_id, standard_hourly_rate, cost_per_unit"
+            ).execute()
+
+            self._cost_center_cache = {}
+            for cc in response.data:
+                asset_id = cc.get("asset_id")
+                if asset_id:
+                    hourly_rate = cc.get("standard_hourly_rate")
+                    cost_per_unit = cc.get("cost_per_unit")
+                    self._cost_center_cache[UUID(asset_id)] = {
+                        "hourly_rate": Decimal(str(hourly_rate)) if hourly_rate else None,
+                        "cost_per_unit": Decimal(str(cost_per_unit)) if cost_per_unit else None,
+                    }
+
+            logger.debug(f"Loaded {len(self._cost_center_cache)} cost centers for financial calc")
+            return self._cost_center_cache
+
+        except Exception as e:
+            logger.warning(f"Failed to load cost centers: {e}")
+            return {}
+
+    def _calculate_financial_loss(
+        self,
+        asset_id: UUID,
+        downtime_minutes: int,
+        waste_count: int
+    ) -> Optional[Decimal]:
+        """
+        Calculate financial loss for an asset (Story 2.7 - AC #7).
+
+        Formula:
+            downtime_loss = (downtime_minutes / 60) * standard_hourly_rate
+            waste_loss = waste_count * cost_per_unit
+            total_loss = downtime_loss + waste_loss
+
+        Args:
+            asset_id: Asset UUID
+            downtime_minutes: Accumulated downtime this shift
+            waste_count: Accumulated waste count this shift
+
+        Returns:
+            Total financial loss as Decimal, or None if no data
+        """
+        from app.core.config import get_settings
+        settings = get_settings()
+
+        cost_center = self._cost_center_cache.get(asset_id, {})
+
+        # Get hourly rate (with fallback to default)
+        hourly_rate = cost_center.get("hourly_rate")
+        if hourly_rate is None or hourly_rate <= 0:
+            hourly_rate = Decimal(str(settings.default_hourly_rate))
+
+        # Get cost per unit (with fallback to default)
+        cost_per_unit = cost_center.get("cost_per_unit")
+        if cost_per_unit is None or cost_per_unit <= 0:
+            cost_per_unit = Decimal(str(settings.default_cost_per_unit))
+
+        # Calculate losses
+        downtime_loss = (Decimal(downtime_minutes) / Decimal(60)) * hourly_rate
+        waste_loss = Decimal(waste_count) * cost_per_unit
+        total_loss = downtime_loss + waste_loss
+
+        return total_loss.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
     @retry(
         stop=stop_after_attempt(3),
@@ -439,7 +522,9 @@ class LivePulsePipeline:
     def create_live_snapshots(
         self,
         production_records: List[dict],
-        oee_data: Dict[str, Decimal]
+        oee_data: Dict[str, Decimal],
+        downtime_data: Optional[Dict[str, int]] = None,
+        waste_data: Optional[Dict[str, int]] = None
     ) -> List[LiveSnapshotData]:
         """
         Create live snapshot objects from production data.
@@ -447,11 +532,19 @@ class LivePulsePipeline:
         Args:
             production_records: Production data from MSSQL
             oee_data: Current OEE values by source_id
+            downtime_data: Downtime minutes by source_id (Story 2.7)
+            waste_data: Waste counts by source_id (Story 2.7)
 
         Returns:
             List of snapshot objects to write
         """
         snapshots = []
+        downtime_data = downtime_data or {}
+        waste_data = waste_data or {}
+
+        # Load cost centers for financial calculations (Story 2.7)
+        if not self._cost_center_cache:
+            self._load_cost_centers()
 
         for record in production_records:
             source_id = record.get("source_id")
@@ -465,12 +558,20 @@ class LivePulsePipeline:
             output_target = self._get_target_output(asset_id)
             oee_current = oee_data.get(source_id)
 
+            # Story 2.7 - AC #7: Calculate financial impact for live snapshot
+            downtime_minutes = downtime_data.get(source_id, 0)
+            waste_count = waste_data.get(source_id, 0)
+            financial_loss = self._calculate_financial_loss(
+                asset_id, downtime_minutes, waste_count
+            )
+
             snapshot = LiveSnapshotData(
                 asset_id=asset_id,
                 source_id=source_id,
                 output_actual=output_actual,
                 output_target=output_target,
                 oee_current=oee_current,
+                financial_loss_dollars=financial_loss,
             )
             snapshots.append(snapshot)
 

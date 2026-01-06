@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     pipeline_retry_count: int = 3
     pipeline_log_level: str = "INFO"
 
+    # Financial Configuration (Story 2.7)
+    default_hourly_rate: float = 100.00
+    default_cost_per_unit: float = 10.00
+    financial_currency: str = "USD"
+
     @property
     def mssql_connection_string(self) -> str:
         """Build MSSQL connection string with proper URL encoding for special characters."""

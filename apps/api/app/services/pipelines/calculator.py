@@ -35,7 +35,20 @@ class CalculationError(Exception):
 # Default values for edge cases
 DEFAULT_SHIFT_HOURS = 8  # 8-hour shift
 DEFAULT_IDEAL_CYCLE_RATE = 100  # units per hour (override per asset if needed)
-DEFAULT_UNIT_COST = Decimal("10.00")  # Default cost per unit for waste
+
+# Get defaults from settings (AC #8 - configurable defaults)
+def _get_default_hourly_rate() -> Decimal:
+    """Get default hourly rate from settings."""
+    settings = get_settings()
+    return Decimal(str(settings.default_hourly_rate))
+
+def _get_default_unit_cost() -> Decimal:
+    """Get default cost per unit from settings."""
+    settings = get_settings()
+    return Decimal(str(settings.default_cost_per_unit))
+
+# Keep for backwards compatibility
+DEFAULT_UNIT_COST = Decimal("10.00")  # Will use settings-based function where needed
 
 
 class Calculator:
@@ -89,16 +102,19 @@ class Calculator:
         try:
             client = self._get_supabase_client()
             response = client.table("cost_centers").select(
-                "id, asset_id, standard_hourly_rate"
+                "id, asset_id, standard_hourly_rate, cost_per_unit"
             ).execute()
 
             self._cost_center_cache = {}
             for cc in response.data:
                 asset_id = cc.get("asset_id")
                 if asset_id:
+                    hourly_rate = cc.get("standard_hourly_rate")
+                    cost_per_unit = cc.get("cost_per_unit")
                     self._cost_center_cache[UUID(asset_id)] = {
                         "id": UUID(cc.get("id")),
-                        "hourly_rate": Decimal(str(cc.get("standard_hourly_rate", 0))),
+                        "hourly_rate": Decimal(str(hourly_rate)) if hourly_rate is not None else None,
+                        "cost_per_unit": Decimal(str(cost_per_unit)) if cost_per_unit is not None else None,
                     }
 
             logger.info(f"Loaded {len(self._cost_center_cache)} cost centers")
@@ -108,7 +124,7 @@ class Calculator:
             logger.error(f"Failed to load cost centers: {e}")
             raise CalculationError(f"Failed to load cost centers: {e}") from e
 
-    def get_hourly_rate(self, asset_id: UUID) -> Decimal:
+    def get_hourly_rate(self, asset_id: UUID) -> Tuple[Decimal, bool]:
         """
         Get the hourly rate for an asset from its cost center.
 
@@ -116,13 +132,47 @@ class Calculator:
             asset_id: UUID of the asset
 
         Returns:
-            Hourly rate as Decimal, or 0 if not found
+            Tuple of (hourly_rate, is_estimated)
+            is_estimated is True if using default rate (AC #8)
         """
         if not self._cost_center_cache:
             self.load_cost_centers()
 
         cost_center = self._cost_center_cache.get(asset_id, {})
-        return cost_center.get("hourly_rate", Decimal("0"))
+        hourly_rate = cost_center.get("hourly_rate")
+
+        if hourly_rate is not None and hourly_rate > 0:
+            return hourly_rate, False
+
+        # Use configurable default rate (AC #8)
+        default_rate = _get_default_hourly_rate()
+        logger.warning(f"Using default hourly rate ${default_rate} for asset {asset_id}")
+        return default_rate, True
+
+    def get_cost_per_unit(self, asset_id: UUID) -> Tuple[Decimal, bool]:
+        """
+        Get the cost per unit for an asset from its cost center.
+
+        Args:
+            asset_id: UUID of the asset
+
+        Returns:
+            Tuple of (cost_per_unit, is_estimated)
+            is_estimated is True if using default rate (AC #8)
+        """
+        if not self._cost_center_cache:
+            self.load_cost_centers()
+
+        cost_center = self._cost_center_cache.get(asset_id, {})
+        cost_per_unit = cost_center.get("cost_per_unit")
+
+        if cost_per_unit is not None and cost_per_unit > 0:
+            return cost_per_unit, False
+
+        # Use configurable default rate (AC #8)
+        default_cost = _get_default_unit_cost()
+        logger.debug(f"Using default cost per unit ${default_cost} for asset {asset_id}")
+        return default_cost, True
 
     def _safe_divide(
         self,
@@ -326,29 +376,33 @@ class Calculator:
         Waste Cost = Scrap Units x Unit Cost
         Total Loss = Downtime Cost + Waste Cost
 
+        Uses cost_centers table for rates with fallback to configurable defaults (AC #8).
+
         Args:
             data: Cleaned production data
             hourly_rate: Override for hourly rate. If None, loaded from cost center.
-            unit_cost: Override for unit cost. Defaults to DEFAULT_UNIT_COST.
+            unit_cost: Override for unit cost. If None, loaded from cost center.
 
         Returns:
             FinancialMetrics with cost breakdown
         """
-        # Get hourly rate from cost center if not provided
+        # Get hourly rate from cost center if not provided (AC #2)
         if hourly_rate is None:
-            hourly_rate = self.get_hourly_rate(data.asset_id)
+            hourly_rate, _ = self.get_hourly_rate(data.asset_id)
 
+        # Get cost per unit from cost center if not provided (AC #3)
         if unit_cost is None:
-            unit_cost = DEFAULT_UNIT_COST
+            unit_cost, _ = self.get_cost_per_unit(data.asset_id)
 
-        # Calculate downtime cost
-        # Cost = (minutes / 60) * hourly_rate
+        # Calculate downtime cost (AC #2)
+        # Formula: financial_loss = (downtime_minutes / 60) * standard_hourly_rate
         downtime_cost = (Decimal(data.total_downtime_minutes) / Decimal(60)) * hourly_rate
 
-        # Calculate waste cost
+        # Calculate waste cost (AC #3)
+        # Formula: waste_loss = waste_count * cost_per_unit
         waste_cost = Decimal(data.units_scrapped) * unit_cost
 
-        # Total loss
+        # Total loss (AC #4)
         total_loss = downtime_cost + waste_cost
 
         # Round to 2 decimal places for currency
