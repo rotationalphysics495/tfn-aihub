@@ -1,4 +1,5 @@
 import '@testing-library/react'
+import '@testing-library/jest-dom/vitest'
 
 // Mock Next.js router
 vi.mock('next/navigation', () => ({

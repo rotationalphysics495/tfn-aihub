@@ -2,50 +2,171 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Industrial Clarity Design System
+ *
+ * High-contrast design system optimized for factory floor visibility.
+ * Readable from 3 feet away on tablets under industrial lighting conditions.
+ *
+ * CRITICAL: Safety Red (#DC2626) is reserved EXCLUSIVELY for safety incidents.
+ * DO NOT use for error states, destructive buttons, or general warnings.
+ */
+
 @layer base {
   :root {
+    /* Base theme colors - Light mode optimized for bright factory floor */
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 220 13% 10%;
+
+    /* Card surfaces */
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 220 13% 10%;
+
+    /* Popover */
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 222.2 47.4% 11.2%;
+    --popover-foreground: 220 13% 10%;
+
+    /* Primary - Industrial steel blue for main actions */
+    --primary: 220 13% 18%;
     --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+
+    /* Secondary - Muted industrial */
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 13% 18%;
+
+    /* Muted - For subtle text and backgrounds */
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 9% 46%;
+
+    /* Accent - Neutral accent */
+    --accent: 220 14% 96%;
+    --accent-foreground: 220 13% 18%;
+
+    /* Destructive - Amber for non-safety destructive actions */
+    /* NOTE: This is NOT safety-red. Safety-red is reserved for incidents only. */
+    --destructive: 35 92% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Border and input */
+    --border: 220 13% 86%;
+    --input: 220 13% 86%;
+
+    /* Focus ring */
+    --ring: 220 13% 18%;
+
+    /* Border radius */
     --radius: 0.5rem;
+
+    /* ====== Industrial Clarity Mode Variables ====== */
+
+    /* Retrospective mode - cool/static analysis */
+    --retrospective-primary: 220 9% 46%;
+    --retrospective-surface: 220 14% 96%;
+    --retrospective-border: 220 13% 83%;
+
+    /* Live mode - vibrant/real-time monitoring */
+    --live-primary: 258 90% 66%;
+    --live-surface: 259 100% 97%;
+    --live-border: 258 77% 73%;
+    --live-pulse: 262 83% 58%;
+
+    /* ====== Status Colors (CSS Variables for dynamic theming) ====== */
+
+    /* Safety - RESERVED FOR INCIDENTS ONLY */
+    --safety-red: 0 84% 50%;
+    --safety-red-light: 0 86% 97%;
+    --safety-red-dark: 0 74% 35%;
+
+    /* Warning - For non-safety alerts */
+    --warning-amber: 38 92% 50%;
+    --warning-amber-light: 48 96% 93%;
+    --warning-amber-dark: 32 95% 38%;
+
+    /* Info */
+    --info-blue: 217 91% 60%;
+    --info-blue-light: 214 100% 93%;
+    --info-blue-dark: 224 76% 48%;
+
+    /* Success */
+    --success-green: 160 84% 39%;
+    --success-green-light: 149 80% 90%;
+    --success-green-dark: 163 94% 24%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
+    /* Dark mode - Optimized for low-light factory areas */
+    --background: 220 13% 5%;
     --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
+
+    /* Card surfaces - slightly elevated from background */
+    --card: 220 13% 8%;
     --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
+
+    /* Popover */
+    --popover: 220 13% 8%;
     --popover-foreground: 210 40% 98%;
+
+    /* Primary */
     --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
+    --primary-foreground: 220 13% 10%;
+
+    /* Secondary */
+    --secondary: 217 33% 17%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
+
+    /* Muted */
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+
+    /* Accent */
+    --accent: 217 33% 17%;
     --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+
+    /* Destructive - Amber for non-safety destructive actions */
+    --destructive: 35 92% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Border and input */
+    --border: 217 33% 20%;
+    --input: 217 33% 20%;
+
+    /* Focus ring */
+    --ring: 212 27% 84%;
+
+    /* ====== Dark Mode Industrial Clarity Modes ====== */
+
+    /* Retrospective mode - cool/static analysis (dark) */
+    --retrospective-primary: 220 9% 64%;
+    --retrospective-surface: 220 13% 15%;
+    --retrospective-border: 220 13% 25%;
+
+    /* Live mode - vibrant/real-time monitoring (dark) */
+    --live-primary: 258 90% 66%;
+    --live-surface: 270 59% 12%;
+    --live-border: 263 70% 50%;
+    --live-pulse: 262 83% 58%;
+
+    /* ====== Dark Mode Status Colors ====== */
+
+    /* Safety - RESERVED FOR INCIDENTS ONLY */
+    --safety-red: 0 72% 51%;
+    --safety-red-light: 0 74% 25%;
+    --safety-red-dark: 0 84% 60%;
+
+    /* Warning */
+    --warning-amber: 38 92% 50%;
+    --warning-amber-light: 32 80% 25%;
+    --warning-amber-dark: 38 92% 60%;
+
+    /* Info */
+    --info-blue: 217 91% 60%;
+    --info-blue-light: 224 76% 25%;
+    --info-blue-dark: 214 100% 70%;
+
+    /* Success */
+    --success-green: 160 84% 39%;
+    --success-green-light: 163 70% 20%;
+    --success-green-dark: 149 80% 60%;
   }
 }
 
@@ -53,7 +174,96 @@
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
+    /* Font smoothing for optimal screen readability */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Focus-visible styles for keyboard navigation - WCAG compliance */
+  :focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+}
+
+@layer components {
+  /* Typography utility classes for industrial contexts */
+
+  /* Dashboard metric - large, bold numbers readable from 3 feet */
+  .metric-display {
+    @apply text-5xl font-bold tracking-tight tabular-nums;
+  }
+
+  /* Page title */
+  .page-title {
+    @apply text-4xl font-bold tracking-tight;
+  }
+
+  /* Section header */
+  .section-header {
+    @apply text-3xl font-semibold tracking-tight;
+  }
+
+  /* Card title */
+  .card-title {
+    @apply text-xl font-semibold;
+  }
+
+  /* Body text - minimum 16px (using our sm = 16px) */
+  .body-text {
+    @apply text-base leading-relaxed;
+  }
+
+  /* Label text - minimum visible size */
+  .label-text {
+    @apply text-sm font-medium;
+  }
+
+  /* Caption - smallest allowed */
+  .caption-text {
+    @apply text-xs text-muted-foreground;
+  }
+
+  /* Mode-specific card styles */
+  .card-retrospective {
+    @apply bg-retrospective-surface border-retrospective-border;
+  }
+
+  .card-live {
+    @apply bg-live-surface border-live-border;
+  }
+
+  /* Safety incident styling - USE ONLY FOR ACTUAL SAFETY INCIDENTS */
+  .safety-incident {
+    @apply bg-safety-red-light border-safety-red text-safety-red-dark;
+  }
+
+  .safety-incident-dark {
+    @apply dark:bg-safety-red-dark/20 dark:border-safety-red dark:text-safety-red;
+  }
+}
+
+@layer utilities {
+  /* Animation utilities for live mode */
+  .animate-live {
+    @apply animate-live-pulse;
+  }
+
+  /* Safety animation - only for critical safety alerts */
+  .animate-safety {
+    @apply animate-safety-pulse;
+  }
+
+  /* High contrast utilities for factory floor visibility */
+  .high-contrast {
+    @apply font-semibold tracking-tight;
+  }
+
+  /* Tablet-optimized touch targets (minimum 44x44px) */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
   }
 }
