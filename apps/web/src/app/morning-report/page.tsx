@@ -2,7 +2,8 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { LogoutButton } from '@/app/dashboard/logout-button'
 import { SafetyAlertsSection, SafetyHeaderIndicator } from '@/components/dashboard'
-import { MorningSummarySection, ActionListContainer } from '@/components/action-list'
+import { MorningSummarySection } from '@/components/action-list'
+import { InsightEvidenceCardList } from '@/components/action-engine'
 import { ViewModeToggle, Breadcrumb } from '@/components/navigation'
 
 /**
@@ -101,11 +102,12 @@ export default async function MorningReportPage() {
           <MorningSummarySection />
 
           {/* Action List - Primary content area - AC #2 */}
-          <section aria-label="Action items">
+          {/* Story 3.4: Insight + Evidence Cards - recommendation + supporting data */}
+          <section aria-label="Action items with evidence">
             <h2 className="section-header text-foreground mb-4">
               Today&apos;s Action Items
             </h2>
-            <ActionListContainer />
+            <InsightEvidenceCardList />
           </section>
         </div>
       </div>
