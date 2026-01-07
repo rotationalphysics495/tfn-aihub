@@ -435,20 +435,81 @@ def get_pipeline() -> MorningReportPipeline:
 
 async def run_morning_report(
     target_date: Optional[date] = None,
-    force: bool = False
+    force: bool = False,
+    generate_smart_summary: bool = True,
 ) -> PipelineResult:
     """
     Convenience function to run the morning report pipeline.
 
+    Story 3.5 AC#9: Triggers Smart Summary generation after pipeline success.
+
     Args:
         target_date: Date to process. Defaults to yesterday (T-1).
         force: If True, re-run even if data already exists.
+        generate_smart_summary: If True, trigger smart summary after pipeline.
 
     Returns:
         PipelineResult with execution details
     """
     pipeline = get_pipeline()
-    return await pipeline.run(target_date, force)
+    result = await pipeline.run(target_date, force)
+
+    # AC#9: Trigger Smart Summary generation after pipeline success
+    if generate_smart_summary and result.status in (
+        PipelineStatus.SUCCESS,
+        PipelineStatus.PARTIAL
+    ):
+        await _trigger_smart_summary_generation(
+            target_date or (date.today() - timedelta(days=1))
+        )
+
+    return result
+
+
+async def _trigger_smart_summary_generation(target_date: date) -> None:
+    """
+    Trigger Smart Summary generation after pipeline completion.
+
+    Story 3.5 AC#9:
+    - Smart Summary generation is triggered automatically after pipeline success
+    - Handle pipeline failures gracefully (don't block on summary)
+    - Summary is available before 06:30 AM
+
+    Args:
+        target_date: Date to generate summary for
+    """
+    try:
+        from app.services.ai.smart_summary import get_smart_summary_service
+
+        logger.info(f"Triggering Smart Summary generation for {target_date}")
+
+        service = get_smart_summary_service()
+
+        # Invalidate any existing cache to ensure fresh data is used
+        await service.invalidate_cache(target_date)
+
+        # Generate new summary
+        summary = await service.generate_smart_summary(
+            target_date=target_date,
+            regenerate=True,  # Force fresh generation with new pipeline data
+        )
+
+        if summary.is_fallback:
+            logger.warning(
+                f"Smart Summary generated with fallback for {target_date}"
+            )
+        else:
+            logger.info(
+                f"Smart Summary generated successfully for {target_date} "
+                f"in {summary.generation_duration_ms}ms"
+            )
+
+    except Exception as e:
+        # AC#9: Handle failures gracefully - don't block pipeline on summary errors
+        logger.error(
+            f"Smart Summary generation failed for {target_date}: {e}. "
+            f"Pipeline result is not affected."
+        )
 
 
 # CLI entry point for Railway Cron
