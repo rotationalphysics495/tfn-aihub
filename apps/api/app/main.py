@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import health, assets, summaries, actions, auth, pipelines, production, oee, downtime, safety, financial, live_pulse, memory
+from app.api import health, assets, summaries, actions, auth, pipelines, production, oee, downtime, safety, financial, live_pulse, memory, chat
 from app.core.database import initialize_database, shutdown_database
 from app.services.scheduler import get_scheduler
 from app.services.pipelines.live_pulse import run_live_pulse_poll
@@ -73,6 +73,8 @@ app.include_router(financial.router, prefix="/api/financial", tags=["Financial"]
 app.include_router(live_pulse.router, prefix="/api/live-pulse", tags=["Live Pulse"])
 # Story 4.1: Memory API for Mem0 vector memory integration
 app.include_router(memory.router, prefix="/api/memory", tags=["Memory"])
+# Story 4.2: Chat API for Text-to-SQL natural language queries
+app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
 
 
 @app.get("/")
