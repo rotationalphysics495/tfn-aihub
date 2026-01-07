@@ -425,6 +425,11 @@ If test data is not available, some scenarios will show empty states - this is e
 
 **Objective:** Verify Morning Report and action endpoints require login.
 
+**Automated Verification Command:**
+```bash
+cd apps/api && source venv/bin/activate && python -m pytest tests/test_actions_api.py::TestVersionedDailyActionListEndpoint::test_v1_daily_endpoint_requires_auth tests/test_auth.py::TestProtectedActionEndpoints -v
+```
+
 | Step | Action | Expected Result |
 |------|--------|-----------------|
 | 20.1 | Log out of the application | Redirected to login page |
