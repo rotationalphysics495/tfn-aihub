@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import health, assets, summaries, actions, auth, pipelines, production, oee, downtime, safety, financial, live_pulse, memory, chat, asset_history
+from app.api import health, assets, summaries, actions, auth, pipelines, production, oee, downtime, safety, financial, live_pulse, memory, chat, asset_history, citations
 from app.core.database import initialize_database, shutdown_database
 from app.services.scheduler import get_scheduler
 from app.services.pipelines.live_pulse import run_live_pulse_poll
@@ -77,6 +77,8 @@ app.include_router(memory.router, prefix="/api/memory", tags=["Memory"])
 app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
 # Story 4.4: Asset History Memory API for historical context
 app.include_router(asset_history.router, prefix="/api/assets", tags=["Asset History"])
+# Story 4.5: Citations API for cited response generation
+app.include_router(citations.router, prefix="/api/citations", tags=["Citations"])
 
 
 @app.get("/")

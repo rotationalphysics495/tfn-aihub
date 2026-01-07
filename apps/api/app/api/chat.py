@@ -1,21 +1,28 @@
 """
-Chat API Endpoints (Story 4.2)
+Chat API Endpoints (Story 4.2, 4.5)
 
-REST API for Text-to-SQL natural language query interface.
+REST API for Text-to-SQL natural language query interface with cited responses.
 
-AC#8: API Endpoint Design
+AC#8 (Story 4.2): API Endpoint Design
 - POST /api/chat/query with body { "question": string, "context"?: object }
 - Responses follow format { "answer": string, "sql": string, "data": object, "citations": array }
 - Protected with Supabase JWT authentication
 - Rate limiting implemented
+
+Story 4.5 Integration:
+- All responses include grounded citations (AC#1)
+- Grounding score included in response metadata (AC#3)
+- NFR1 compliance: All factual claims cite data sources (AC#7)
 """
 
 import logging
+import re
 import time
 from collections import defaultdict
 from functools import lru_cache
+from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.core.config import get_settings
 from app.core.security import get_current_user
@@ -33,6 +40,10 @@ from app.services.ai.text_to_sql import (
     get_text_to_sql_service,
 )
 from app.services.ai.text_to_sql.prompts import TABLE_DESCRIPTIONS
+from app.services.cited_response_service import (
+    CitedResponseService,
+    get_cited_response_service,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +67,21 @@ _rate_limit_store: dict = defaultdict(list)
 def get_service() -> TextToSQLService:
     """Dependency to get Text-to-SQL service instance."""
     return get_text_to_sql_service()
+
+
+def get_cited_service() -> CitedResponseService:
+    """Dependency to get Cited Response service instance."""
+    return get_cited_response_service()
+
+
+def _extract_source_table(sql: Optional[str]) -> Optional[str]:
+    """Extract the primary source table from SQL query."""
+    if not sql:
+        return None
+    match = re.search(r"\bFROM\s+([a-zA-Z_][a-zA-Z0-9_]*)", sql, re.IGNORECASE)
+    if match:
+        return match.group(1).lower()
+    return None
 
 
 def check_rate_limit(user_id: str) -> None:
@@ -101,7 +127,8 @@ def check_rate_limit(user_id: str) -> None:
     The system will:
     1. Parse your question into a SQL query
     2. Execute the query against the manufacturing database
-    3. Return a natural language answer with data citations
+    3. Validate response grounding against data sources (Story 4.5)
+    4. Return a natural language answer with verified data citations
 
     **Supported Topics:**
     - OEE (Overall Equipment Effectiveness)
@@ -115,16 +142,27 @@ def check_rate_limit(user_id: str) -> None:
     - "Which asset had the most downtime last week?"
     - "Show me all safety events this month"
     - "What's the total financial loss for the Grinding area?"
+
+    **Story 4.5 Features:**
+    - All responses include inline citations [Source: table/record]
+    - Grounding score indicates response reliability
+    - NFR1 compliant: All claims cite specific data points
     """,
 )
 async def query_data(
     query_input: QueryInput,
+    enable_grounding: bool = Query(
+        True,
+        description="Enable Story 4.5 grounding validation and citation generation"
+    ),
     current_user: CurrentUser = Depends(get_current_user),
     service: TextToSQLService = Depends(get_service),
+    cited_service: CitedResponseService = Depends(get_cited_service),
 ) -> QueryResponse:
     """
     Process a natural language query about plant data.
 
+    Story 4.2:
     AC#2: Natural language question is processed
     AC#3: Query executes and returns formatted results
     AC#4: Response includes data citations
@@ -133,10 +171,18 @@ async def query_data(
     AC#7: Context is accepted for enhancement
     AC#8: Protected with Supabase JWT authentication
 
+    Story 4.5:
+    AC#1: Response includes inline citations
+    AC#3: Grounding validation with 0.6 threshold
+    AC#7: NFR1 compliance - all factual claims cite sources
+    AC#8: Citation generation within 500ms
+
     Args:
         query_input: The question and optional context
+        enable_grounding: Enable Story 4.5 citation generation
         current_user: Authenticated user from JWT
         service: Text-to-SQL service instance
+        cited_service: Cited response service instance
 
     Returns:
         QueryResponse with answer, SQL, data, and citations
@@ -162,11 +208,44 @@ async def query_data(
             context=context,
         )
 
+        # Story 4.5: Enhance response with grounding validation and citations
+        if enable_grounding and not result.get("error"):
+            try:
+                # Extract source table from SQL
+                source_table = _extract_source_table(result.get("sql"))
+
+                # Process response through citation service
+                cited_result = await cited_service.process_chat_response(
+                    raw_response=result["answer"],
+                    query_text=query_input.question,
+                    user_id=current_user.id,
+                    sql=result.get("sql"),
+                    data=result.get("data", []),
+                    source_table=source_table,
+                    context=context,
+                )
+
+                # Update result with cited response
+                result["answer"] = cited_result["answer"]
+                result["citations"] = cited_result["citations"]
+
+                # Add Story 4.5 metadata
+                if "meta" not in result:
+                    result["meta"] = {}
+                result["meta"]["grounding_score"] = cited_result.get("grounding_score", 0.0)
+                result["meta"]["ungrounded_claims"] = cited_result.get("ungrounded_claims", [])
+                result["meta"]["citation_meta"] = cited_result.get("meta", {})
+
+            except Exception as e:
+                # Story 4.5 graceful degradation - continue without citations
+                logger.warning(f"Citation generation failed (graceful degradation): {e}")
+
         # Log for analytics
         logger.info(
             f"Query processed: user={current_user.id}, "
             f"question='{query_input.question[:50]}...', "
-            f"rows={result.get('row_count', 0)}"
+            f"rows={result.get('row_count', 0)}, "
+            f"grounding={result.get('meta', {}).get('grounding_score', 'N/A')}"
         )
 
         # Convert citations to Pydantic models

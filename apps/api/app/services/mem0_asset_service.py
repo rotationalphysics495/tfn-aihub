@@ -358,6 +358,134 @@ class Mem0AssetService:
             logger.error(f"Failed to get all asset memories: {e}")
             return []
 
+    async def retrieve_memories_with_provenance(
+        self,
+        asset_id: UUID,
+        query: str,
+        limit: int = 5,
+    ) -> List[Dict[str, Any]]:
+        """
+        Retrieve memories with full provenance for citation.
+
+        Story 4.5 AC#6: Historical context from Mem0 includes memory provenance.
+        Returns memories with memory_id, timestamp, and source context.
+
+        Args:
+            asset_id: Asset identifier
+            query: Search query
+            limit: Maximum number of results
+
+        Returns:
+            List of memories with full provenance metadata including:
+            - memory_id: Unique identifier for citation
+            - content: Memory content text
+            - created_at: When the memory was stored
+            - source_event: Original event type if applicable
+            - similarity: Relevance score for this query
+            - asset_id: Asset identifier
+            - asset_name: Human-readable asset name
+        """
+        self._ensure_initialized()
+
+        try:
+            user_id = f"asset:{asset_id}"
+
+            results = self._memory.search(
+                query,
+                user_id=user_id,
+                limit=limit
+            )
+
+            memories = results.get("results", []) if isinstance(results, dict) else results
+
+            # Format memories with full provenance for citations
+            provenance_memories = []
+            for mem in memories:
+                metadata = mem.get("metadata", {})
+
+                provenance = {
+                    "memory_id": mem.get("id", mem.get("memory_id")),
+                    "content": mem.get("memory", mem.get("content", "")),
+                    "created_at": metadata.get("timestamp") or mem.get("created_at"),
+                    "source_event": metadata.get("event_type"),
+                    "similarity": mem.get("score", mem.get("similarity", 0)),
+                    "asset_id": str(asset_id),
+                    "asset_name": metadata.get("asset_name"),
+                    "title": metadata.get("title"),
+                    "area": metadata.get("area"),
+                    "memory_type": metadata.get("memory_type", "asset_history"),
+                    "raw_metadata": metadata,
+                }
+                provenance_memories.append(provenance)
+
+            logger.debug(
+                f"Retrieved {len(provenance_memories)} memories with provenance "
+                f"for asset {asset_id}"
+            )
+            return provenance_memories
+
+        except Exception as e:
+            logger.error(f"Failed to retrieve memories with provenance: {e}")
+            return []
+
+    async def retrieve_user_preference_memories(
+        self,
+        user_id: str,
+        query: str,
+        limit: int = 5,
+    ) -> List[Dict[str, Any]]:
+        """
+        Retrieve user preference memories with provenance.
+
+        Story 4.5 AC#6: User preference citations include when preference was learned.
+
+        Args:
+            user_id: User identifier
+            query: Search query
+            limit: Maximum number of results
+
+        Returns:
+            List of user preference memories with provenance
+        """
+        self._ensure_initialized()
+
+        try:
+            results = self._memory.search(
+                query,
+                user_id=user_id,
+                limit=limit
+            )
+
+            memories = results.get("results", []) if isinstance(results, dict) else results
+
+            # Filter for user preferences and add provenance
+            preference_memories = []
+            for mem in memories:
+                metadata = mem.get("metadata", {})
+
+                # Include if it's a user preference or general memory
+                if metadata.get("memory_type") in ["user_preference", "user_context", None]:
+                    provenance = {
+                        "memory_id": mem.get("id", mem.get("memory_id")),
+                        "content": mem.get("memory", mem.get("content", "")),
+                        "learned_at": metadata.get("timestamp") or mem.get("created_at"),
+                        "preference_type": metadata.get("preference_type"),
+                        "similarity": mem.get("score", mem.get("similarity", 0)),
+                        "user_id": user_id,
+                        "raw_metadata": metadata,
+                    }
+                    preference_memories.append(provenance)
+
+            logger.debug(
+                f"Retrieved {len(preference_memories)} user preference memories "
+                f"for user {user_id}"
+            )
+            return preference_memories
+
+        except Exception as e:
+            logger.error(f"Failed to retrieve user preference memories: {e}")
+            return []
+
     def is_configured(self) -> bool:
         """Check if the service is properly configured."""
         settings = self._get_settings()

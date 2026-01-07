@@ -1,6 +1,6 @@
 # Story 4.5: Cited Response Generation
 
-Status: ready-for-dev
+Status: Done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -479,10 +479,61 @@ interface CitationDetailResponse {
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Debug Log References
 
+N/A
+
 ### Completion Notes List
 
+1. **Task 1: Citation Data Model** - Completed. Created comprehensive Pydantic models in `apps/api/app/models/citation.py` including Citation, Claim, ClaimType, CitedResponse, GroundingResult, CitationLogEntry, CitationDetailResponse, and SourceLookupResponse. Created database migration `supabase/migrations/20260107000001_citation_logs.sql` with citation_logs and system_alerts tables, including trigger for low grounding alerts.
+
+2. **Task 2: Grounding Validation Service** - Completed. Created `apps/api/app/services/grounding_service.py` implementing three-step grounding approach: claim extraction using LLM, source matching with semantic similarity, and grounding score calculation. Includes fallback response generation for low-grounding claims.
+
+3. **Task 3: Citation Generator** - Completed. Created `apps/api/app/services/citation_generator.py` with methods for generating citations from database records, Mem0 memories, calculations, and inferences. Includes multi-source aggregation, primary source selection, and inline citation formatting.
+
+4. **Task 4: Mem0 Memory Citations** - Completed. Extended `apps/api/app/services/mem0_asset_service.py` with `retrieve_memories_with_provenance()` method returning memory_id, created_at, source_event, and similarity for proper citation provenance.
+
+5. **Task 5: Citation API Endpoints** - Completed. Created `apps/api/app/api/citations.py` with endpoints for citation detail lookup, source data lookup, audit log access, and statistics. Includes 5-minute caching for performance. Registered in main.py.
+
+6. **Task 6: Chat Response Chain Integration** - Completed. Updated `apps/api/app/api/chat.py` to integrate CitedResponseService with optional grounding via `enable_grounding` query parameter. Added source table extraction helper.
+
+7. **Task 7: Citation UI Components** - Completed. Created frontend components:
+   - `apps/web/src/components/chat/CitationLink.tsx` - Inline citation with color-coded source types
+   - `apps/web/src/components/chat/CitationPanel.tsx` - Side panel Sheet for source data display
+   - Updated `apps/web/src/components/chat/types.ts` with SourceType and extended Citation/Message interfaces
+   - Updated `apps/web/src/components/chat/ChatMessage.tsx` with grounding score badges and citation integration
+
+8. **Task 8: Audit Logging** - Completed. Created `apps/api/app/services/citation_audit_service.py` with async queue-based logging to minimize latency impact. Created orchestration service `apps/api/app/services/cited_response_service.py` as main entry point.
+
+9. **Task 9: Testing and Validation** - Completed. Created comprehensive test suites:
+   - `apps/api/tests/test_grounding_service.py` - 17 tests for claim extraction, validation, and performance
+   - `apps/api/tests/test_citation_generator.py` - 21 tests for citation generation, aggregation, and formatting
+   - `apps/api/tests/test_citation_api.py` - 13 tests for API endpoints
+   - `apps/api/tests/test_cited_response_service.py` - 20 tests for orchestration service
+   - All 71 tests passing
+
 ### File List
+
+**New Files Created:**
+- `supabase/migrations/20260107000001_citation_logs.sql`
+- `apps/api/app/models/citation.py` (extended existing)
+- `apps/api/app/services/grounding_service.py`
+- `apps/api/app/services/citation_generator.py`
+- `apps/api/app/services/citation_audit_service.py`
+- `apps/api/app/services/cited_response_service.py`
+- `apps/api/app/api/citations.py`
+- `apps/web/src/components/chat/CitationLink.tsx`
+- `apps/web/src/components/chat/CitationPanel.tsx`
+- `apps/api/tests/test_grounding_service.py`
+- `apps/api/tests/test_citation_generator.py`
+- `apps/api/tests/test_citation_api.py`
+- `apps/api/tests/test_cited_response_service.py`
+
+**Modified Files:**
+- `apps/api/app/main.py` - Added citations router
+- `apps/api/app/api/chat.py` - Integrated citation service
+- `apps/api/app/services/mem0_asset_service.py` - Added provenance methods
+- `apps/web/src/components/chat/types.ts` - Extended with citation types
+- `apps/web/src/components/chat/ChatMessage.tsx` - Added citation rendering

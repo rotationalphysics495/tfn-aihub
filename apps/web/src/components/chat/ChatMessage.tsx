@@ -7,14 +7,18 @@
  * Includes collapsible citation display for AI responses.
  *
  * @see Story 4.3 - Chat Sidebar UI
+ * @see Story 4.5 - Cited Response Generation
  * @see AC #3 - Message Display (clear visual distinction)
  * @see AC #6 - Citation Display (structured evidence area)
  */
 
 import { useState } from 'react'
-import { ChevronDown, ChevronUp, Database } from 'lucide-react'
+import { ChevronDown, ChevronUp, Database, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { CitationLink, type CitationData } from './CitationLink'
+import { CitationPanel } from './CitationPanel'
 import type { Message, Citation } from './types'
 
 interface ChatMessageProps {
@@ -25,14 +29,64 @@ interface ChatMessageProps {
 }
 
 /**
+ * Convert legacy Citation to CitationData format for new components.
+ */
+function convertToCitationData(citation: Citation, index: number): CitationData {
+  return {
+    id: citation.id || `cit-${index}`,
+    sourceType: citation.sourceType || 'database',
+    sourceTable: citation.source,
+    recordId: citation.recordId,
+    memoryId: citation.memoryId,
+    timestamp: citation.timestamp,
+    excerpt: citation.dataPoint,
+    confidence: citation.confidence || 0.8,
+    displayText: citation.displayText || `[Source: ${citation.source}]`,
+  }
+}
+
+/**
  * Individual chat message bubble with role-based styling.
  * - User messages: right-aligned, info-blue background
  * - AI messages: left-aligned, industrial-gray background with citations
+ *
+ * Story 4.5 enhancements:
+ * - Clickable citation links (AC#4)
+ * - Grounding score display (AC#3)
+ * - Citation panel on click (AC#4)
  */
 export function ChatMessage({ message, className }: ChatMessageProps) {
   const [showCitations, setShowCitations] = useState(false)
+  const [selectedCitation, setSelectedCitation] = useState<CitationData | null>(null)
+  const [isPanelOpen, setIsPanelOpen] = useState(false)
+
   const isUser = message.role === 'user'
   const hasCitations = message.citations && message.citations.length > 0
+  const hasGroundingScore = typeof message.groundingScore === 'number'
+
+  // Convert citations to CitationData format
+  const citationData: CitationData[] = hasCitations
+    ? message.citations!.map((c, i) => convertToCitationData(c, i))
+    : []
+
+  // Handle citation click - open panel
+  const handleCitationClick = (citationId: string) => {
+    const citation = citationData.find((c) => c.id === citationId)
+    if (citation) {
+      setSelectedCitation(citation)
+      setIsPanelOpen(true)
+    }
+  }
+
+  // Get grounding status
+  const getGroundingStatus = () => {
+    if (!hasGroundingScore) return null
+    if (message.groundingScore! >= 0.8) return 'high'
+    if (message.groundingScore! >= 0.6) return 'medium'
+    return 'low'
+  }
+
+  const groundingStatus = getGroundingStatus()
 
   return (
     <div
@@ -82,6 +136,39 @@ export function ChatMessage({ message, className }: ChatMessageProps) {
           {message.content}
         </div>
 
+        {/* Story 4.5: Grounding score indicator for AI messages */}
+        {!isUser && hasGroundingScore && (
+          <div className="flex items-center gap-1.5">
+            {groundingStatus === 'high' && (
+              <Badge
+                variant="outline"
+                className="h-5 gap-1 border-green-300 bg-green-50 px-1.5 text-[10px] text-green-700 dark:border-green-700 dark:bg-green-900/20 dark:text-green-400"
+              >
+                <CheckCircle2 className="h-2.5 w-2.5" />
+                Verified
+              </Badge>
+            )}
+            {groundingStatus === 'medium' && (
+              <Badge
+                variant="outline"
+                className="h-5 gap-1 border-yellow-300 bg-yellow-50 px-1.5 text-[10px] text-yellow-700 dark:border-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400"
+              >
+                <Database className="h-2.5 w-2.5" />
+                Partial
+              </Badge>
+            )}
+            {groundingStatus === 'low' && (
+              <Badge
+                variant="outline"
+                className="h-5 gap-1 border-amber-300 bg-amber-50 px-1.5 text-[10px] text-amber-700 dark:border-amber-700 dark:bg-amber-900/20 dark:text-amber-400"
+              >
+                <AlertTriangle className="h-2.5 w-2.5" />
+                Limited
+              </Badge>
+            )}
+          </div>
+        )}
+
         {/* Citations section for AI messages */}
         {!isUser && hasCitations && (
           <div className="w-full">
@@ -105,7 +192,7 @@ export function ChatMessage({ message, className }: ChatMessageProps) {
               )}
             </Button>
 
-            {/* Collapsible citations list */}
+            {/* Collapsible citations list with clickable links (Story 4.5 AC#4) */}
             {showCitations && (
               <div
                 id={`citations-${message.id}`}
@@ -114,14 +201,30 @@ export function ChatMessage({ message, className }: ChatMessageProps) {
                 aria-label="Data sources"
               >
                 <ul className="space-y-2">
-                  {message.citations!.map((citation, index) => (
-                    <CitationItem key={index} citation={citation} />
+                  {citationData.map((citation) => (
+                    <li key={citation.id} className="flex items-start gap-2">
+                      <CitationLink
+                        citation={citation}
+                        onClick={handleCitationClick}
+                      />
+                    </li>
                   ))}
                 </ul>
               </div>
             )}
           </div>
         )}
+
+        {/* Citation Panel (Story 4.5 AC#4) */}
+        <CitationPanel
+          citation={selectedCitation}
+          isOpen={isPanelOpen}
+          onClose={() => {
+            setIsPanelOpen(false)
+            setSelectedCitation(null)
+          }}
+          onRelatedCitationClick={handleCitationClick}
+        />
 
         {/* Timestamp */}
         <span className="text-xs text-muted-foreground">
@@ -132,22 +235,6 @@ export function ChatMessage({ message, className }: ChatMessageProps) {
   )
 }
 
-/**
- * Individual citation display within AI messages.
- */
-function CitationItem({ citation }: { citation: Citation }) {
-  return (
-    <li className="flex flex-col gap-0.5 text-sm">
-      <span className="font-medium text-industrial-700 dark:text-industrial-300">
-        {citation.dataPoint}
-      </span>
-      <span className="text-xs text-muted-foreground">
-        {citation.source}
-        {citation.timestamp && ` • ${citation.timestamp}`}
-      </span>
-    </li>
-  )
-}
 
 /**
  * Format timestamp for display.
