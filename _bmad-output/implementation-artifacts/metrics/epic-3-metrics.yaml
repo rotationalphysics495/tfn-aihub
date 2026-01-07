@@ -9,7 +9,10 @@ stories:
   failed: 0
   skipped: 1
 validation:
-  gate_executed: false
-  gate_status: "PENDING"
-  fix_attempts: 0
+  gate_executed: true
+  gate_status: "PASS"
+  fix_attempts: 2
+  last_fix_time: "2026-01-07T00:40:00Z"
+  scenarios_passed: 1
+  scenarios_total: 1
 issues: []
