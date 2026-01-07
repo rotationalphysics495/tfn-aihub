@@ -29,10 +29,15 @@ class Settings(BaseSettings):
     mssql_max_overflow: int = 10
     mssql_pool_timeout: int = 30
 
-    # Mem0
+    # Mem0 Configuration (Story 4.1)
     mem0_api_key: str = ""
+    supabase_db_url: str = ""  # Direct PostgreSQL connection string for Mem0
+    mem0_collection_name: str = "memories"
+    mem0_embedding_dims: int = 1536
+    mem0_top_k: int = 5
+    mem0_similarity_threshold: float = 0.7
 
-    # OpenAI (for LangChain)
+    # OpenAI (for LangChain and Mem0 embeddings)
     openai_api_key: str = ""
 
     # Pipeline Configuration
@@ -79,6 +84,14 @@ class Settings(BaseSettings):
             self.mssql_database,
             self.mssql_user,
             self.mssql_password
+        ])
+
+    @property
+    def mem0_configured(self) -> bool:
+        """Check if Mem0 memory service is properly configured (Story 4.1 AC#1)."""
+        return all([
+            self.supabase_db_url,
+            self.openai_api_key
         ])
 
 
