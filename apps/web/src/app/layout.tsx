@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
+import { ChatSidebar } from '@/components/chat'
 import './globals.css'
 
 /**
@@ -37,6 +38,9 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           {children}
+          {/* AI Chat Sidebar - accessible from anywhere in the application */}
+          {/* @see Story 4.3 - Chat Sidebar UI, AC #1 */}
+          <ChatSidebar />
         </ThemeProvider>
       </body>
     </html>
