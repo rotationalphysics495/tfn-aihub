@@ -39,14 +39,19 @@ class QueryComplexityError(QueryValidationError):
     pass
 
 
-# Allowed tables whitelist (AC#1, AC#5)
-ALLOWED_TABLES: Set[str] = {
+# Default allowed tables whitelist (AC#1, AC#5)
+# This is the canonical list - service.py also defines ALLOWED_TABLES as a class attribute
+# for API exposure, but both should remain in sync
+DEFAULT_ALLOWED_TABLES: Set[str] = {
     "assets",
     "cost_centers",
     "daily_summaries",
     "live_snapshots",
     "safety_events",
 }
+
+# Alias for backward compatibility
+ALLOWED_TABLES = DEFAULT_ALLOWED_TABLES
 
 # Dangerous SQL patterns to block (AC#5)
 DANGEROUS_PATTERNS: List[Tuple[str, str]] = [

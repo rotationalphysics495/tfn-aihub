@@ -13,6 +13,7 @@ AC#8: API Endpoint Design
 import logging
 import time
 from collections import defaultdict
+from functools import lru_cache
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
@@ -37,9 +38,16 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Rate limiting configuration (AC#8)
-RATE_LIMIT_REQUESTS = 10  # requests per window
-RATE_LIMIT_WINDOW = 60  # seconds
+
+@lru_cache()
+def _get_rate_limit_config():
+    """Get rate limit configuration from settings."""
+    settings = get_settings()
+    return (
+        getattr(settings, 'chat_rate_limit_requests', 10),
+        getattr(settings, 'chat_rate_limit_window', 60),
+    )
+
 
 # Simple in-memory rate limiter
 _rate_limit_store: dict = defaultdict(list)
@@ -54,7 +62,7 @@ def check_rate_limit(user_id: str) -> None:
     """
     Check if user has exceeded rate limit.
 
-    AC#8: Rate limiting (10 requests/minute per user)
+    AC#8: Rate limiting (configurable via settings, default 10 requests/minute per user)
 
     Args:
         user_id: User identifier from JWT
@@ -62,16 +70,17 @@ def check_rate_limit(user_id: str) -> None:
     Raises:
         HTTPException 429: If rate limit exceeded
     """
+    rate_limit_requests, rate_limit_window = _get_rate_limit_config()
     current_time = time.time()
-    window_start = current_time - RATE_LIMIT_WINDOW
+    window_start = current_time - rate_limit_window
 
     # Get user's requests and filter to current window
     user_requests = _rate_limit_store[user_id]
     user_requests = [t for t in user_requests if t > window_start]
     _rate_limit_store[user_id] = user_requests
 
-    if len(user_requests) >= RATE_LIMIT_REQUESTS:
-        wait_time = max(1, int(user_requests[0] + RATE_LIMIT_WINDOW - current_time) + 1)
+    if len(user_requests) >= rate_limit_requests:
+        wait_time = max(1, int(user_requests[0] + rate_limit_window - current_time) + 1)
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"Rate limit exceeded. Please wait {wait_time} seconds before trying again.",

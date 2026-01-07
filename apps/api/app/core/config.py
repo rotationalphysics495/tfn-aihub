@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     # OpenAI (for LangChain and Mem0 embeddings)
     openai_api_key: str = ""
 
+    # Text-to-SQL Configuration (Story 4.2)
+    sql_query_timeout: int = 30  # Max query execution seconds
+    sql_max_rows: int = 100  # Max rows returned
+    chat_rate_limit_requests: int = 10  # Requests per window
+    chat_rate_limit_window: int = 60  # Window in seconds
+
     # Pipeline Configuration
     pipeline_timezone: str = "America/Chicago"
     safety_reason_code: str = "Safety Issue"

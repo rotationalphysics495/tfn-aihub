@@ -93,15 +93,15 @@ class TextToSQLService:
 
     def __init__(
         self,
-        query_timeout: int = DEFAULT_QUERY_TIMEOUT,
-        max_rows: int = DEFAULT_MAX_ROWS,
+        query_timeout: Optional[int] = None,
+        max_rows: Optional[int] = None,
     ):
         """
         Initialize the Text-to-SQL service (lazy initialization).
 
         Args:
-            query_timeout: Maximum query execution time in seconds
-            max_rows: Maximum rows to return from queries
+            query_timeout: Maximum query execution time in seconds (default from settings)
+            max_rows: Maximum rows to return from queries (default from settings)
         """
         self._db: Optional[SQLDatabase] = None
         self._llm: Optional[ChatOpenAI] = None
@@ -109,8 +109,10 @@ class TextToSQLService:
         self._initialized: bool = False
         self._settings = None
 
-        self.query_timeout = query_timeout
-        self.max_rows = max_rows
+        # Use settings if not explicitly provided
+        settings = self._get_settings()
+        self.query_timeout = query_timeout if query_timeout is not None else getattr(settings, 'sql_query_timeout', DEFAULT_QUERY_TIMEOUT)
+        self.max_rows = max_rows if max_rows is not None else getattr(settings, 'sql_max_rows', DEFAULT_MAX_ROWS)
         self.validator = QueryValidator()
         self.formatter = ResponseFormatter()
 

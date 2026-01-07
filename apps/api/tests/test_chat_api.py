@@ -295,12 +295,13 @@ class TestRateLimiting:
             mock_service.return_value = service_instance
 
             # Clear rate limit store and add old timestamps
-            from app.api.chat import _rate_limit_store, RATE_LIMIT_WINDOW
+            from app.api.chat import _rate_limit_store, _get_rate_limit_config
             _rate_limit_store.clear()
 
             # Add old requests (older than window)
+            _, rate_limit_window = _get_rate_limit_config()
             user_id = "123e4567-e89b-12d3-a456-426614174000"
-            old_time = time.time() - RATE_LIMIT_WINDOW - 10
+            old_time = time.time() - rate_limit_window - 10
             _rate_limit_store[user_id] = [old_time] * 10
 
             # Should be able to make new request
