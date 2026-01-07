@@ -1,6 +1,6 @@
 # Story 4.2: LangChain Text-to-SQL
 
-Status: Done
+Status: In Review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
