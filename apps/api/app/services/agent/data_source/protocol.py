@@ -375,6 +375,17 @@ class DataSource(Protocol):
         """
         ...
 
+    async def get_all_live_snapshots(self) -> DataResult:
+        """
+        Get live snapshots for all assets in the system.
+
+        Returns most recent snapshot for each asset.
+
+        Returns:
+            DataResult with list of ProductionStatus objects
+        """
+        ...
+
     # =========================================================================
     # Target Methods
     # =========================================================================
@@ -390,6 +401,17 @@ class DataSource(Protocol):
 
         Returns:
             DataResult with ShiftTarget or None if no target set
+        """
+        ...
+
+    async def get_all_shift_targets(self) -> DataResult:
+        """
+        Get shift targets for all assets in the system.
+
+        Returns the most recently effective target for each asset.
+
+        Returns:
+            DataResult with list of ShiftTarget objects
         """
         ...
 

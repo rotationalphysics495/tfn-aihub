@@ -712,6 +712,54 @@ class SupabaseDataSource:
                 table_name="live_snapshots",
             )
 
+    async def get_all_live_snapshots(self) -> DataResult:
+        """
+        Get live snapshots for all assets in the system.
+
+        Returns most recent snapshot for each asset.
+        Uses a single query with ordering to fetch all snapshots efficiently,
+        then deduplicates to get the most recent per asset.
+        """
+        try:
+            # Fetch all snapshots ordered by timestamp descending
+            # This allows us to deduplicate to get the latest per asset
+            result = (
+                self.client.table("live_snapshots")
+                .select("*, assets!inner(name, area)")
+                .order("snapshot_timestamp", desc=True)
+                .execute()
+            )
+
+            if not result.data:
+                return self._create_result(
+                    data=[],
+                    table_name="live_snapshots",
+                    query="SELECT * FROM live_snapshots (latest per asset)",
+                )
+
+            # Deduplicate to get only the most recent snapshot per asset
+            seen_assets = set()
+            snapshots = []
+            for row in result.data:
+                asset_id = row.get("asset_id")
+                if asset_id not in seen_assets:
+                    seen_assets.add(asset_id)
+                    snapshots.append(self._parse_production_status(row))
+
+            return self._create_result(
+                data=snapshots,
+                table_name="live_snapshots",
+                query="SELECT * FROM live_snapshots (latest per asset)",
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to get all live snapshots: {e}")
+            raise DataSourceQueryError(
+                f"Failed to get all live snapshots: {str(e)}",
+                source_name=self.source_name,
+                table_name="live_snapshots",
+            )
+
     # =========================================================================
     # Target Methods
     # =========================================================================
@@ -752,6 +800,63 @@ class SupabaseDataSource:
             logger.error(f"Failed to get shift target for asset {asset_id}: {e}")
             raise DataSourceQueryError(
                 f"Failed to get shift target: {str(e)}",
+                source_name=self.source_name,
+                table_name="shift_targets",
+            )
+
+    async def get_all_shift_targets(self) -> DataResult:
+        """
+        Get shift targets for all assets in the system.
+
+        Returns the most recently effective target for each asset.
+        Uses a single query with ordering to fetch all targets efficiently,
+        then deduplicates to get the most recent per asset.
+        """
+        try:
+            today = date.today()
+
+            # Fetch all shift targets ordered by effective_date descending
+            # This allows us to deduplicate to get the latest per asset
+            result = (
+                self.client.table("shift_targets")
+                .select("*")
+                .lte("effective_date", today.isoformat())
+                .order("effective_date", desc=True)
+                .execute()
+            )
+
+            if not result.data:
+                return self._create_result(
+                    data=[],
+                    table_name="shift_targets",
+                    query=(
+                        f"SELECT * FROM shift_targets "
+                        f"WHERE effective_date <= '{today}' (latest per asset)"
+                    ),
+                )
+
+            # Deduplicate to get only the most recent target per asset
+            seen_assets = set()
+            targets = []
+            for row in result.data:
+                asset_id = row.get("asset_id")
+                if asset_id not in seen_assets:
+                    seen_assets.add(asset_id)
+                    targets.append(self._parse_shift_target(row))
+
+            return self._create_result(
+                data=targets,
+                table_name="shift_targets",
+                query=(
+                    f"SELECT * FROM shift_targets "
+                    f"WHERE effective_date <= '{today}' (latest per asset)"
+                ),
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to get all shift targets: {e}")
+            raise DataSourceQueryError(
+                f"Failed to get all shift targets: {str(e)}",
                 source_name=self.source_name,
                 table_name="shift_targets",
             )
