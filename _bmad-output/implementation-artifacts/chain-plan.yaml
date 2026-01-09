@@ -1,5 +1,5 @@
 # Epic Chain Execution Plan
-# Generated: 2026-01-09 10:03:19
+# Generated: 2026-01-09 10:17:50
 
 epics: [5 6 7]
 total_epics: 3
@@ -22,6 +22,6 @@ total_stories: 17
 
 options:
   dry_run: false
-  skip_done: false
+  skip_done: true
   context_handoff: true
   combined_uat: true
