@@ -202,13 +202,19 @@ class SupabaseDataSource:
         )
 
     def _parse_safety_event(self, row: Dict[str, Any]) -> SafetyEvent:
-        """Parse a database row into a SafetyEvent model."""
+        """Parse a database row into a SafetyEvent model.
+
+        Story 6.1: Enhanced to include area. Uses is_resolved from DB.
+        Note: reason_code is required in DB schema; resolution_status is
+        derived from is_resolved boolean via property.
+        """
         asset_data = row.get("assets", {}) or {}
 
         return SafetyEvent(
             id=str(row["id"]),
             asset_id=str(row["asset_id"]),
             asset_name=asset_data.get("name"),
+            area=asset_data.get("area"),
             event_timestamp=row["event_timestamp"],
             reason_code=row["reason_code"],
             severity=row["severity"],
@@ -871,23 +877,60 @@ class SupabaseDataSource:
         start_date: date,
         end_date: date,
         include_resolved: bool = False,
+        area: Optional[str] = None,
+        severity: Optional[str] = None,
     ) -> DataResult:
         """
         Get safety events for an asset or all assets.
+
+        Story 6.1: Enhanced with area and severity filtering.
+
+        Args:
+            asset_id: UUID of asset, or None for all assets
+            start_date: Start of date range
+            end_date: End of date range
+            include_resolved: Whether to include resolved events
+            area: Optional area name to filter by (e.g., 'Packaging')
+            severity: Optional severity level filter ('critical', 'high', 'medium', 'low')
+
+        Returns:
+            DataResult with list of SafetyEvent objects
         """
         try:
-            query = self.client.table("safety_events").select(
-                "*, assets!inner(name, area)"
-            )
+            # Use left join to allow events without assets, but prefer inner for filtering
+            if area:
+                # Inner join when filtering by area
+                query = self.client.table("safety_events").select(
+                    "*, assets!inner(name, area)"
+                )
+            else:
+                # Left join when not filtering by area
+                query = self.client.table("safety_events").select(
+                    "*, assets(name, area)"
+                )
 
             if asset_id:
                 query = query.eq("asset_id", asset_id)
 
+            # Convert date to datetime for timestamp comparison
+            # end_date should include the full day
+            start_datetime = f"{start_date.isoformat()}T00:00:00Z"
+            end_datetime = f"{end_date.isoformat()}T23:59:59Z"
+
             query = (
-                query.gte("event_timestamp", start_date.isoformat())
-                .lte("event_timestamp", end_date.isoformat())
+                query.gte("event_timestamp", start_datetime)
+                .lte("event_timestamp", end_datetime)
             )
 
+            # Filter by area (case-insensitive)
+            if area:
+                query = query.ilike("assets.area", area)
+
+            # Filter by severity
+            if severity:
+                query = query.eq("severity", severity.lower())
+
+            # Filter by resolution status (DB uses is_resolved boolean)
             if not include_resolved:
                 query = query.eq("is_resolved", False)
 
@@ -895,12 +938,23 @@ class SupabaseDataSource:
 
             events = [self._parse_safety_event(row) for row in (result.data or [])]
 
+            # Build query description for debugging/citations
+            filters_desc = []
+            if asset_id:
+                filters_desc.append(f"asset_id={asset_id}")
+            if area:
+                filters_desc.append(f"area={area}")
+            if severity:
+                filters_desc.append(f"severity={severity}")
+            filters_str = ", ".join(filters_desc) if filters_desc else "all"
+
             return self._create_result(
                 data=events,
                 table_name="safety_events",
                 query=(
                     f"SELECT * FROM safety_events "
-                    f"WHERE event_timestamp BETWEEN '{start_date}' AND '{end_date}'"
+                    f"WHERE event_timestamp BETWEEN '{start_date}' AND '{end_date}' "
+                    f"({filters_str})"
                 ),
             )
 

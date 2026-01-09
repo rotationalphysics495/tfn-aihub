@@ -484,3 +484,181 @@ class AgentServiceStatus(BaseModel):
         None,
         description="LLM model being used"
     )
+
+
+# =============================================================================
+# Story 6.1: Safety Events Tool Models
+# =============================================================================
+
+
+class SafetySeverity(str, Enum):
+    """Severity levels for safety events (ordered by priority)."""
+    CRITICAL = "critical"  # Immediate danger, requires immediate action
+    HIGH = "high"          # Serious safety concern
+    MEDIUM = "medium"      # Moderate safety issue
+    LOW = "low"            # Minor safety concern
+
+
+class ResolutionStatus(str, Enum):
+    """Resolution status for safety events."""
+    OPEN = "open"                        # Not yet addressed
+    UNDER_INVESTIGATION = "under_investigation"  # Being investigated
+    RESOLVED = "resolved"                # Issue resolved
+
+
+class SafetyEventsInput(BaseModel):
+    """
+    Input schema for Safety Events tool.
+
+    Story 6.1 AC#1-3: Query safety incidents with optional filters.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "time_range": "today",
+                "area": "Packaging",
+                "severity_filter": "critical",
+                "asset_id": None
+            }
+        }
+    )
+
+    time_range: str = Field(
+        default="today",
+        description=(
+            "Time range to query: 'today', 'yesterday', 'this week', "
+            "'last 7 days', 'last N days', or date range like '2026-01-01 to 2026-01-09'"
+        )
+    )
+    area: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=100,
+        description="Area name to filter by (e.g., 'Grinding', 'Packaging')"
+    )
+    severity_filter: Optional[str] = Field(
+        default=None,
+        description="Severity level filter: 'critical', 'high', 'medium', 'low'"
+    )
+    asset_id: Optional[str] = Field(
+        default=None,
+        description="Specific asset UUID to filter by"
+    )
+
+
+class SafetyEventDetail(BaseModel):
+    """
+    Single safety event with full details.
+
+    Story 6.1 AC#1: For each event: timestamp, asset, severity, description
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "event_id": "evt-001",
+                "timestamp": "2026-01-09T06:42:00Z",
+                "asset_id": "ast-pkg-002",
+                "asset_name": "Packaging Line 2",
+                "area": "Packaging",
+                "severity": "critical",
+                "description": "Safety stop triggered - emergency shutoff activated",
+                "resolution_status": "under_investigation",
+                "reported_by": "Sensor Alert"
+            }
+        }
+    )
+
+    event_id: str = Field(..., description="Event UUID")
+    timestamp: str = Field(..., description="When the event occurred (ISO format)")
+    asset_id: str = Field(..., description="Asset UUID")
+    asset_name: Optional[str] = Field(None, description="Human-readable asset name")
+    area: Optional[str] = Field(None, description="Plant area")
+    severity: str = Field(..., description="Severity level: critical/high/medium/low")
+    description: Optional[str] = Field(None, description="Event description")
+    resolution_status: str = Field(
+        default="open",
+        description="Status: open/under_investigation/resolved"
+    )
+    reported_by: Optional[str] = Field(None, description="Who reported the event")
+
+
+class SafetySummaryStats(BaseModel):
+    """
+    Summary statistics for safety events.
+
+    Story 6.1 AC#2: Summary statistics (total events, resolved vs open)
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "total_events": 5,
+                "by_severity": {"critical": 1, "high": 2, "medium": 1, "low": 1},
+                "by_status": {"open": 2, "under_investigation": 1, "resolved": 2},
+                "resolved_count": 2,
+                "open_count": 3
+            }
+        }
+    )
+
+    total_events: int = Field(..., ge=0, description="Total number of events")
+    by_severity: Dict[str, int] = Field(
+        ..., description="Count by severity level"
+    )
+    by_status: Dict[str, int] = Field(
+        ..., description="Count by resolution status"
+    )
+    resolved_count: int = Field(default=0, ge=0, description="Number of resolved events")
+    open_count: int = Field(default=0, ge=0, description="Number of open events (including under investigation)")
+
+
+class SafetyEventsOutput(BaseModel):
+    """
+    Output schema for Safety Events tool.
+
+    Story 6.1 AC#1, AC#4, AC#5: Complete safety events response.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "scope": "Packaging",
+                "time_range": "today",
+                "events": [],
+                "total_count": 1,
+                "summary": {
+                    "total_events": 1,
+                    "by_severity": {"critical": 1, "high": 0, "medium": 0, "low": 0},
+                    "by_status": {"open": 0, "under_investigation": 1, "resolved": 0},
+                    "resolved_count": 0,
+                    "open_count": 1
+                },
+                "message": None,
+                "no_incidents": False,
+                "data_freshness": "2026-01-09T09:00:00Z"
+            }
+        }
+    )
+
+    scope: str = Field(..., description="Scope of query: 'all', area name, or asset name")
+    time_range: str = Field(..., description="Time range queried")
+    events: List[SafetyEventDetail] = Field(
+        default_factory=list,
+        description="List of safety events (sorted by severity, then recency)"
+    )
+    total_count: int = Field(default=0, ge=0, description="Total number of events")
+    summary: SafetySummaryStats = Field(..., description="Summary statistics")
+    message: Optional[str] = Field(
+        None,
+        description="Additional message (e.g., 'No safety incidents recorded')"
+    )
+    no_incidents: bool = Field(
+        default=False,
+        description="True if no incidents found (positive news)"
+    )
+    data_freshness: str = Field(
+        ...,
+        description="Data freshness timestamp (ISO format)"
+    )

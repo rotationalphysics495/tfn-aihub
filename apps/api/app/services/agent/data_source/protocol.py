@@ -109,17 +109,33 @@ class ShiftTarget(BaseModel):
 
 
 class SafetyEvent(BaseModel):
-    """Safety event from safety_events table."""
+    """Safety event from safety_events table.
+
+    Story 6.1: Enhanced with area field for filtering.
+    Note: Database uses `is_resolved` boolean; we derive `resolution_status` for API.
+    """
 
     id: str = Field(..., description="Event UUID")
     asset_id: str = Field(..., description="Asset UUID")
     asset_name: Optional[str] = Field(None, description="Asset name")
+    area: Optional[str] = Field(None, description="Plant area from joined assets table")
     event_timestamp: datetime = Field(..., description="When event occurred")
     reason_code: str = Field(..., description="Safety reason code")
-    severity: str = Field(..., description="Severity level")
+    severity: str = Field(..., description="Severity level: critical/high/medium/low")
     description: Optional[str] = Field(None, description="Event description")
-    is_resolved: bool = Field(default=False, description="Resolution status")
+    is_resolved: bool = Field(default=False, description="Whether event is resolved (from DB)")
     resolved_at: Optional[datetime] = Field(None, description="Resolution timestamp")
+
+    @property
+    def resolution_status(self) -> str:
+        """Derive resolution status from is_resolved flag.
+
+        Story 6.1: Maps DB boolean to status string.
+        - resolved: is_resolved=True
+        - open: is_resolved=False (default for unresolved)
+        Note: 'under_investigation' not distinguishable from 'open' in current schema.
+        """
+        return "resolved" if self.is_resolved else "open"
 
 
 # =============================================================================
@@ -425,15 +441,21 @@ class DataSource(Protocol):
         start_date: date,
         end_date: date,
         include_resolved: bool = False,
+        area: Optional[str] = None,
+        severity: Optional[str] = None,
     ) -> DataResult:
         """
         Get safety events for an asset or all assets.
+
+        Story 6.1: Enhanced with area and severity filtering.
 
         Args:
             asset_id: UUID of asset, or None for all assets
             start_date: Start of date range
             end_date: End of date range
             include_resolved: Whether to include resolved events
+            area: Optional area name to filter by (e.g., 'Packaging')
+            severity: Optional severity level to filter by ('critical', 'high', 'medium', 'low')
 
         Returns:
             DataResult with list of SafetyEvent objects
