@@ -186,6 +186,7 @@ class SupabaseDataSource:
             id=str(row["id"]),
             asset_id=str(row["asset_id"]),
             target_output=row["target_output"],
+            target_oee=row.get("target_oee"),
             shift=row.get("shift"),
             effective_date=row.get("effective_date"),
         )

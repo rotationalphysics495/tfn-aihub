@@ -100,6 +100,7 @@ class ShiftTarget(BaseModel):
     id: str = Field(..., description="Target UUID")
     asset_id: str = Field(..., description="Asset UUID")
     target_output: int = Field(..., description="Production target")
+    target_oee: Optional[float] = Field(None, description="Target OEE percentage (0-100)")
     shift: Optional[str] = Field(None, description="Shift name")
     effective_date: Optional[date] = Field(None, description="Effective date")
 
