@@ -1,16 +1,215 @@
 """
-Agent Pydantic Models (Story 5.1)
+Agent Pydantic Models (Story 5.1, 5.3)
 
-Request and response models for the Agent API endpoints.
+Request and response models for the Agent API endpoints and tools.
 
 AC#5: Structured Response with Citations
 AC#7: Agent Chat Endpoint
+Story 5.3: Asset Lookup Tool Input/Output Schemas
 """
 
 from datetime import datetime
+from enum import Enum
 from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
+
+# =============================================================================
+# Story 5.3: Asset Lookup Tool Models
+# =============================================================================
+
+
+class AssetStatus(str, Enum):
+    """Status enum for asset operational state."""
+    RUNNING = "running"
+    DOWN = "down"
+    IDLE = "idle"
+    UNKNOWN = "unknown"
+
+
+class OEETrend(str, Enum):
+    """Trend indicator for OEE performance."""
+    IMPROVING = "improving"
+    STABLE = "stable"
+    DECLINING = "declining"
+    INSUFFICIENT_DATA = "insufficient_data"
+
+
+class AssetLookupInput(BaseModel):
+    """
+    Input schema for Asset Lookup tool.
+
+    Story 5.3 AC#1: Asset Lookup by Name
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "asset_name": "Grinder 5",
+                "include_performance": True,
+                "days_back": 7
+            }
+        }
+    )
+
+    asset_name: str = Field(
+        ...,
+        min_length=1,
+        max_length=200,
+        description="Name of the asset to look up (e.g., 'Grinder 5', 'CAMA 800-1')"
+    )
+    include_performance: bool = Field(
+        default=True,
+        description="Include 7-day performance summary (OEE, downtime)"
+    )
+    days_back: int = Field(
+        default=7,
+        ge=1,
+        le=90,
+        description="Number of days to analyze for performance metrics"
+    )
+
+
+class AssetMetadata(BaseModel):
+    """
+    Asset metadata from Plant Object Model.
+
+    Story 5.3 AC#1: Returns asset metadata (name, area, cost center)
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "id": "550e8400-e29b-41d4-a716-446655440000",
+                "name": "Grinder 5",
+                "source_id": "GRD005",
+                "area": "Grinding",
+                "cost_center": "GR-001"
+            }
+        }
+    )
+
+    id: str = Field(..., description="Asset UUID")
+    name: str = Field(..., description="Human-readable asset name")
+    source_id: Optional[str] = Field(None, description="Source system ID (e.g., MSSQL locationName)")
+    area: Optional[str] = Field(None, description="Plant area location")
+    cost_center: Optional[str] = Field(None, description="Cost center identifier")
+
+
+class AssetCurrentStatus(BaseModel):
+    """
+    Current live status of an asset.
+
+    Story 5.3 AC#4: Live status display with freshness tracking
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "status": "running",
+                "output_current": 847,
+                "output_target": 900,
+                "variance": -53,
+                "variance_percent": -5.9,
+                "last_updated": "2026-01-09T14:45:00Z",
+                "data_stale": False,
+                "stale_warning": None
+            }
+        }
+    )
+
+    status: AssetStatus = Field(..., description="Current operational status")
+    output_current: Optional[int] = Field(None, description="Current production count")
+    output_target: Optional[int] = Field(None, description="Target production count for shift")
+    variance: Optional[int] = Field(None, description="Units variance from target (can be negative)")
+    variance_percent: Optional[float] = Field(None, description="Percentage variance from target")
+    last_updated: Optional[str] = Field(None, description="Timestamp of last live data (ISO format)")
+    data_stale: bool = Field(default=False, description="True if data is older than 30 minutes")
+    stale_warning: Optional[str] = Field(None, description="Warning message if data is stale")
+
+
+class AssetPerformance(BaseModel):
+    """
+    Performance summary for an asset over a time period.
+
+    Story 5.3 AC#5: Performance summary with OEE, trend, and downtime
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "avg_oee": 78.3,
+                "oee_trend": "stable",
+                "total_downtime_minutes": 252,
+                "top_downtime_reason": "Material Jam",
+                "top_downtime_percent": 38.1,
+                "days_analyzed": 7,
+                "no_data": False,
+                "message": None
+            }
+        }
+    )
+
+    avg_oee: Optional[float] = Field(None, ge=0.0, le=100.0, description="Average OEE percentage")
+    oee_trend: OEETrend = Field(
+        default=OEETrend.INSUFFICIENT_DATA,
+        description="OEE trend: improving, stable, declining, or insufficient_data"
+    )
+    total_downtime_minutes: int = Field(default=0, description="Total downtime in minutes")
+    top_downtime_reason: Optional[str] = Field(None, description="Most common downtime reason")
+    top_downtime_percent: Optional[float] = Field(None, description="Percentage of downtime from top reason")
+    days_analyzed: int = Field(default=7, description="Number of days analyzed")
+    no_data: bool = Field(default=False, description="True if no performance data available")
+    message: Optional[str] = Field(None, description="Message about data availability")
+
+
+class AssetLookupOutput(BaseModel):
+    """
+    Output schema for Asset Lookup tool.
+
+    Story 5.3 AC#1, AC#2, AC#3: Complete asset lookup response
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "found": True,
+                "metadata": {
+                    "id": "550e8400-e29b-41d4-a716-446655440000",
+                    "name": "Grinder 5",
+                    "area": "Grinding",
+                    "cost_center": "GR-001"
+                },
+                "current_status": {
+                    "status": "running",
+                    "output_current": 847,
+                    "output_target": 900,
+                    "variance": -53,
+                    "variance_percent": -5.9
+                },
+                "performance": {
+                    "avg_oee": 78.3,
+                    "oee_trend": "stable",
+                    "total_downtime_minutes": 252,
+                    "top_downtime_reason": "Material Jam"
+                },
+                "suggestions": None,
+                "message": None
+            }
+        }
+    )
+
+    found: bool = Field(default=True, description="Whether the asset was found")
+    metadata: Optional[AssetMetadata] = Field(None, description="Asset metadata from POM")
+    current_status: Optional[AssetCurrentStatus] = Field(None, description="Current live status")
+    performance: Optional[AssetPerformance] = Field(None, description="Performance summary")
+    suggestions: Optional[List[str]] = Field(
+        None,
+        max_length=5,
+        description="Similar asset names when requested asset not found (max 5)"
+    )
+    message: Optional[str] = Field(None, description="Additional message (e.g., 'Asset not found')")
 
 
 class FollowUpQuestion(BaseModel):
