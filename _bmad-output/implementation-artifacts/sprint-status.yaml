@@ -59,7 +59,7 @@ development_status:
   # Story 5.1: Agent Framework & Tool Registry
   # - LangChain agent framework with automatic tool registration
   # - ManufacturingTool base class, tool registry, AgentExecutor wrapper
-  5-1-agent-framework-tool-registry: ready-for-dev
+  5-1-agent-framework-tool-registry: done
 
   # Story 5.2: Data Access Abstraction Layer
   # - Data access abstraction for future MSSQL support
