@@ -4,6 +4,8 @@ inputDocuments:
   - "_bmad/bmm/data/prd.md"
   - "_bmad/bmm/data/architecture.md"
   - "_bmad/bmm/data/ux-design.md"
+  - "_bmad-output/planning-artifacts/prd-addendum-ai-agent-tools.md"
+lastUpdated: "2026-01-09"
 ---
 
 # Manufacturing Performance Assistant - Epic Breakdown
@@ -22,12 +24,17 @@ This document provides the complete epic and story breakdown for Manufacturing P
 - **FR4 (Safety Alerting):** Immediately visual "Red" alerting for any "Safety Issue" reason code.
 - **FR5 (Financial Context):** Translate operational losses (waste, downtime) into estimated dollar values using standard costs.
 - **FR6 (AI Chat with Memory):** Provide a chat interface that remembers past context (via Mem0) to answer specific queries.
+- **FR7 (AI Agent Tools):** Provide specialized tools for common plant manager queries (Asset Lookup, OEE Query, Downtime Analysis, Production Status, Safety Events, Financial Impact, Cost of Loss, Trend Analysis, Memory Recall, Comparative Analysis, Action List, Alert Check, Recommendation Engine).
 
 ### NonFunctional Requirements
 
 - **NFR1 (Accuracy):** AI must cite specific data points for every recommendation to prevent hallucination.
 - **NFR2 (Latency):** "Live" views must reflect SQL data within 60 seconds of ingestion.
 - **NFR3 (Read-Only):** System must strictly observe Read-Only permissions on source manufacturing databases.
+- **NFR4 (Agent Honesty):** AI Agent must never fabricate data; clearly state when information is unavailable.
+- **NFR5 (Tool Extensibility):** Tool architecture must support adding new data sources (MSSQL) without modifying existing tools.
+- **NFR6 (Response Structure):** All tool responses must include citations, structured data, and optional follow-ups.
+- **NFR7 (Tool Response Caching):** Tool responses must be cached with tiered TTLs (60s live, 15m daily, 1h static).
 
 ### Additional Requirements
 
@@ -66,15 +73,22 @@ This document provides the complete epic and story breakdown for Manufacturing P
 | FR4 | Epic 2 | Safety Alerting (immediate "Red" alerts) |
 | FR5 | Epic 2 | Financial Context (integrated with production views) |
 | FR6 | Epic 4 | AI Chat with Memory (Mem0 integration) |
+| FR7.1 | Epic 5 | Core Operations Tools (Asset, OEE, Downtime, Production) |
+| FR7.2 | Epic 6 | Safety & Financial Tools |
+| FR7.3 | Epic 6 + Epic 7 | Intelligence Tools (Trend Analysis in E6, Memory/Comparison in E7) |
+| FR7.4 | Epic 7 | Proactive Action Tools (Action List, Alerts, Recommendations) |
 
 ## Epic List
 
-| Epic | Title | User Value | FRs |
-|------|-------|------------|-----|
-| 1 | Project Foundation & Infrastructure | Auth + UI shell + design system | FR2, partial FR1 |
-| 2 | Data Pipelines & Production Intelligence | Live monitoring + safety + financials | FR1, FR4, FR5 |
-| 3 | Action Engine & AI Synthesis | Prioritized Daily Action List | FR3 |
-| 4 | AI Chat & Memory | Natural language queries with context | FR6 |
+| Epic | Title | User Value | FRs | Status |
+|------|-------|------------|-----|--------|
+| 1 | Project Foundation & Infrastructure | Auth + UI shell + design system | FR2, partial FR1 | ✅ Complete |
+| 2 | Data Pipelines & Production Intelligence | Live monitoring + safety + financials | FR1, FR4, FR5 | ✅ Complete |
+| 3 | Action Engine & AI Synthesis | Prioritized Daily Action List | FR3 | ✅ Complete |
+| 4 | AI Chat & Memory | Natural language queries with context | FR6 | ✅ Complete |
+| 5 | Agent Foundation & Core Tools | Reliable, fast responses to common questions | FR7.1, NFR4-7 | Ready |
+| 6 | Safety & Financial Intelligence Tools | Safety visibility + financial context via chat | FR7.2, FR7.3 | Ready |
+| 7 | Proactive Agent Capabilities | Memory, comparison, recommendations | FR7.3, FR7.4 | Ready |
 
 ---
 
@@ -143,3 +157,61 @@ This document provides the complete epic and story breakdown for Manufacturing P
 - Responses cite specific data points (NFR1)
 - Context-aware follow-up conversations
 
+---
+
+## Epic 5: Agent Foundation & Core Tools
+
+**Goal:** Plant Managers can ask natural language questions about assets, OEE, downtime, and production status and receive fast, reliable, cited responses.
+
+**FRs Covered:** FR7.1 (Core Operations Tools), NFR4-7
+
+**Dependencies:** Epic 4 (AI Chat & Memory) - completed
+
+**Scope:**
+- LangChain Agent Framework with tool registration pattern
+- Data Access Abstraction Layer (Supabase now, MSSQL future)
+- Asset Lookup Tool (metadata, status, 7-day performance)
+- OEE Query Tool (with component breakdown)
+- Downtime Analysis Tool (Pareto, patterns)
+- Production Status Tool (real-time output vs target)
+- Agent Chat Integration (wire to existing UI)
+- Tool Response Caching (tiered TTLs)
+
+**Stories:** 8 | **Details:** See [epic-5.md](epic-5.md)
+
+---
+
+## Epic 6: Safety & Financial Intelligence Tools
+
+**Goal:** Plant Managers can query safety incidents and understand the financial impact of operational issues.
+
+**FRs Covered:** FR7.2 (Safety & Financial Tools), FR7.3 (Trend Analysis)
+
+**Dependencies:** Epic 5 (Agent Foundation & Core Tools)
+
+**Scope:**
+- Safety Events Tool (incidents with severity, resolution status)
+- Financial Impact Tool (cost calculation by asset/area)
+- Cost of Loss Tool (ranked financial losses)
+- Trend Analysis Tool (7-90 day performance trends)
+
+**Stories:** 4 | **Details:** See [epic-6.md](epic-6.md)
+
+---
+
+## Epic 7: Proactive Agent Capabilities
+
+**Goal:** The AI Agent proactively helps plant managers by recalling context, comparing assets, and suggesting actions.
+
+**FRs Covered:** FR7.3 (Memory Recall, Comparative Analysis), FR7.4 (Proactive Action Tools)
+
+**Dependencies:** Epic 6 (Safety & Financial Intelligence Tools)
+
+**Scope:**
+- Memory Recall Tool (conversation history by topic/asset)
+- Comparative Analysis Tool (side-by-side asset comparison)
+- Action List Tool (prioritized daily actions)
+- Alert Check Tool (active warnings and issues)
+- Recommendation Engine (pattern-based suggestions)
+
+**Stories:** 5 | **Details:** See [epic-7.md](epic-7.md)
