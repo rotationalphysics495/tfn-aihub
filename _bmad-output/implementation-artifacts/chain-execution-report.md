@@ -9,7 +9,7 @@
 |--------|-------|
 | Total Epics | 3 |
 | Completed | 0 |
-| Failed | 3 |
+| Failed | 1 |
 | Skipped | 0 |
 | Duration | s |
 
@@ -33,9 +33,9 @@
 | Metrics | /Users/heimdallagent/Documents/GitHub/tfn-aihub/_bmad-output/implementation-artifacts/metrics/ |
 | UAT Documents | /Users/heimdallagent/Documents/GitHub/tfn-aihub/_bmad-output/uat/ |
 | Handoffs | /Users/heimdallagent/Documents/GitHub/tfn-aihub/_bmad-output/handoffs/ |
-| Log | /tmp/bmad-epic-chain-57041.log |
+| Log | /tmp/bmad-epic-chain-62654.log |
 
 ---
 
-*Report generated: 2026-01-09T16:40:02Z*
+*Report generated: 2026-01-09T21:03:00Z*
 *BMAD Method Epic Chain*
