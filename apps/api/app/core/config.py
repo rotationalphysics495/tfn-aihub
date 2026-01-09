@@ -65,6 +65,16 @@ class Settings(BaseSettings):
     financial_high_threshold: float = 5000.0
     financial_medium_threshold: float = 2000.0
 
+    # Agent Configuration (Story 5.1)
+    llm_provider: str = "openai"  # LLM provider selection (openai/anthropic)
+    llm_model: str = "gpt-4-turbo-preview"  # Model identifier
+    agent_temperature: float = 0.1  # Lower for more deterministic tool selection
+    agent_max_iterations: int = 5  # Prevent runaway agent loops
+    agent_verbose: bool = False  # Debug logging for agent
+    agent_timeout_seconds: int = 60  # Agent execution timeout
+    agent_rate_limit_requests: int = 10  # Rate limit requests per window
+    agent_rate_limit_window: int = 60  # Rate limit window in seconds
+
     @property
     def mssql_connection_string(self) -> str:
         """Build MSSQL connection string with proper URL encoding for special characters."""
@@ -99,6 +109,13 @@ class Settings(BaseSettings):
             self.supabase_db_url,
             self.openai_api_key
         ])
+
+    @property
+    def agent_configured(self) -> bool:
+        """Check if Agent is properly configured (Story 5.1 AC#1)."""
+        if self.llm_provider == "openai":
+            return bool(self.openai_api_key)
+        return False
 
 
 @lru_cache()

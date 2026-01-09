@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import health, assets, summaries, actions, auth, pipelines, production, oee, downtime, safety, financial, live_pulse, memory, chat, asset_history, citations
+from app.api import health, assets, summaries, actions, auth, pipelines, production, oee, downtime, safety, financial, live_pulse, memory, chat, asset_history, citations, agent
 from app.core.database import initialize_database, shutdown_database
 from app.services.scheduler import get_scheduler
 from app.services.pipelines.live_pulse import run_live_pulse_poll
@@ -79,6 +79,8 @@ app.include_router(chat.router, prefix="/api/chat", tags=["Chat"])
 app.include_router(asset_history.router, prefix="/api/assets", tags=["Asset History"])
 # Story 4.5: Citations API for cited response generation
 app.include_router(citations.router, prefix="/api/citations", tags=["Citations"])
+# Story 5.1: Agent API for LangChain agent-based queries
+app.include_router(agent.router, prefix="/api/agent", tags=["Agent"])
 
 
 @app.get("/")
