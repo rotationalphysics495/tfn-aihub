@@ -758,84 +758,14 @@ if [ "$GENERATE_REPORT" = true ] && [ "$DRY_RUN" = false ]; then
     else
         log "Found $metrics_found metrics files"
 
-        # Determine workflow path (installed vs source)
-        WORKFLOW_PATH=""
-        if [ -d "$BMAD_DIR/bmm/workflows/4-implementation/epic-chain" ]; then
-            WORKFLOW_PATH="$BMAD_DIR/bmm/workflows/4-implementation/epic-chain"
-        elif [ -d "$PROJECT_ROOT/src/modules/bmm/workflows/4-implementation/epic-chain" ]; then
-            WORKFLOW_PATH="$PROJECT_ROOT/src/modules/bmm/workflows/4-implementation/epic-chain"
-        fi
+        # Generate basic report directly (avoids memory issues with Claude)
+        # Claude-based enhanced report can be generated separately if needed
+        log "Creating report from metrics..."
+        create_basic_report
 
-        # Build report generation prompt
-        report_prompt="You are Bob, the Scrum Master, generating a chain execution report.
-
-## Your Task
-
-Generate a comprehensive chain execution report for the completed epic chain.
-
-## Configuration
-
-- Chain Plan: $CHAIN_PLAN_FILE
-- Metrics Folder: $METRICS_DIR
-- Output File: $CHAIN_REPORT_FILE
-- Stories Location: $STORIES_DIR
-- UAT Location: $UAT_DIR
-- Epics Location: $EPICS_DIR
-- Handoffs Location: $HANDOFF_DIR
-
-## Epics in Chain
-
-${EPIC_IDS[*]}
-
-## Process
-
-1. Read the chain plan file to understand the epic sequence
-2. For each epic, load the metrics file from: $METRICS_DIR/epic-{id}-metrics.yaml
-3. Aggregate metrics across all epics:
-   - Total duration
-   - Story counts (total, completed, failed, skipped)
-   - UAT gate results
-   - Issues encountered
-4. Generate the report following the template structure
-
-## Report Structure
-
-Generate a markdown report with these sections:
-- Executive Summary (status, counts, duration)
-- Timeline (epic-by-epic execution details)
-- What Was Built (brief per-epic summary)
-- Issues Encountered (aggregated from metrics)
-- UAT Validation Summary (gate results, fix attempts)
-- Artifacts Generated (list generated files)
-- Conclusion
-
-## Output
-
-Write the report to: $CHAIN_REPORT_FILE
-
-When complete, output exactly:
-REPORT_GENERATED: $CHAIN_REPORT_FILE"
-
-        log "Invoking report generator..."
-
-        # Execute report generation
-        report_result=$(claude --dangerously-skip-permissions -p "$report_prompt" 2>&1) || true
-
-        echo "$report_result" >> "$LOG_FILE"
-
-        if echo "$report_result" | grep -q "REPORT_GENERATED"; then
+        if [ -f "$CHAIN_REPORT_FILE" ]; then
             log_success "Report generated: $CHAIN_REPORT_FILE"
-
-            # Stage report file
             git add "$CHAIN_REPORT_FILE" 2>/dev/null || true
-        else
-            log_warn "Report generation may not have completed cleanly"
-
-            # If Claude didn't generate it, create a basic report
-            if [ ! -f "$CHAIN_REPORT_FILE" ]; then
-                log "Creating basic report from metrics..."
-                create_basic_report
-            fi
         fi
     fi
 fi
