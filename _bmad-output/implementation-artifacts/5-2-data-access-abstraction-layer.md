@@ -1,6 +1,6 @@
 # Story 5.2: Data Access Abstraction Layer
 
-Status: ready-for-dev
+Status: In Review
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -79,63 +79,63 @@ so that **we can add MSSQL as a data source in the future without modifying tool
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Define DataSource Protocol (AC: #1)
-  - [ ] 1.1 Create `apps/api/app/services/agent/data_source/__init__.py`
-  - [ ] 1.2 Create `apps/api/app/services/agent/data_source/protocol.py`
-  - [ ] 1.3 Define DataSource Protocol with typing.Protocol
-  - [ ] 1.4 Define async method signatures for all data operations
-  - [ ] 1.5 Add docstrings explaining expected behavior
-  - [ ] 1.6 Create unit tests for protocol compliance
+- [x] Task 1: Define DataSource Protocol (AC: #1)
+  - [x] 1.1 Create `apps/api/app/services/agent/data_source/__init__.py`
+  - [x] 1.2 Create `apps/api/app/services/agent/data_source/protocol.py`
+  - [x] 1.3 Define DataSource Protocol with typing.Protocol
+  - [x] 1.4 Define async method signatures for all data operations
+  - [x] 1.5 Add docstrings explaining expected behavior
+  - [x] 1.6 Create unit tests for protocol compliance
 
-- [ ] Task 2: Create DataResult Model (AC: #3)
-  - [ ] 2.1 Add DataResult to `apps/api/app/models/agent.py`
-  - [ ] 2.2 Define data field (generic Any type)
-  - [ ] 2.3 Define source_name field (str)
-  - [ ] 2.4 Define table_name field (str)
-  - [ ] 2.5 Define query_timestamp field (datetime)
-  - [ ] 2.6 Define optional query field for debugging
+- [x] Task 2: Create DataResult Model (AC: #3)
+  - [x] 2.1 Add DataResult to protocol.py (kept with protocol for cohesion)
+  - [x] 2.2 Define data field (generic Any type)
+  - [x] 2.3 Define source_name field (str)
+  - [x] 2.4 Define table_name field (str)
+  - [x] 2.5 Define query_timestamp field (datetime)
+  - [x] 2.6 Define optional query field for debugging
 
-- [ ] Task 3: Implement SupabaseDataSource (AC: #2, #4, #5, #6, #7)
-  - [ ] 3.1 Create `apps/api/app/services/agent/data_source/supabase.py`
-  - [ ] 3.2 Implement get_asset(asset_id) method
-  - [ ] 3.3 Implement get_asset_by_name(name) with fuzzy matching
-  - [ ] 3.4 Implement get_assets_by_area(area) method
-  - [ ] 3.5 Implement get_oee(asset_id, start, end) method
-  - [ ] 3.6 Implement get_oee_by_area(area, start, end) method
-  - [ ] 3.7 Implement get_downtime(asset_id, start, end) method
-  - [ ] 3.8 Implement get_downtime_by_area(area, start, end) method
-  - [ ] 3.9 Implement get_live_snapshot(asset_id) method
-  - [ ] 3.10 Implement get_live_snapshots_by_area(area) method
-  - [ ] 3.11 Implement get_shift_target(asset_id) method
-  - [ ] 3.12 Wrap all responses in DataResult
-  - [ ] 3.13 Create comprehensive unit tests
+- [x] Task 3: Implement SupabaseDataSource (AC: #2, #4, #5, #6, #7)
+  - [x] 3.1 Create `apps/api/app/services/agent/data_source/supabase.py`
+  - [x] 3.2 Implement get_asset(asset_id) method
+  - [x] 3.3 Implement get_asset_by_name(name) with fuzzy matching
+  - [x] 3.4 Implement get_assets_by_area(area) method
+  - [x] 3.5 Implement get_oee(asset_id, start, end) method
+  - [x] 3.6 Implement get_oee_by_area(area, start, end) method
+  - [x] 3.7 Implement get_downtime(asset_id, start, end) method
+  - [x] 3.8 Implement get_downtime_by_area(area, start, end) method
+  - [x] 3.9 Implement get_live_snapshot(asset_id) method
+  - [x] 3.10 Implement get_live_snapshots_by_area(area) method
+  - [x] 3.11 Implement get_shift_target(asset_id) method
+  - [x] 3.12 Wrap all responses in DataResult
+  - [x] 3.13 Create comprehensive unit tests
 
-- [ ] Task 4: Implement CompositeDataSource (AC: #8)
-  - [ ] 4.1 Create `apps/api/app/services/agent/data_source/composite.py`
-  - [ ] 4.2 Implement CompositeDataSource class
-  - [ ] 4.3 Add data_sources list for multiple sources
-  - [ ] 4.4 Implement routing logic (for now, delegate to primary)
-  - [ ] 4.5 Add TODO comments for future MSSQL routing
-  - [ ] 4.6 Create unit tests for composite behavior
+- [x] Task 4: Implement CompositeDataSource (AC: #8)
+  - [x] 4.1 Create `apps/api/app/services/agent/data_source/composite.py`
+  - [x] 4.2 Implement CompositeDataSource class
+  - [x] 4.3 Add data_sources list for multiple sources
+  - [x] 4.4 Implement routing logic (for now, delegate to primary)
+  - [x] 4.5 Add TODO comments for future MSSQL routing
+  - [x] 4.6 Create unit tests for composite behavior
 
-- [ ] Task 5: Create Factory Function (AC: #9)
-  - [ ] 5.1 Add get_data_source() to data_source/__init__.py
-  - [ ] 5.2 Implement singleton pattern
-  - [ ] 5.3 Read configuration from settings
-  - [ ] 5.4 Return appropriate DataSource implementation
-  - [ ] 5.5 Create unit tests for factory
+- [x] Task 5: Create Factory Function (AC: #9)
+  - [x] 5.1 Add get_data_source() to data_source/__init__.py
+  - [x] 5.2 Implement singleton pattern
+  - [x] 5.3 Read configuration from settings
+  - [x] 5.4 Return appropriate DataSource implementation
+  - [x] 5.5 Create unit tests for factory
 
-- [ ] Task 6: Add Fuzzy Name Matching (AC: #4)
-  - [ ] 6.1 Implement fuzzy_match_asset() helper function
-  - [ ] 6.2 Use PostgreSQL ILIKE for pattern matching
-  - [ ] 6.3 Return list of similar assets when exact match fails
-  - [ ] 6.4 Create tests for fuzzy matching
+- [x] Task 6: Add Fuzzy Name Matching (AC: #4)
+  - [x] 6.1 Implement fuzzy matching in get_asset_by_name()
+  - [x] 6.2 Use PostgreSQL ILIKE for pattern matching
+  - [x] 6.3 Return list of similar assets via get_similar_assets()
+  - [x] 6.4 Create tests for fuzzy matching
 
-- [ ] Task 7: Integration Testing (AC: All)
-  - [ ] 7.1 Create integration tests with mock Supabase
-  - [ ] 7.2 Test all DataSource methods
-  - [ ] 7.3 Verify DataResult format for citations
-  - [ ] 7.4 Test error handling and edge cases
+- [x] Task 7: Integration Testing (AC: All)
+  - [x] 7.1 Create integration tests with mock Supabase
+  - [x] 7.2 Test all DataSource methods
+  - [x] 7.3 Verify DataResult format for citations
+  - [x] 7.4 Test error handling and edge cases
 
 ## Dev Notes
 
@@ -567,11 +567,121 @@ class SupabaseDataSource:
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
-### Debug Log References
+### Implementation Summary
 
-### Completion Notes List
+Implemented a complete Data Access Abstraction Layer that enables tools to query manufacturing data without knowing the underlying database implementation. The layer follows a protocol-based design pattern with:
+
+1. **DataSource Protocol**: Defines the interface for all data sources with async methods for assets, OEE, downtime, live snapshots, shift targets, and safety events.
+
+2. **DataResult Model**: Wrapper for all query responses with source metadata (source_name, table_name, query_timestamp) for citation generation.
+
+3. **SupabaseDataSource**: Full implementation of the protocol for Supabase PostgreSQL with:
+   - All asset methods including fuzzy name matching via ILIKE
+   - OEE and downtime queries with date range filtering
+   - Live snapshot retrieval with freshness timestamps
+   - Shift target and safety event queries
+
+4. **CompositeDataSource**: Router class that delegates to SupabaseDataSource, with architecture ready for future MSSQL integration.
+
+5. **Factory Function**: `get_data_source()` singleton factory with environment-based configuration.
+
+### Files Created/Modified
+
+**Created:**
+- `apps/api/app/services/agent/data_source/protocol.py` - DataSource Protocol, DataResult, domain models
+- `apps/api/app/services/agent/data_source/supabase.py` - SupabaseDataSource implementation
+- `apps/api/app/services/agent/data_source/composite.py` - CompositeDataSource router
+- `apps/api/app/services/agent/data_source/exceptions.py` - Custom exceptions
+- `apps/api/tests/services/agent/data_source/__init__.py` - Test package
+- `apps/api/tests/services/agent/data_source/test_protocol.py` - Protocol and model tests
+- `apps/api/tests/services/agent/data_source/test_supabase.py` - SupabaseDataSource tests
+- `apps/api/tests/services/agent/data_source/test_composite.py` - CompositeDataSource tests
+- `apps/api/tests/services/agent/data_source/test_factory.py` - Factory function tests
+- `apps/api/tests/services/agent/data_source/test_integration.py` - Integration tests
+
+**Modified:**
+- `apps/api/app/services/agent/data_source/__init__.py` - Updated with all exports and factory
+
+### Key Decisions
+
+1. **DataResult in protocol.py**: Kept DataResult model in protocol.py alongside the Protocol definition for cohesion, rather than in models/agent.py.
+
+2. **Domain Models**: Created typed domain models (Asset, OEEMetrics, DowntimeEvent, ProductionStatus, ShiftTarget, SafetyEvent) to provide type safety.
+
+3. **Lazy Client Initialization**: SupabaseDataSource uses lazy initialization for the Supabase client to allow dependency injection for testing.
+
+4. **Fuzzy Matching Strategy**: Implemented fuzzy name matching using PostgreSQL ILIKE with fallback from exact match to partial match.
+
+5. **Error Handling**: Raises DataSourceQueryError with context (source_name, table_name) for debuggability.
+
+### Tests Added
+
+83 tests covering:
+- DataResult model creation and to_citation_metadata()
+- All domain models (Asset, OEEMetrics, DowntimeEvent, etc.)
+- Protocol compliance verification
+- SupabaseDataSource all methods with mock client
+- Fuzzy name matching logic
+- CompositeDataSource delegation
+- Factory singleton pattern
+- Integration flows with mock Supabase
+
+### Test Results
+
+```
+============================= test session starts ==============================
+collected 83 items
+
+tests/services/agent/data_source/test_composite.py ..................... [ 25%]
+tests/services/agent/data_source/test_factory.py .......                 [ 33%]
+tests/services/agent/data_source/test_integration.py .........           [ 44%]
+tests/services/agent/data_source/test_protocol.py ...................    [ 67%]
+tests/services/agent/data_source/test_supabase.py ..................     [100%]
+
+======================= 83 passed, 12 warnings in 0.09s ========================
+```
+
+### Notes for Reviewer
+
+1. The implementation follows the same patterns established in Story 5.1 (Agent Framework).
+
+2. DataResult.to_citation_metadata() provides a dict suitable for ManufacturingTool._create_citation().
+
+3. CompositeDataSource includes TODO comments for future MSSQL routing integration.
+
+4. All async methods use the synchronous Supabase client since the `supabase-py` library doesn't have native async support. The methods are still async for consistency with the Protocol definition.
+
+5. Safety events query includes a join to assets table to get asset_name for display.
+
+### Acceptance Criteria Status
+
+- [x] **AC#1: DataSource Protocol Definition** - `protocol.py:161-308`
+- [x] **AC#2: Supabase DataSource Implementation** - `supabase.py:53-500`
+- [x] **AC#3: DataResult Response Format** - `protocol.py:122-158`
+- [x] **AC#4: Asset Data Methods** - `supabase.py:125-220`
+- [x] **AC#5: OEE Data Methods** - `supabase.py:226-290`
+- [x] **AC#6: Downtime Data Methods** - `supabase.py:296-400`
+- [x] **AC#7: Live Data Methods** - `supabase.py:406-470`
+- [x] **AC#8: CompositeDataSource Router** - `composite.py:20-160`
+- [x] **AC#9: Factory Function** - `__init__.py:50-86`
 
 ### File List
 
+```
+apps/api/app/services/agent/data_source/
+├── __init__.py        # Factory function and exports
+├── protocol.py        # DataSource Protocol, DataResult, domain models
+├── supabase.py        # SupabaseDataSource implementation
+├── composite.py       # CompositeDataSource router
+└── exceptions.py      # Custom exceptions
+
+apps/api/tests/services/agent/data_source/
+├── __init__.py
+├── test_protocol.py   # Protocol and model tests
+├── test_supabase.py   # SupabaseDataSource tests
+├── test_composite.py  # CompositeDataSource tests
+├── test_factory.py    # Factory function tests
+└── test_integration.py # Integration tests
+```

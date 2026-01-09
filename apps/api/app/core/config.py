@@ -75,6 +75,9 @@ class Settings(BaseSettings):
     agent_rate_limit_requests: int = 10  # Rate limit requests per window
     agent_rate_limit_window: int = 60  # Rate limit window in seconds
 
+    # Data Source Configuration (Story 5.2)
+    data_source_type: str = "supabase"  # Data source type: "supabase" or "composite"
+
     @property
     def mssql_connection_string(self) -> str:
         """Build MSSQL connection string with proper URL encoding for special characters."""
@@ -115,6 +118,16 @@ class Settings(BaseSettings):
         """Check if Agent is properly configured (Story 5.1 AC#1)."""
         if self.llm_provider == "openai":
             return bool(self.openai_api_key)
+        return False
+
+    @property
+    def data_source_configured(self) -> bool:
+        """Check if data source is properly configured (Story 5.2 AC#5)."""
+        if self.data_source_type == "supabase":
+            return all([self.supabase_url, self.supabase_key])
+        elif self.data_source_type == "composite":
+            # Composite requires at least Supabase as primary
+            return all([self.supabase_url, self.supabase_key])
         return False
 
 
