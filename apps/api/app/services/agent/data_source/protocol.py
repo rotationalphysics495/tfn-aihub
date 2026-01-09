@@ -138,6 +138,33 @@ class SafetyEvent(BaseModel):
         return "resolved" if self.is_resolved else "open"
 
 
+class FinancialMetrics(BaseModel):
+    """Financial metrics from daily_summaries joined with cost_centers.
+
+    Story 6.2: Enhanced metrics for financial impact calculation.
+    """
+
+    id: str = Field(..., description="Record UUID (from daily_summaries)")
+    asset_id: str = Field(..., description="Asset UUID")
+    asset_name: Optional[str] = Field(None, description="Asset name")
+    area: Optional[str] = Field(None, description="Plant area")
+    report_date: date = Field(..., description="Report date")
+    downtime_minutes: int = Field(default=0, description="Total downtime in minutes")
+    waste_count: int = Field(default=0, description="Number of waste items")
+    # Cost center data (may be None if not configured)
+    standard_hourly_rate: Optional[Decimal] = Field(
+        None, description="$/hour for downtime calculation (from cost_centers)"
+    )
+    cost_per_unit: Optional[Decimal] = Field(
+        None, description="$/unit for waste calculation (from cost_centers)"
+    )
+
+    @property
+    def has_cost_data(self) -> bool:
+        """Check if cost center data is available for financial calculations."""
+        return self.standard_hourly_rate is not None or self.cost_per_unit is not None
+
+
 # =============================================================================
 # DataResult Response Wrapper
 # =============================================================================
@@ -459,5 +486,34 @@ class DataSource(Protocol):
 
         Returns:
             DataResult with list of SafetyEvent objects
+        """
+        ...
+
+    # =========================================================================
+    # Financial Methods (Story 6.2)
+    # =========================================================================
+
+    async def get_financial_metrics(
+        self,
+        start_date: date,
+        end_date: date,
+        asset_id: Optional[str] = None,
+        area: Optional[str] = None,
+    ) -> DataResult:
+        """
+        Get financial metrics for assets in date range.
+
+        Story 6.2: Query daily_summaries joined with cost_centers for
+        financial impact calculations.
+
+        Args:
+            start_date: Start of date range (inclusive)
+            end_date: End of date range (inclusive)
+            asset_id: Optional UUID of specific asset
+            area: Optional area name to filter by
+
+        Returns:
+            DataResult with list of FinancialMetrics objects
+            DataResult.data includes has_cost_data flag for detecting missing cost centers
         """
         ...

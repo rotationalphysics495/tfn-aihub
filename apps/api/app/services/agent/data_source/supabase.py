@@ -26,6 +26,7 @@ from app.services.agent.data_source.protocol import (
     Asset,
     DataResult,
     DowntimeEvent,
+    FinancialMetrics,
     OEEMetrics,
     ProductionStatus,
     SafetyEvent,
@@ -964,4 +965,131 @@ class SupabaseDataSource:
                 f"Failed to get safety events: {str(e)}",
                 source_name=self.source_name,
                 table_name="safety_events",
+            )
+
+    # =========================================================================
+    # Financial Methods (Story 6.2)
+    # =========================================================================
+
+    def _parse_financial_metrics(self, row: Dict[str, Any]) -> FinancialMetrics:
+        """Parse a database row into a FinancialMetrics model.
+
+        Story 6.2: Handles joined data from daily_summaries + assets + cost_centers.
+        """
+        # Handle nested asset data from joins
+        asset_data = row.get("assets", {}) or {}
+
+        # Handle cost center data (may be None, empty dict, or list)
+        cost_center_data = row.get("cost_centers")
+        standard_hourly_rate = None
+        cost_per_unit = None
+
+        if cost_center_data:
+            # cost_centers may be a list (from join) or a single dict
+            if isinstance(cost_center_data, list) and len(cost_center_data) > 0:
+                # Take the first (most recent) cost center
+                cost_center_data = cost_center_data[0]
+
+            if isinstance(cost_center_data, dict):
+                rate = cost_center_data.get("standard_hourly_rate")
+                if rate is not None:
+                    standard_hourly_rate = Decimal(str(rate))
+                unit_cost = cost_center_data.get("cost_per_unit")
+                if unit_cost is not None:
+                    cost_per_unit = Decimal(str(unit_cost))
+
+        return FinancialMetrics(
+            id=str(row["id"]),
+            asset_id=str(row["asset_id"]),
+            asset_name=asset_data.get("name"),
+            area=asset_data.get("area"),
+            report_date=row["report_date"],
+            downtime_minutes=row.get("downtime_minutes") or 0,
+            waste_count=row.get("waste_count") or 0,
+            standard_hourly_rate=standard_hourly_rate,
+            cost_per_unit=cost_per_unit,
+        )
+
+    async def get_financial_metrics(
+        self,
+        start_date: date,
+        end_date: date,
+        asset_id: Optional[str] = None,
+        area: Optional[str] = None,
+    ) -> DataResult:
+        """
+        Get financial metrics for assets in date range.
+
+        Story 6.2: Query daily_summaries joined with cost_centers for
+        financial impact calculations.
+
+        Args:
+            start_date: Start of date range (inclusive)
+            end_date: End of date range (inclusive)
+            asset_id: Optional UUID of specific asset
+            area: Optional area name to filter by
+
+        Returns:
+            DataResult with list of FinancialMetrics objects
+        """
+        try:
+            # Build query with joins to assets and cost_centers
+            # Use left join for cost_centers to handle missing data gracefully
+            select_fields = """
+                id, asset_id, report_date, downtime_minutes, waste_count,
+                assets!inner(id, name, area),
+                cost_centers(standard_hourly_rate, cost_per_unit)
+            """
+
+            # Start building query based on area filter
+            if area:
+                # Use inner join when filtering by area
+                query = self.client.table("daily_summaries").select(select_fields)
+                # Area filter through joined assets table
+                query = query.ilike("assets.area", area)
+            elif asset_id:
+                # Filter by specific asset
+                query = self.client.table("daily_summaries").select(select_fields)
+                query = query.eq("asset_id", asset_id)
+            else:
+                # No filter - get all
+                query = self.client.table("daily_summaries").select(select_fields)
+
+            # Apply date range filter
+            query = (
+                query.gte("report_date", start_date.isoformat())
+                .lte("report_date", end_date.isoformat())
+                .order("report_date", desc=True)
+            )
+
+            result = query.execute()
+
+            metrics = [self._parse_financial_metrics(row) for row in (result.data or [])]
+
+            # Build query description
+            filters_desc = []
+            if asset_id:
+                filters_desc.append(f"asset_id={asset_id}")
+            if area:
+                filters_desc.append(f"area={area}")
+            filters_str = ", ".join(filters_desc) if filters_desc else "all"
+
+            return self._create_result(
+                data=metrics,
+                table_name="daily_summaries",
+                query=(
+                    f"SELECT * FROM daily_summaries "
+                    f"JOIN assets ON daily_summaries.asset_id = assets.id "
+                    f"LEFT JOIN cost_centers ON assets.id = cost_centers.asset_id "
+                    f"WHERE report_date BETWEEN '{start_date}' AND '{end_date}' "
+                    f"({filters_str})"
+                ),
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to get financial metrics: {e}")
+            raise DataSourceQueryError(
+                f"Failed to get financial metrics: {str(e)}",
+                source_name=self.source_name,
+                table_name="daily_summaries",
             )

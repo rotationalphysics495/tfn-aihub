@@ -29,6 +29,7 @@ from app.services.agent.data_source.protocol import (
     ProductionStatus,
     SafetyEvent,
     ShiftTarget,
+    FinancialMetrics,
 )
 from app.services.agent.data_source.exceptions import (
     DataSourceError,
@@ -109,6 +110,7 @@ __all__ = [
     "ProductionStatus",
     "SafetyEvent",
     "ShiftTarget",
+    "FinancialMetrics",
     # Exceptions
     "DataSourceError",
     "DataSourceConnectionError",

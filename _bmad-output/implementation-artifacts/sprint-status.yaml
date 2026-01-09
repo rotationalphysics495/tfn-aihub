@@ -106,7 +106,7 @@ development_status:
   # Story 6.1: Safety Events Tool
   # - Query safety incidents with severity, status, affected assets
   # - Sorting by severity, filtering by area
-  6-1-safety-events-tool: backlog
+  6-1-safety-events-tool: done
 
   # Story 6.2: Financial Impact Tool
   # - Calculate financial cost of downtime and waste

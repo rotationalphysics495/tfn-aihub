@@ -662,3 +662,239 @@ class SafetyEventsOutput(BaseModel):
         ...,
         description="Data freshness timestamp (ISO format)"
     )
+
+
+# =============================================================================
+# Story 6.2: Financial Impact Tool Models
+# =============================================================================
+
+
+class FinancialImpactInput(BaseModel):
+    """
+    Input schema for Financial Impact tool.
+
+    Story 6.2 AC#1-2: Query financial impact for assets or areas.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "time_range": "yesterday",
+                "asset_id": None,
+                "area": "Grinding",
+                "include_breakdown": True
+            }
+        }
+    )
+
+    time_range: str = Field(
+        default="yesterday",
+        description=(
+            "Time range to query: 'today', 'yesterday', 'this week', "
+            "'last 7 days', 'last N days', or date range like '2026-01-01 to 2026-01-09'"
+        )
+    )
+    asset_id: Optional[str] = Field(
+        default=None,
+        description="Specific asset UUID to calculate financial impact for"
+    )
+    area: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=100,
+        description="Area name to aggregate financial impact for (e.g., 'Grinding', 'Packaging')"
+    )
+    include_breakdown: bool = Field(
+        default=True,
+        description="Include detailed breakdown by cost category"
+    )
+
+
+class CostBreakdown(BaseModel):
+    """
+    Breakdown of a cost category with calculation details.
+
+    Story 6.2 AC#4: Transparent calculations with formulas.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "category": "downtime",
+                "amount": 1875.00,
+                "calculation_basis": {
+                    "downtime_minutes": 47,
+                    "standard_hourly_rate": 2393.62
+                },
+                "formula_used": "47 min * $2393.62/hr / 60 = $1875.00"
+            }
+        }
+    )
+
+    category: str = Field(..., description="Cost category: 'downtime' or 'waste'")
+    amount: float = Field(..., ge=0.0, description="Cost amount in dollars")
+    calculation_basis: Dict[str, Any] = Field(
+        ..., description="Values used in calculation"
+    )
+    formula_used: str = Field(..., description="Human-readable formula showing calculation")
+
+
+class AssetFinancialSummary(BaseModel):
+    """
+    Financial summary for a single asset.
+
+    Story 6.2 AC#1, AC#2: Per-asset financial breakdown.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "asset_id": "ast-grd-005",
+                "asset_name": "Grinder 5",
+                "total_loss": 2340.50,
+                "downtime_cost": 1875.00,
+                "waste_cost": 465.50,
+                "hourly_rate": 2393.62,
+                "cost_per_unit": 20.24,
+                "downtime_minutes": 47,
+                "waste_count": 23
+            }
+        }
+    )
+
+    asset_id: str = Field(..., description="Asset UUID")
+    asset_name: str = Field(..., description="Human-readable asset name")
+    total_loss: float = Field(..., ge=0.0, description="Total financial loss in dollars")
+    downtime_cost: float = Field(default=0.0, ge=0.0, description="Cost from downtime")
+    waste_cost: float = Field(default=0.0, ge=0.0, description="Cost from waste/scrap")
+    hourly_rate: Optional[float] = Field(None, description="Hourly rate used for calculation")
+    cost_per_unit: Optional[float] = Field(None, description="Cost per unit used for waste calculation")
+    downtime_minutes: int = Field(default=0, ge=0, description="Total downtime minutes")
+    waste_count: int = Field(default=0, ge=0, description="Total waste count")
+
+
+class HighestCostAsset(BaseModel):
+    """
+    Identifies the highest-cost asset in an area query.
+
+    Story 6.2 AC#2: Identifies highest-cost asset.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "asset_id": "ast-grd-005",
+                "asset_name": "Grinder 5",
+                "total_loss": 2340.50
+            }
+        }
+    )
+
+    asset_id: str = Field(..., description="Asset UUID")
+    asset_name: str = Field(..., description="Asset name")
+    total_loss: float = Field(..., ge=0.0, description="Total loss amount")
+
+
+class AverageComparison(BaseModel):
+    """
+    Comparison to average loss for the asset/area.
+
+    Story 6.2 AC#1: Comparison to average loss.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "average_daily_loss": 1850.00,
+                "current_loss": 2340.50,
+                "variance": 490.50,
+                "variance_percent": 26.5,
+                "comparison_text": "$490.50 (26.5%) above average"
+            }
+        }
+    )
+
+    average_daily_loss: float = Field(..., ge=0.0, description="Average daily loss")
+    current_loss: float = Field(..., ge=0.0, description="Current period loss")
+    variance: float = Field(..., description="Difference from average (can be negative)")
+    variance_percent: float = Field(..., description="Percentage variance from average")
+    comparison_text: str = Field(..., description="Human-readable comparison")
+
+
+class NonFinancialMetric(BaseModel):
+    """
+    Non-financial metrics returned when cost center data is missing.
+
+    Story 6.2 AC#3: Returns available non-financial metrics.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "asset_id": "ast-001",
+                "asset_name": "Grinder 5",
+                "downtime_minutes": 47,
+                "waste_count": 23,
+                "note": "Unable to calculate financial impact - no cost center data"
+            }
+        }
+    )
+
+    asset_id: str = Field(..., description="Asset UUID")
+    asset_name: str = Field(..., description="Asset name")
+    downtime_minutes: Optional[int] = Field(None, ge=0, description="Downtime minutes if available")
+    waste_count: Optional[int] = Field(None, ge=0, description="Waste count if available")
+    note: str = Field(..., description="Note explaining why financial data unavailable")
+
+
+class FinancialImpactOutput(BaseModel):
+    """
+    Output schema for Financial Impact tool.
+
+    Story 6.2 AC#1-5: Complete financial impact response.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "scope": "asset: Grinder 5",
+                "time_range": "yesterday",
+                "total_loss": 2340.50,
+                "breakdown": [],
+                "per_asset_breakdown": None,
+                "highest_cost_asset": None,
+                "average_comparison": None,
+                "message": None,
+                "non_financial_metrics": None,
+                "data_freshness": "2026-01-09T09:00:00Z"
+            }
+        }
+    )
+
+    scope: str = Field(..., description="Query scope: asset name, area name, or 'plant-wide'")
+    time_range: str = Field(..., description="Time range queried")
+    total_loss: Optional[float] = Field(
+        None, ge=0.0, description="Total financial loss (None if no cost data)"
+    )
+    breakdown: List[CostBreakdown] = Field(
+        default_factory=list,
+        description="Breakdown by cost category (downtime, waste)"
+    )
+    per_asset_breakdown: Optional[List[AssetFinancialSummary]] = Field(
+        None, description="Per-asset breakdown for area queries"
+    )
+    highest_cost_asset: Optional[HighestCostAsset] = Field(
+        None, description="Asset with highest cost in area queries"
+    )
+    average_comparison: Optional[AverageComparison] = Field(
+        None, description="Comparison to historical average"
+    )
+    message: Optional[str] = Field(
+        None, description="Additional message (e.g., missing cost data warning)"
+    )
+    non_financial_metrics: Optional[List[NonFinancialMetric]] = Field(
+        None, description="Available metrics when cost data unavailable"
+    )
+    data_freshness: str = Field(
+        ..., description="Data freshness timestamp (ISO format)"
+    )
