@@ -265,7 +265,7 @@ update_story_metrics() {
     local status="$1"  # completed|failed|skipped
 
     if [ -z "$METRICS_FILE" ] || [ ! -f "$METRICS_FILE" ]; then
-        return
+        return 0
     fi
 
     # Check if yq is available for YAML manipulation
@@ -277,8 +277,11 @@ update_story_metrics() {
         esac
     else
         # Fallback: log warning (metrics will be finalized at end)
-        [ "$VERBOSE" = true ] && log_warn "yq not found - metrics update deferred"
+        if [ "$VERBOSE" = true ]; then
+            log_warn "yq not found - metrics update deferred"
+        fi
     fi
+    return 0
 }
 
 add_metrics_issue() {
