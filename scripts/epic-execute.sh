@@ -29,8 +29,15 @@ SPRINT_ARTIFACTS_DIR="$PROJECT_ROOT/_bmad-output/implementation-artifacts"
 SPRINTS_DIR="$PROJECT_ROOT/_bmad-output/sprints"
 EPICS_DIR="$PROJECT_ROOT/_bmad-output/planning-artifacts"
 UAT_DIR="$PROJECT_ROOT/_bmad-output/uat"
+ISSUES_DIR="$PROJECT_ROOT/_bmad-output/issues"
+SPRINT_STATUS_FILE="$SPRINT_ARTIFACTS_DIR/sprint-status.yaml"
+STORY_FILES_DIR="$PROJECT_ROOT/_bmad-output/stories"
 
 LOG_FILE="/tmp/bmad-epic-execute-$$.log"
+
+# Retry and degradation settings
+MAX_RETRIES=2
+CONSECUTIVE_FAILURE_THRESHOLD=3
 
 # Colors for output
 RED='\033[0;31m'
@@ -61,6 +68,162 @@ log_error() {
 log_warn() {
     echo -e "${YELLOW}[!]${NC} $1"
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] [WARN] $1" >> "$LOG_FILE"
+}
+
+# =============================================================================
+# Story Completion Verification Functions
+# =============================================================================
+
+# Check if story is marked as done in the story file
+check_story_file_done() {
+    local story_id="$1"
+    local story_file="$STORY_FILES_DIR/${story_id}.md"
+
+    if [ -f "$story_file" ]; then
+        if grep -qi "^Status:.*Done" "$story_file" 2>/dev/null; then
+            return 0  # Done
+        fi
+    fi
+    return 1  # Not done
+}
+
+# Check if story is marked as done in sprint-status.yaml
+check_sprint_status_done() {
+    local story_id="$1"
+
+    if [ -f "$SPRINT_STATUS_FILE" ]; then
+        if grep -q "^[[:space:]]*${story_id}:.*done" "$SPRINT_STATUS_FILE" 2>/dev/null; then
+            return 0  # Done
+        fi
+    fi
+    return 1  # Not done
+}
+
+# Check both sources for done status
+is_story_done() {
+    local story_id="$1"
+
+    if check_story_file_done "$story_id" && check_sprint_status_done "$story_id"; then
+        return 0  # Both confirm done
+    fi
+    return 1  # Not confirmed done in both
+}
+
+# Update sprint-status.yaml to mark story as done
+update_sprint_status() {
+    local story_id="$1"
+    local new_status="$2"
+
+    if [ -f "$SPRINT_STATUS_FILE" ]; then
+        # Use sed to update the status
+        sed -i.bak "s/^\([[:space:]]*${story_id}:\).*/\1 ${new_status}/" "$SPRINT_STATUS_FILE"
+        rm -f "${SPRINT_STATUS_FILE}.bak"
+        log "Updated sprint-status.yaml: $story_id -> $new_status"
+    fi
+}
+
+# Verify story completion after dev+review cycle
+verify_story_completion() {
+    local story_id="$1"
+    local story_file="$2"
+
+    # Check story file status
+    if ! grep -qi "^Status:.*Done" "$story_file" 2>/dev/null; then
+        log_warn "Story file not marked as Done: $story_id"
+        return 1
+    fi
+
+    # Update sprint-status.yaml
+    update_sprint_status "$story_id" "done"
+
+    # Verify both are now in sync
+    if is_story_done "$story_id"; then
+        log_success "Story completion verified: $story_id"
+        return 0
+    else
+        log_warn "Story completion verification failed: $story_id"
+        return 1
+    fi
+}
+
+# =============================================================================
+# Issue File Creation
+# =============================================================================
+
+create_issue_file() {
+    local issue_type="$1"
+    local story_id="$2"
+    local message="$3"
+    local details="$4"
+
+    mkdir -p "$ISSUES_DIR"
+
+    local timestamp=$(date '+%Y-%m-%d_%H-%M-%S')
+    local issue_file="$ISSUES_DIR/issue-${timestamp}-${story_id}.md"
+
+    cat > "$issue_file" << EOF
+# Epic Chain Issue Report
+
+**Generated**: $(date '+%Y-%m-%d %H:%M:%S')
+**Epic**: $EPIC_ID
+**Story**: $story_id
+**Issue Type**: $issue_type
+
+## Summary
+
+$message
+
+## Details
+
+$details
+
+## Context
+
+- Log File: $LOG_FILE
+- Metrics File: $METRICS_FILE
+- Sprint Status: $SPRINT_STATUS_FILE
+
+## Recommended Actions
+
+EOF
+
+    case "$issue_type" in
+        "degradation")
+            cat >> "$issue_file" << EOF
+1. Review the log file for error patterns
+2. Check if there are environmental issues (API limits, memory, etc.)
+3. Consider running stories individually to isolate the problem
+4. Resume with: ./scripts/epic-execute.sh $EPIC_ID --start-from $story_id --skip-done
+EOF
+            ;;
+        "consecutive_failures")
+            cat >> "$issue_file" << EOF
+1. Multiple consecutive stories have failed
+2. This may indicate a systemic issue with the codebase or test environment
+3. Review failed stories and their error messages
+4. Fix underlying issues before resuming
+5. Resume with: ./scripts/epic-execute.sh $EPIC_ID --start-from $story_id --skip-done
+EOF
+            ;;
+        "verification_failed")
+            cat >> "$issue_file" << EOF
+1. Story completed but verification failed
+2. Check if story file status was updated correctly
+3. Manually verify sprint-status.yaml is in sync
+4. Resume with: ./scripts/epic-execute.sh $EPIC_ID --start-from $story_id --skip-done
+EOF
+            ;;
+        *)
+            cat >> "$issue_file" << EOF
+1. Review the error details above
+2. Check the log file for more context
+3. Resume with: ./scripts/epic-execute.sh $EPIC_ID --start-from $story_id --skip-done
+EOF
+            ;;
+    esac
+
+    log_error "Issue file created: $issue_file"
+    echo "$issue_file"
 }
 
 # =============================================================================
@@ -658,9 +821,13 @@ log "=========================================="
 log "Starting execution of ${#STORIES[@]} stories"
 log "=========================================="
 
+# Ensure issues directory exists
+mkdir -p "$ISSUES_DIR"
+
 COMPLETED=0
 FAILED=0
 SKIPPED=0
+CONSECUTIVE_FAILURES=0
 START_TIME=$(date +%s)
 STARTED=false
 
@@ -679,10 +846,24 @@ for story_file in "${STORIES[@]}"; do
         fi
     fi
 
-    # --skip-done: Skip stories with Status: Done
+    # --skip-done: Check BOTH story file AND sprint-status.yaml
     if [ "$SKIP_DONE" = true ]; then
-        if grep -q "^Status:.*Done" "$story_file" 2>/dev/null; then
-            log_warn "Skipping $story_id (Status: Done)"
+        story_file_done=false
+        sprint_status_done=false
+
+        # Check story file
+        if grep -qi "^Status:.*Done" "$story_file" 2>/dev/null; then
+            story_file_done=true
+        fi
+
+        # Check sprint-status.yaml
+        if [ -f "$SPRINT_STATUS_FILE" ] && grep -q "^[[:space:]]*${story_id}:.*done" "$SPRINT_STATUS_FILE" 2>/dev/null; then
+            sprint_status_done=true
+        fi
+
+        # Skip if EITHER source says done (to be safe)
+        if [ "$story_file_done" = true ] || [ "$sprint_status_done" = true ]; then
+            log_warn "Skipping $story_id (already done - file:$story_file_done, status:$sprint_status_done)"
             ((SKIPPED++))
             update_story_metrics "skipped"
             continue
@@ -694,32 +875,100 @@ for story_file in "${STORIES[@]}"; do
     log "Story: $story_id"
     log "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-    # DEV PHASE (Context 1)
-    if ! execute_dev_phase "$story_file"; then
-        log_error "Dev phase failed for $story_id"
-        ((FAILED++))
-        update_story_metrics "failed"
-        add_metrics_issue "$story_id" "dev_phase_failed" "Development phase did not complete"
-        continue
-    fi
+    # Track retry attempts for this story
+    STORY_SUCCESS=false
+    RETRY_COUNT=0
 
-    # REVIEW PHASE (Context 2 - Fresh)
-    if [ "$SKIP_REVIEW" = false ]; then
-        if ! execute_review_phase "$story_file"; then
-            log_error "Review phase failed for $story_id"
-            ((FAILED++))
-            update_story_metrics "failed"
-            add_metrics_issue "$story_id" "review_failed" "Code review phase failed"
+    while [ "$STORY_SUCCESS" = false ] && [ $RETRY_COUNT -le $MAX_RETRIES ]; do
+        if [ $RETRY_COUNT -gt 0 ]; then
+            log_warn "Retry attempt $RETRY_COUNT/$MAX_RETRIES for $story_id"
+        fi
+
+        DEV_SUCCESS=false
+        REVIEW_SUCCESS=false
+
+        # DEV PHASE (Context 1)
+        if execute_dev_phase "$story_file"; then
+            DEV_SUCCESS=true
+            log_success "Dev phase complete: $story_id"
+        else
+            log_error "Dev phase failed for $story_id (attempt $((RETRY_COUNT + 1)))"
+            ((RETRY_COUNT++))
             continue
         fi
+
+        # REVIEW PHASE (Context 2 - Fresh)
+        if [ "$SKIP_REVIEW" = false ]; then
+            if execute_review_phase "$story_file"; then
+                REVIEW_SUCCESS=true
+            else
+                log_error "Review phase failed for $story_id (attempt $((RETRY_COUNT + 1)))"
+                ((RETRY_COUNT++))
+                continue
+            fi
+        else
+            REVIEW_SUCCESS=true
+        fi
+
+        # If we got here, both phases succeeded
+        if [ "$DEV_SUCCESS" = true ] && [ "$REVIEW_SUCCESS" = true ]; then
+            STORY_SUCCESS=true
+        fi
+    done
+
+    # Handle story result
+    if [ "$STORY_SUCCESS" = true ]; then
+        # COMMIT
+        commit_story "$story_id"
+
+        # VERIFY completion in both sources
+        if ! verify_story_completion "$story_id" "$story_file"; then
+            log_warn "Story completion verification failed, but continuing..."
+            # Still count as completed since code review passed
+        fi
+
+        ((COMPLETED++))
+        CONSECUTIVE_FAILURES=0  # Reset on success
+        update_story_metrics "completed"
+        log_success "Story complete: $story_id ($COMPLETED/${#STORIES[@]})"
+    else
+        # Story failed after all retries
+        ((FAILED++))
+        ((CONSECUTIVE_FAILURES++))
+        update_story_metrics "failed"
+        add_metrics_issue "$story_id" "story_failed" "Failed after $MAX_RETRIES retries"
+
+        log_error "Story failed after $MAX_RETRIES retries: $story_id"
+
+        # Check for consecutive failure threshold
+        if [ $CONSECUTIVE_FAILURES -ge $CONSECUTIVE_FAILURE_THRESHOLD ]; then
+            log_error "DEGRADATION DETECTED: $CONSECUTIVE_FAILURES consecutive failures"
+
+            # Create issue file
+            issue_details="Consecutive failures: $CONSECUTIVE_FAILURES
+Failed stories in sequence ending with: $story_id
+Total completed before stopping: $COMPLETED
+Total failed: $FAILED
+
+This indicates potential systemic issues with:
+- The codebase or test environment
+- API rate limits or service availability
+- Memory or resource constraints"
+
+            create_issue_file "consecutive_failures" "$story_id" \
+                "Epic chain stopped due to $CONSECUTIVE_FAILURES consecutive story failures" \
+                "$issue_details"
+
+            log_error "Epic chain halted due to degradation. Check issue file for details."
+
+            # Finalize metrics before exit
+            END_TIME=$(date +%s)
+            DURATION=$((END_TIME - START_TIME))
+            finalize_metrics "${#STORIES[@]}" "$COMPLETED" "$FAILED" "$SKIPPED" "$DURATION"
+
+            exit 2  # Exit code 2 indicates degradation stop
+        fi
     fi
-
-    # COMMIT
-    commit_story "$story_id"
-
-    ((COMPLETED++))
-    update_story_metrics "completed"
-    log_success "Story complete: $story_id ($COMPLETED/${#STORIES[@]})"
 done
 
 # =============================================================================
