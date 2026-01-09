@@ -333,12 +333,15 @@ for i in "${!EPIC_IDS[@]}"; do
     EPIC_FILES_LIST[$i]="$epic_file"
     log_success "Epic $epic_id: Found $(basename "$epic_file")"
 
-    # Find stories for this epic
+    # Find stories for this epic (dedupe directories to avoid double-counting)
     story_count=0
+    searched_dirs=""
     for search_dir in "$STORIES_DIR" "$SPRINT_ARTIFACTS_DIR"; do
-        if [ -d "$search_dir" ]; then
+        # Skip if directory already searched or doesn't exist
+        if [ -d "$search_dir" ] && [[ ! "$searched_dirs" =~ "$search_dir" ]]; then
             count=$(find "$search_dir" -name "${epic_id}-*-*.md" 2>/dev/null | wc -l)
             story_count=$((story_count + count))
+            searched_dirs="$searched_dirs:$search_dir"
         fi
     done
 
