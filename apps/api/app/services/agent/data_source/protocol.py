@@ -58,6 +58,9 @@ class OEEMetrics(BaseModel):
     actual_output: Optional[int] = Field(None, description="Actual production output")
     target_output: Optional[int] = Field(None, description="Target production output")
     downtime_minutes: Optional[int] = Field(None, description="Total downtime in minutes")
+    downtime_reasons: Optional[dict] = Field(
+        None, description="Downtime reasons breakdown: {reason_code: minutes}"
+    )
     waste_count: Optional[int] = Field(None, description="Number of waste items")
     financial_loss_dollars: Optional[Decimal] = Field(
         None, description="Calculated financial loss"

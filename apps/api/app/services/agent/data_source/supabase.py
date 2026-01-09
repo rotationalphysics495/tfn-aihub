@@ -127,6 +127,15 @@ class SupabaseDataSource:
 
     def _parse_oee_metrics(self, row: Dict[str, Any]) -> OEEMetrics:
         """Parse a database row into an OEEMetrics model."""
+        # Parse downtime_reasons if present (may be JSON string or dict)
+        downtime_reasons = row.get("downtime_reasons")
+        if isinstance(downtime_reasons, str):
+            import json
+            try:
+                downtime_reasons = json.loads(downtime_reasons)
+            except (json.JSONDecodeError, TypeError):
+                downtime_reasons = None
+
         return OEEMetrics(
             id=str(row["id"]),
             asset_id=str(row["asset_id"]),
@@ -154,6 +163,7 @@ class SupabaseDataSource:
             actual_output=row.get("actual_output"),
             target_output=row.get("target_output"),
             downtime_minutes=row.get("downtime_minutes"),
+            downtime_reasons=downtime_reasons,
             waste_count=row.get("waste_count"),
             financial_loss_dollars=(
                 Decimal(str(row["financial_loss_dollars"]))

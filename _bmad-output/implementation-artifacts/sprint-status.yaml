@@ -74,7 +74,7 @@ development_status:
   # Story 5.4: OEE Query Tool
   # - OEE for asset, area, or plant-wide with breakdown
   # - Availability, Performance, Quality components
-  5-4-oee-query-tool: backlog
+  5-4-oee-query-tool: done
 
   # Story 5.5: Downtime Analysis Tool
   # - Downtime reasons and patterns (Pareto analysis)
