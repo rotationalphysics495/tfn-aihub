@@ -523,7 +523,13 @@ for current_idx in "${!EXECUTION_ORDER[@]}"; do
         echo "[DRY RUN] Would execute: $exec_cmd"
         ((COMPLETED_EPICS++))
     else
-        if $exec_cmd; then
+        # Disable set -e temporarily to capture exit code properly
+        set +e
+        $exec_cmd
+        exec_exit_code=$?
+        set -e
+
+        if [ $exec_exit_code -eq 0 ]; then
             log_success "Epic $epic_id completed"
 
             # Run UAT validation if enabled
@@ -651,8 +657,15 @@ EOF
                 fi
             fi
         else
-            log_error "Epic $epic_id failed"
+            log_error "Epic $epic_id failed (exit code: $exec_exit_code)"
             ((FAILED_EPICS++))
+
+            # Exit code 2 from epic-execute means degradation detected - stop immediately
+            if [ $exec_exit_code -eq 2 ]; then
+                log_error "Degradation detected in epic-execute - halting chain"
+                log_error "Check _bmad-output/issues/ for details"
+                break
+            fi
 
             # Ask whether to continue or abort
             echo ""
