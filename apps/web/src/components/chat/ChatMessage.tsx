@@ -4,26 +4,35 @@
  * Chat Message Component
  *
  * Renders individual chat messages with distinct styling for user vs AI.
- * Includes collapsible citation display for AI responses.
+ * Includes collapsible citation display, markdown rendering, and follow-up chips.
  *
  * @see Story 4.3 - Chat Sidebar UI
  * @see Story 4.5 - Cited Response Generation
+ * @see Story 5.7 - Agent Chat Integration
  * @see AC #3 - Message Display (clear visual distinction)
  * @see AC #6 - Citation Display (structured evidence area)
+ * @see AC #7 - Response Formatting (tables, lists)
  */
 
 import { useState } from 'react'
-import { ChevronDown, ChevronUp, Database, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { ChevronDown, ChevronUp, Database, AlertTriangle, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { CitationLink, type CitationData } from './CitationLink'
 import { CitationPanel } from './CitationPanel'
+import { FollowUpChips } from './FollowUpChips'
 import type { Message, Citation } from './types'
 
 interface ChatMessageProps {
   /** The message to display */
   message: Message
+  /** Handler for follow-up chip selection (Story 5.7) */
+  onFollowUpSelect?: (question: string) => void
+  /** Handler for retry on error (Story 5.7) */
+  onRetry?: () => void
   /** Optional custom class name */
   className?: string
 }
@@ -54,8 +63,13 @@ function convertToCitationData(citation: Citation, index: number): CitationData 
  * - Clickable citation links (AC#4)
  * - Grounding score display (AC#3)
  * - Citation panel on click (AC#4)
+ *
+ * Story 5.7 enhancements:
+ * - Markdown rendering for structured content (AC#7)
+ * - Follow-up question chips (AC#3)
+ * - Error state with retry button (AC#5)
  */
-export function ChatMessage({ message, className }: ChatMessageProps) {
+export function ChatMessage({ message, onFollowUpSelect, onRetry, className }: ChatMessageProps) {
   const [showCitations, setShowCitations] = useState(false)
   const [selectedCitation, setSelectedCitation] = useState<CitationData | null>(null)
   const [isPanelOpen, setIsPanelOpen] = useState(false)
@@ -63,6 +77,8 @@ export function ChatMessage({ message, className }: ChatMessageProps) {
   const isUser = message.role === 'user'
   const hasCitations = message.citations && message.citations.length > 0
   const hasGroundingScore = typeof message.groundingScore === 'number'
+  const hasFollowUps = message.followUpQuestions && message.followUpQuestions.length > 0
+  const isError = message.isError
 
   // Convert citations to CitationData format
   const citationData: CitationData[] = hasCitations
@@ -102,19 +118,25 @@ export function ChatMessage({ message, className }: ChatMessageProps) {
           'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
           isUser
             ? 'bg-info-blue text-white'
-            : 'bg-industrial-200 dark:bg-industrial-700'
+            : isError
+              ? 'bg-warning-amber/20 dark:bg-warning-amber/30'
+              : 'bg-industrial-200 dark:bg-industrial-700'
         )}
       >
-        <span
-          className={cn(
-            'text-xs font-semibold',
-            isUser
-              ? 'text-white'
-              : 'text-industrial-600 dark:text-industrial-300'
-          )}
-        >
-          {isUser ? 'You' : 'AI'}
-        </span>
+        {isError ? (
+          <AlertCircle className="h-4 w-4 text-warning-amber" />
+        ) : (
+          <span
+            className={cn(
+              'text-xs font-semibold',
+              isUser
+                ? 'text-white'
+                : 'text-industrial-600 dark:text-industrial-300'
+            )}
+          >
+            {isUser ? 'You' : 'AI'}
+          </span>
+        )}
       </div>
 
       {/* Message content */}
@@ -130,14 +152,107 @@ export function ChatMessage({ message, className }: ChatMessageProps) {
             'rounded-lg px-4 py-3 text-base leading-relaxed',
             isUser
               ? 'bg-info-blue text-white'
-              : 'bg-industrial-100 text-industrial-900 dark:bg-industrial-800 dark:text-industrial-100'
+              : isError
+                ? 'bg-warning-amber/10 border border-warning-amber/30 text-industrial-900 dark:text-industrial-100'
+                : 'bg-industrial-100 text-industrial-900 dark:bg-industrial-800 dark:text-industrial-100'
           )}
         >
-          {message.content}
+          {/* Story 5.7 AC#7: Markdown rendering for structured content */}
+          {isUser ? (
+            message.content
+          ) : (
+            <div className="prose prose-sm dark:prose-invert max-w-none">
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  // Table rendering with horizontal scroll for mobile (AC#8)
+                  table: ({ children }) => (
+                    <div className="overflow-x-auto -mx-2 my-2">
+                      <table className="min-w-full border-collapse text-sm">
+                        {children}
+                      </table>
+                    </div>
+                  ),
+                  thead: ({ children }) => (
+                    <thead className="bg-industrial-200/50 dark:bg-industrial-700/50">
+                      {children}
+                    </thead>
+                  ),
+                  th: ({ children }) => (
+                    <th className="border border-industrial-300 dark:border-industrial-600 px-3 py-2 text-left font-medium">
+                      {children}
+                    </th>
+                  ),
+                  td: ({ children }) => (
+                    <td className="border border-industrial-300 dark:border-industrial-600 px-3 py-2">
+                      {children}
+                    </td>
+                  ),
+                  // Status colors for production data (AC#7)
+                  strong: ({ children }) => {
+                    const text = String(children).toLowerCase()
+                    if (text.includes('behind') || text.includes('down') || text.includes('critical')) {
+                      return <strong className="text-warning-amber dark:text-warning-amber">{children}</strong>
+                    }
+                    if (text.includes('ahead') || text.includes('running') || text.includes('on target')) {
+                      return <strong className="text-success-green dark:text-success-green">{children}</strong>
+                    }
+                    return <strong>{children}</strong>
+                  },
+                  // Links open in new tab
+                  a: ({ href, children }) => (
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-info-blue hover:underline"
+                    >
+                      {children}
+                    </a>
+                  ),
+                  // List styling
+                  ul: ({ children }) => (
+                    <ul className="list-disc list-inside space-y-1 my-2">{children}</ul>
+                  ),
+                  ol: ({ children }) => (
+                    <ol className="list-decimal list-inside space-y-1 my-2">{children}</ol>
+                  ),
+                  // Code blocks
+                  code: ({ className, children }) => {
+                    const isInline = !className
+                    return isInline ? (
+                      <code className="bg-industrial-200 dark:bg-industrial-700 px-1 py-0.5 rounded text-sm">
+                        {children}
+                      </code>
+                    ) : (
+                      <code className="block bg-industrial-200 dark:bg-industrial-700 p-2 rounded text-sm overflow-x-auto">
+                        {children}
+                      </code>
+                    )
+                  },
+                }}
+              >
+                {message.content}
+              </ReactMarkdown>
+            </div>
+          )}
         </div>
 
+        {/* Story 5.7 AC#5: Error state with retry button */}
+        {isError && onRetry && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onRetry}
+            className="h-8 gap-1.5 text-xs border-warning-amber/50 hover:bg-warning-amber/10"
+          >
+            <RefreshCw className="h-3 w-3" />
+            Retry
+          </Button>
+        )}
+
         {/* Story 4.5: Grounding score indicator for AI messages */}
-        {!isUser && hasGroundingScore && (
+        {!isUser && !isError && hasGroundingScore && (
           <div className="flex items-center gap-1.5">
             {groundingStatus === 'high' && (
               <Badge
@@ -170,7 +285,7 @@ export function ChatMessage({ message, className }: ChatMessageProps) {
         )}
 
         {/* Citations section for AI messages */}
-        {!isUser && hasCitations && (
+        {!isUser && !isError && hasCitations && (
           <div className="w-full">
             <Button
               variant="ghost"
@@ -225,6 +340,14 @@ export function ChatMessage({ message, className }: ChatMessageProps) {
           }}
           onRelatedCitationClick={handleCitationClick}
         />
+
+        {/* Story 5.7 AC#3: Follow-up question chips */}
+        {!isUser && !isError && hasFollowUps && onFollowUpSelect && (
+          <FollowUpChips
+            questions={message.followUpQuestions!}
+            onSelect={onFollowUpSelect}
+          />
+        )}
 
         {/* Timestamp */}
         <span className="text-xs text-muted-foreground">

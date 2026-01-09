@@ -63,6 +63,14 @@ export interface Message {
   groundingScore?: number
   /** Claims that could not be grounded (Story 4.5) */
   ungroundedClaims?: string[]
+
+  // Story 5.7 Extended Fields
+  /** Suggested follow-up questions from agent (Story 5.7) */
+  followUpQuestions?: string[]
+  /** Whether the message is an error response (Story 5.7) */
+  isError?: boolean
+  /** Tool used by agent to generate response (Story 5.7) */
+  toolUsed?: string
 }
 
 /**

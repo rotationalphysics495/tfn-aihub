@@ -1,7 +1,13 @@
 """
-Chat API Endpoints (Story 4.2, 4.5)
+Chat API Endpoints (Story 4.2, 4.5, 5.7)
 
-REST API for Text-to-SQL natural language query interface with cited responses.
+REST API for AI chat interface routing to ManufacturingAgent with cited responses.
+
+Story 5.7: Agent Chat Integration
+- Routes chat messages to ManufacturingAgent (not Text-to-SQL directly)
+- Preserves Mem0 memory storage for conversations
+- Transforms agent response for frontend compatibility
+- Maintains backward compatibility with existing chat UI
 
 AC#8 (Story 4.2): API Endpoint Design
 - POST /api/chat/query with body { "question": string, "context"?: object }
@@ -19,8 +25,9 @@ import logging
 import re
 import time
 from collections import defaultdict
+from datetime import datetime, timezone
 from functools import lru_cache
-from typing import Optional
+from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
@@ -44,6 +51,12 @@ from app.services.cited_response_service import (
     CitedResponseService,
     get_cited_response_service,
 )
+from app.services.agent.executor import (
+    ManufacturingAgent,
+    get_manufacturing_agent,
+    AgentError,
+)
+from app.services.memory.mem0_service import memory_service, MemoryServiceError
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +85,11 @@ def get_service() -> TextToSQLService:
 def get_cited_service() -> CitedResponseService:
     """Dependency to get Cited Response service instance."""
     return get_cited_response_service()
+
+
+def get_agent() -> ManufacturingAgent:
+    """Dependency to get ManufacturingAgent instance."""
+    return get_manufacturing_agent()
 
 
 def _extract_source_table(sql: Optional[str]) -> Optional[str]:
@@ -124,43 +142,58 @@ def check_rate_limit(user_id: str) -> None:
     description="""
     Submit a natural language question about plant performance data.
 
+    Story 5.7: Routes messages to ManufacturingAgent for intelligent tool selection.
+
     The system will:
-    1. Parse your question into a SQL query
-    2. Execute the query against the manufacturing database
-    3. Validate response grounding against data sources (Story 4.5)
-    4. Return a natural language answer with verified data citations
+    1. Route your question to the Manufacturing Agent
+    2. Agent selects appropriate tools based on intent
+    3. Execute queries and aggregate data with citations
+    4. Store conversation in Mem0 for future context
+    5. Return a natural language answer with verified data citations
 
     **Supported Topics:**
     - OEE (Overall Equipment Effectiveness)
     - Downtime and production output
     - Financial loss calculations
     - Safety events and incidents
-    - Asset comparisons
+    - Asset status and comparisons
+    - Production targets and variance
 
     **Example Questions:**
     - "What was Grinder 5's OEE yesterday?"
     - "Which asset had the most downtime last week?"
     - "Show me all safety events this month"
     - "What's the total financial loss for the Grinding area?"
+    - "How is production tracking against target?"
 
-    **Story 4.5 Features:**
+    **Features:**
     - All responses include inline citations [Source: table/record]
-    - Grounding score indicates response reliability
+    - Suggested follow-up questions
+    - Conversation memory for contextual responses
     - NFR1 compliant: All claims cite specific data points
     """,
 )
 async def query_data(
     query_input: QueryInput,
+    use_agent: bool = Query(
+        True,
+        description="Route to ManufacturingAgent (Story 5.7) vs legacy Text-to-SQL"
+    ),
     enable_grounding: bool = Query(
         True,
         description="Enable Story 4.5 grounding validation and citation generation"
     ),
     current_user: CurrentUser = Depends(get_current_user),
+    agent: ManufacturingAgent = Depends(get_agent),
     service: TextToSQLService = Depends(get_service),
     cited_service: CitedResponseService = Depends(get_cited_service),
 ) -> QueryResponse:
     """
     Process a natural language query about plant data.
+
+    Story 5.7: Agent Chat Integration
+    AC#1: Message is routed to agent endpoint
+    AC#6: Conversations are stored in Mem0
 
     Story 4.2:
     AC#2: Natural language question is processed
@@ -179,9 +212,11 @@ async def query_data(
 
     Args:
         query_input: The question and optional context
+        use_agent: Route to ManufacturingAgent (default) vs legacy Text-to-SQL
         enable_grounding: Enable Story 4.5 citation generation
         current_user: Authenticated user from JWT
-        service: Text-to-SQL service instance
+        agent: ManufacturingAgent instance
+        service: Text-to-SQL service instance (fallback)
         cited_service: Cited response service instance
 
     Returns:
@@ -195,6 +230,146 @@ async def query_data(
     # AC#8: Rate limiting
     check_rate_limit(current_user.id)
 
+    # Story 5.7: Route to agent if enabled and agent is configured
+    if use_agent and agent.is_configured:
+        return await _process_via_agent(
+            query_input=query_input,
+            current_user=current_user,
+            agent=agent,
+        )
+
+    # Fallback to legacy Text-to-SQL path
+    return await _process_via_text_to_sql(
+        query_input=query_input,
+        enable_grounding=enable_grounding,
+        current_user=current_user,
+        service=service,
+        cited_service=cited_service,
+    )
+
+
+async def _process_via_agent(
+    query_input: QueryInput,
+    current_user: CurrentUser,
+    agent: ManufacturingAgent,
+) -> QueryResponse:
+    """
+    Process query through ManufacturingAgent.
+
+    Story 5.7: Agent Chat Integration
+    AC#1: Routes to agent endpoint
+    AC#6: Stores conversation in Mem0
+
+    Args:
+        query_input: The question and optional context
+        current_user: Authenticated user from JWT
+        agent: ManufacturingAgent instance
+
+    Returns:
+        QueryResponse with answer, citations, and follow-up questions
+    """
+    user_id = current_user.id
+    start_time = time.time()
+
+    try:
+        # Build context for agent
+        context = None
+        if query_input.context:
+            context = query_input.context.model_dump(exclude_none=True)
+
+        # Story 5.7 AC#6: Get memory context for the query
+        chat_history: List[Dict[str, str]] = []
+        try:
+            chat_history = await memory_service.get_context_for_query(
+                query=query_input.question,
+                user_id=user_id,
+                asset_id=context.get("asset_focus") if context else None,
+            )
+        except MemoryServiceError as e:
+            logger.warning(f"Memory context retrieval failed (graceful degradation): {e}")
+
+        # Process through ManufacturingAgent
+        agent_response = await agent.process_message(
+            message=query_input.question,
+            user_id=user_id,
+            chat_history=chat_history,
+        )
+
+        # Story 5.7 AC#6: Store conversation in Mem0
+        try:
+            metadata = {"source": "chat_sidebar"}
+            if context and context.get("asset_focus"):
+                metadata["asset_id"] = context["asset_focus"]
+
+            await memory_service.add_memory(
+                messages=[
+                    {"role": "user", "content": query_input.question},
+                    {"role": "assistant", "content": agent_response.content},
+                ],
+                user_id=user_id,
+                metadata=metadata,
+            )
+        except MemoryServiceError as e:
+            logger.warning(f"Memory storage failed (graceful degradation): {e}")
+
+        # Transform agent citations to QueryResponse format
+        citations = _transform_agent_citations(agent_response.citations)
+
+        execution_time = time.time() - start_time
+
+        # Log for analytics
+        logger.info(
+            f"Agent query processed: user={user_id}, "
+            f"question='{query_input.question[:50]}...', "
+            f"tool={agent_response.tool_used}, "
+            f"citations={len(citations)}, "
+            f"time={execution_time:.2f}s"
+        )
+
+        return QueryResponse(
+            answer=agent_response.content,
+            sql=None,  # Agent doesn't expose SQL directly
+            data=[],   # Agent formats data in response
+            citations=citations,
+            executed_at=datetime.now(timezone.utc).isoformat(),
+            execution_time_seconds=execution_time,
+            row_count=0,
+            error=bool(agent_response.error),
+            suggestions=agent_response.suggested_questions or None,
+            # Story 5.7: Include agent metadata
+            meta={
+                "agent_tool": agent_response.tool_used,
+                "follow_up_questions": agent_response.suggested_questions,
+                "grounding_score": _calculate_grounding_score(agent_response.citations),
+            },
+        )
+
+    except AgentError as e:
+        logger.error(f"Agent error for user {user_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.exception(f"Unexpected error in agent processing for user {user_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="An unexpected error occurred. Please try again.",
+        )
+
+
+async def _process_via_text_to_sql(
+    query_input: QueryInput,
+    enable_grounding: bool,
+    current_user: CurrentUser,
+    service: TextToSQLService,
+    cited_service: CitedResponseService,
+) -> QueryResponse:
+    """
+    Process query through legacy Text-to-SQL path.
+
+    Maintained for backward compatibility and as fallback when agent is not configured.
+    """
     try:
         # Build context dict if provided
         context = None
@@ -277,6 +452,59 @@ async def query_data(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="An unexpected error occurred. Please try again.",
         )
+
+
+def _transform_agent_citations(agent_citations: List[Dict[str, Any]]) -> List[Citation]:
+    """
+    Transform agent citations to QueryResponse Citation format.
+
+    Story 5.7: Ensures agent citations are compatible with existing frontend.
+
+    Args:
+        agent_citations: Citations from agent response
+
+    Returns:
+        List of Citation models for QueryResponse
+    """
+    citations = []
+    for cit in agent_citations:
+        try:
+            citations.append(Citation(
+                value=cit.get("display_text", ""),
+                field=cit.get("source", "agent"),
+                table=cit.get("table", cit.get("source", "agent_data")),
+                context=f"{cit.get('source', '')} at {cit.get('timestamp', '')}",
+            ))
+        except Exception as e:
+            logger.warning(f"Failed to transform citation: {e}")
+    return citations
+
+
+def _calculate_grounding_score(citations: List[Dict[str, Any]]) -> float:
+    """
+    Calculate grounding score based on citation confidence.
+
+    Story 5.7: Provides grounding score for UI display.
+
+    Args:
+        citations: List of agent citations with confidence scores
+
+    Returns:
+        Average grounding score (0.0 to 1.0)
+    """
+    if not citations:
+        return 0.0
+
+    confidences = [
+        cit.get("confidence", 0.5)
+        for cit in citations
+        if isinstance(cit.get("confidence"), (int, float))
+    ]
+
+    if not confidences:
+        return 0.5  # Default moderate confidence
+
+    return sum(confidences) / len(confidences)
 
 
 @router.get(

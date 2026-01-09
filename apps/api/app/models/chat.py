@@ -107,6 +107,7 @@ class QueryResponse(BaseModel):
     Response schema for natural language query.
 
     AC#8: Response format { "answer": string, "sql": string, "data": object, "citations": array }
+    Story 5.7: Extended with follow_up_questions and meta for agent responses
     """
 
     model_config = ConfigDict(
@@ -126,6 +127,11 @@ class QueryResponse(BaseModel):
                 "executed_at": "2026-01-05T10:30:00Z",
                 "execution_time_seconds": 0.45,
                 "row_count": 1,
+                "suggestions": ["What caused the downtime?", "How does this compare to last week?"],
+                "meta": {
+                    "grounding_score": 0.95,
+                    "follow_up_questions": ["What caused the downtime?"]
+                }
             }
         }
     )
@@ -164,7 +170,11 @@ class QueryResponse(BaseModel):
     )
     suggestions: Optional[List[str]] = Field(
         None,
-        description="Suggestions for improving the query (on error)"
+        description="Follow-up questions or suggestions (Story 5.7)"
+    )
+    meta: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Additional metadata (grounding_score, follow_up_questions, agent_tool)"
     )
 
 

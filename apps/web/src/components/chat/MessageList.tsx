@@ -7,6 +7,7 @@
  * Uses Radix ScrollArea for consistent cross-browser scrolling.
  *
  * @see Story 4.3 - Chat Sidebar UI
+ * @see Story 5.7 - Agent Chat Integration
  * @see AC #3 - Message Display (scrollable conversation view)
  */
 
@@ -22,6 +23,10 @@ interface MessageListProps {
   messages: Message[]
   /** Whether AI is currently generating a response */
   isLoading?: boolean
+  /** Handler for follow-up chip selection (Story 5.7) */
+  onFollowUpSelect?: (question: string) => void
+  /** Handler for retry on error (Story 5.7) */
+  onRetry?: (messageId: string) => void
   /** Optional custom class name */
   className?: string
 }
@@ -29,8 +34,16 @@ interface MessageListProps {
 /**
  * Scrollable message list with auto-scroll behavior.
  * Automatically scrolls to bottom when new messages arrive.
+ *
+ * Story 5.7: Passes through follow-up and retry handlers to messages.
  */
-export function MessageList({ messages, isLoading, className }: MessageListProps) {
+export function MessageList({
+  messages,
+  isLoading,
+  onFollowUpSelect,
+  onRetry,
+  className,
+}: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -55,7 +68,12 @@ export function MessageList({ messages, isLoading, className }: MessageListProps
         ) : (
           <>
             {messages.map((message) => (
-              <ChatMessage key={message.id} message={message} />
+              <ChatMessage
+                key={message.id}
+                message={message}
+                onFollowUpSelect={onFollowUpSelect}
+                onRetry={message.isError && onRetry ? () => onRetry(message.id) : undefined}
+              />
             ))}
 
             {/* Loading indicator when AI is thinking */}
