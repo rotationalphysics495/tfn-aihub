@@ -96,6 +96,26 @@ def mock_verify_jwt_invalid():
 
 
 @pytest.fixture
+def admin_jwt_payload():
+    """Sample admin JWT payload for testing (Story 5.8)."""
+    return {
+        "sub": "admin-user-id-12345",
+        "email": "admin@example.com",
+        "role": "service_role",
+        "aud": "authenticated",
+        "exp": 9999999999,
+    }
+
+
+@pytest.fixture
+def mock_verify_jwt_admin(admin_jwt_payload):
+    """Mock the JWT verification to return an admin payload (Story 5.8)."""
+    with patch("app.core.security.verify_supabase_jwt", new_callable=AsyncMock) as mock:
+        mock.return_value = admin_jwt_payload
+        yield mock
+
+
+@pytest.fixture
 def mock_action_engine():
     """Mock ActionEngine for API tests."""
     with patch('app.api.actions.get_action_engine') as mock_get:

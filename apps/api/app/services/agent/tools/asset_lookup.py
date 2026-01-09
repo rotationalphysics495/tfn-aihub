@@ -32,6 +32,7 @@ from app.models.agent import (
     OEETrend,
 )
 from app.services.agent.base import Citation, ManufacturingTool, ToolResult
+from app.services.agent.cache import cached_tool
 from app.services.agent.data_source import (
     DataResult,
     DataSourceError,
@@ -108,6 +109,9 @@ class AssetLookupTool(ManufacturingTool):
     args_schema: Type[BaseModel] = AssetLookupInput
     citations_required: bool = True
 
+    # Story 5.8: Apply caching with static tier (1 hour TTL)
+    # Asset metadata changes rarely, so static tier is appropriate
+    @cached_tool(tier="static")
     async def _arun(
         self,
         asset_name: str,

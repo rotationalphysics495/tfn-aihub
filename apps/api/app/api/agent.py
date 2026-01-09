@@ -170,10 +170,12 @@ async def chat(
             ]
 
         # Process message through agent
+        # AC#5 (Story 5.8): Pass force_refresh to bypass cache
         result = await agent.process_message(
             message=request.message,
             user_id=current_user.id,
             chat_history=chat_history,
+            force_refresh=request.force_refresh,
         )
 
         # Convert internal response to API response format

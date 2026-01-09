@@ -257,6 +257,7 @@ class ManufacturingAgent:
         message: str,
         user_id: str,
         chat_history: Optional[List[Dict[str, str]]] = None,
+        force_refresh: bool = False,
     ) -> AgentResponse:
         """
         Process a user message and return an agent response.
@@ -269,10 +270,14 @@ class ManufacturingAgent:
             message: User's natural language message
             user_id: User identifier for logging
             chat_history: Optional conversation history
+            force_refresh: Bypass cache and fetch fresh data (Story 5.8 AC#5)
 
         Returns:
             AgentResponse with content, citations, and metadata
         """
+        # Story 5.8: Set force_refresh in context for cache decorator to access
+        from app.services.agent.cache import set_force_refresh
+        set_force_refresh(force_refresh)
         start_time = time.time()
 
         # Ensure agent is initialized

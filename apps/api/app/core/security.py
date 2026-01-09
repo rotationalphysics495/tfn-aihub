@@ -237,3 +237,29 @@ async def get_optional_user(
         return await get_current_user(credentials)
     except HTTPException:
         return None
+
+
+async def require_admin(
+    current_user: CurrentUser = Depends(get_current_user),
+) -> CurrentUser:
+    """
+    FastAPI dependency that requires admin role.
+
+    Story 5.8 AC#7: Cache stats endpoint is admin-only.
+
+    Args:
+        current_user: Authenticated user from get_current_user
+
+    Returns:
+        CurrentUser if user has admin or service_role
+
+    Raises:
+        HTTPException: If user is not an admin
+    """
+    admin_roles = {"service_role", "admin", "supabase_admin"}
+    if current_user.role not in admin_roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required for this endpoint",
+        )
+    return current_user

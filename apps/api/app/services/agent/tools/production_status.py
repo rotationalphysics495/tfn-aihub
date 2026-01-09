@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Literal, Optional, Tuple, Type
 from pydantic import BaseModel, Field
 
 from app.services.agent.base import Citation, ManufacturingTool, ToolResult
+from app.services.agent.cache import cached_tool
 from app.services.agent.data_source import (
     DataResult,
     DataSourceError,
@@ -171,6 +172,9 @@ class ProductionStatusTool(ManufacturingTool):
     args_schema: Type[BaseModel] = ProductionStatusInput
     citations_required: bool = True
 
+    # Story 5.8: Apply caching with live tier (60 second TTL)
+    # Production status is real-time data, so live tier is appropriate
+    @cached_tool(tier="live")
     async def _arun(
         self,
         area: Optional[str] = None,

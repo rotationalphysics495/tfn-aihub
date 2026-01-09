@@ -24,6 +24,7 @@ from typing import Any, Dict, List, Literal, Optional, Tuple, Type
 from pydantic import BaseModel, Field
 
 from app.services.agent.base import Citation, ManufacturingTool, ToolResult
+from app.services.agent.cache import cached_tool
 from app.services.agent.data_source import (
     DataResult,
     DataSourceError,
@@ -213,6 +214,9 @@ class DowntimeAnalysisTool(ManufacturingTool):
     args_schema: Type[BaseModel] = DowntimeAnalysisInput
     citations_required: bool = True
 
+    # Story 5.8: Apply caching with daily tier (15 minute TTL)
+    # Downtime data is T-1 (yesterday) based, so daily tier is appropriate
+    @cached_tool(tier="daily")
     async def _arun(
         self,
         scope: str,

@@ -377,6 +377,10 @@ class AgentChatRequest(BaseModel):
         None,
         description="Previous messages in the conversation"
     )
+    force_refresh: bool = Field(
+        default=False,
+        description="Bypass cache and fetch fresh data (Story 5.8 AC#5)"
+    )
 
 
 class AgentResponse(BaseModel):

@@ -78,6 +78,13 @@ class Settings(BaseSettings):
     # Data Source Configuration (Story 5.2)
     data_source_type: str = "supabase"  # Data source type: "supabase" or "composite"
 
+    # Cache Configuration (Story 5.8)
+    cache_enabled: bool = True  # Enable/disable tool response caching
+    cache_max_size: int = 1000  # Max entries per cache tier
+    cache_live_ttl: int = 60  # Live tier TTL in seconds (1 minute)
+    cache_daily_ttl: int = 900  # Daily tier TTL in seconds (15 minutes)
+    cache_static_ttl: int = 3600  # Static tier TTL in seconds (1 hour)
+
     @property
     def mssql_connection_string(self) -> str:
         """Build MSSQL connection string with proper URL encoding for special characters."""
