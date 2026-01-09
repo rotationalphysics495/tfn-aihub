@@ -136,6 +136,21 @@ class SupabaseDataSource:
                 if row.get("oee_percentage") is not None
                 else None
             ),
+            availability=(
+                Decimal(str(row["availability"]))
+                if row.get("availability") is not None
+                else None
+            ),
+            performance=(
+                Decimal(str(row["performance"]))
+                if row.get("performance") is not None
+                else None
+            ),
+            quality=(
+                Decimal(str(row["quality"]))
+                if row.get("quality") is not None
+                else None
+            ),
             actual_output=row.get("actual_output"),
             target_output=row.get("target_output"),
             downtime_minutes=row.get("downtime_minutes"),
