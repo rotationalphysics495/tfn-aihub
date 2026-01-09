@@ -1,6 +1,6 @@
 # Story 6.3: Cost of Loss Tool
 
-Status: ready-for-dev
+Status: Done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -558,10 +558,165 @@ async def test_cost_of_loss_root_cause_extraction():
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
-### Debug Log References
+### Implementation Summary
 
-### Completion Notes List
+Successfully implemented the Cost of Loss Tool (Story 6.3) following all acceptance criteria. The tool provides a ranked list of financial losses, grouped by category (downtime, waste, quality), with root cause extraction from downtime_reasons JSONB, trend comparison, and area comparison features.
 
-### File List
+### Files Created
+
+1. **apps/api/app/services/agent/tools/cost_of_loss.py**
+   - CostOfLossTool implementation extending ManufacturingTool
+   - Time range parsing (yesterday, this week, last N days, date range)
+   - Loss calculation from FinancialMetrics
+   - Category grouping with top contributors
+   - Root cause extraction from downtime_reasons
+   - Trend comparison with 5% threshold
+   - Area comparison vs plant-wide average
+   - Citation generation per Story 4.5 patterns
+   - 15-minute cache TTL using @cached_tool decorator
+
+2. **apps/api/tests/services/agent/tools/test_cost_of_loss.py**
+   - 48 comprehensive unit tests covering all acceptance criteria
+   - Tests for ranking, percentage calculation, category grouping
+   - Tests for trend and area comparison
+   - Tests for root cause extraction
+   - Tests for citation compliance
+   - Tests for caching behavior
+   - Tests for error handling
+
+### Files Modified
+
+1. **apps/api/app/models/agent.py**
+   - Added LossCategory, TrendDirection enums
+   - Added CostOfLossInput schema
+   - Added LossItem schema with root_cause field
+   - Added CategorySummary schema
+   - Added TrendComparison schema
+   - Added AreaComparison schema
+   - Added CostOfLossOutput schema
+
+2. **apps/api/app/services/agent/data_source/protocol.py**
+   - Added downtime_reasons field to FinancialMetrics model
+   - Added get_cost_of_loss() method to DataSource protocol
+
+3. **apps/api/app/services/agent/data_source/supabase.py**
+   - Updated _parse_financial_metrics() to include downtime_reasons
+   - Implemented get_cost_of_loss() method with downtime_reasons in query
+
+### Key Decisions
+
+1. **Reused FinancialMetrics model** - Extended existing model with downtime_reasons rather than creating new model to maintain consistency with Story 6.2
+
+2. **Root cause extraction** - Each downtime reason from JSONB becomes a separate LossItem with cost calculated from (minutes * hourly_rate/60)
+
+3. **Category grouping** - Downtime items show top 3 reasons as contributors; waste/quality show top 3 assets
+
+4. **Trend direction threshold** - 5% threshold for "stable" classification per story spec
+
+5. **Area comparison** - Compares area total to plant-wide average (total / number of areas)
+
+### Tests Added
+
+48 unit tests covering:
+- Tool properties and schema validation
+- Trend direction logic
+- Cost calculation functions
+- Basic cost of loss query (AC#1)
+- Percentage calculations
+- Top N cost drivers (AC#2)
+- Area-filtered queries (AC#3)
+- Category grouping (AC#4)
+- Root cause extraction
+- Citation compliance (AC#5)
+- Caching support (AC#6)
+- Time range parsing
+- Missing cost center handling
+- Error handling
+- Follow-up question generation
+- Tool registration
+
+### Test Results
+
+```
+48 passed in 0.06s
+```
+
+All tests pass. Financial impact tool tests also pass (90 tests total for both tools).
+
+### Notes for Reviewer
+
+1. Tool auto-registers with agent tool registry via ManufacturingTool inheritance
+2. Intent matching description optimized for queries like "What are we losing money on?", "Top cost drivers"
+3. Citations include both data source (daily_summaries) and calculation evidence (cost_centers)
+4. Response includes data_freshness timestamp
+5. Follow-up questions are context-aware based on results
+
+### Acceptance Criteria Status
+
+- [x] AC#1: Basic Cost of Loss Query - `apps/api/app/services/agent/tools/cost_of_loss.py:163-280`
+- [x] AC#2: Top N Cost Drivers Query - `apps/api/app/services/agent/tools/cost_of_loss.py:227` (limit parameter)
+- [x] AC#3: Area-Filtered Query - `apps/api/app/services/agent/tools/cost_of_loss.py:404-462` (_calculate_area_comparison)
+- [x] AC#4: Category Grouping - `apps/api/app/services/agent/tools/cost_of_loss.py:315-370` (_generate_category_summaries)
+- [x] AC#5: Citation Compliance - `apps/api/app/services/agent/tools/cost_of_loss.py:471-500` (citation methods)
+- [x] AC#6: Performance Requirements - `apps/api/app/services/agent/tools/cost_of_loss.py:149` (@cached_tool decorator with daily tier = 15min TTL)
+
+## Code Review Record
+
+**Reviewer**: Code Review Agent (Claude Opus 4.5)
+**Date**: 2026-01-09
+
+### Issues Found
+
+| # | Description | Severity | Status |
+|---|-------------|----------|--------|
+| 1 | Unused enums `LossCategory` and `TrendDirection` defined in models/agent.py but not used in tool implementation | LOW | Document only |
+| 2 | Hardcoded category strings ("downtime", "waste", "quality") instead of enum values | LOW | Document only |
+| 3 | Hardcoded trend direction strings ("up", "down", "stable") instead of enum values | LOW | Document only |
+
+**Totals**: 0 HIGH, 0 MEDIUM, 3 LOW
+
+### Fixes Applied
+
+None required - all issues are LOW severity and total issues (3) is not greater than 5.
+
+### Remaining Issues
+
+The LOW severity items are documented for future cleanup consideration:
+- The unused enum pattern is consistent with other tools in the codebase (SafetySeverity, ResolutionStatus are also unused in their respective tools)
+- This appears to be intentional for schema documentation/validation purposes while keeping implementation simple with strings
+- No functional impact - the strings match the enum values if enums were used
+
+### Acceptance Criteria Verification
+
+| AC# | Description | Implemented | Tested | Notes |
+|-----|-------------|-------------|--------|-------|
+| AC#1 | Basic Cost of Loss Query | ✅ | ✅ | Ranked list, asset/category/amount/root_cause, total, percentages |
+| AC#2 | Top N Cost Drivers Query | ✅ | ✅ | Limit parameter, trend comparison with 5% threshold |
+| AC#3 | Area-Filtered Query | ✅ | ✅ | Area filtering, comparison to plant-wide average |
+| AC#4 | Category Grouping | ✅ | ✅ | Groups by downtime/waste/quality, subtotals, top contributors |
+| AC#5 | Citation Compliance | ✅ | ✅ | Citations with source tables, data freshness indicator |
+| AC#6 | Performance Requirements | ✅ | ✅ | 15-minute cache TTL via @cached_tool decorator |
+
+### Test Results
+
+```
+48 passed in 0.04s
+```
+
+All 48 tests pass. Combined with Financial Impact Tool: 90 tests pass.
+
+### Code Quality Assessment
+
+- **Architecture**: Follows ManufacturingTool base class pattern (Story 5.1) ✅
+- **Data Access**: Uses DataSource protocol abstraction (Story 5.2) ✅
+- **Caching**: Uses @cached_tool decorator with daily tier (Story 5.8) ✅
+- **Citations**: Follows CitedResponse pattern (Story 4.5) ✅
+- **Error Handling**: Proper try/catch with user-friendly messages ✅
+- **Division by Zero**: Protected in trend and area calculations ✅
+- **Security**: No SQL injection risks - uses ORM ✅
+
+### Final Status
+
+**Approved** - All acceptance criteria are met, tests pass, code quality is good, and no HIGH or MEDIUM severity issues found.

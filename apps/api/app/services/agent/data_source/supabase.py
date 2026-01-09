@@ -975,6 +975,7 @@ class SupabaseDataSource:
         """Parse a database row into a FinancialMetrics model.
 
         Story 6.2: Handles joined data from daily_summaries + assets + cost_centers.
+        Story 6.3: Added downtime_reasons for root cause extraction.
         """
         # Handle nested asset data from joins
         asset_data = row.get("assets", {}) or {}
@@ -998,6 +999,15 @@ class SupabaseDataSource:
                 if unit_cost is not None:
                     cost_per_unit = Decimal(str(unit_cost))
 
+        # Story 6.3: Parse downtime_reasons if present (may be JSON string or dict)
+        downtime_reasons = row.get("downtime_reasons")
+        if isinstance(downtime_reasons, str):
+            import json
+            try:
+                downtime_reasons = json.loads(downtime_reasons)
+            except (json.JSONDecodeError, TypeError):
+                downtime_reasons = None
+
         return FinancialMetrics(
             id=str(row["id"]),
             asset_id=str(row["asset_id"]),
@@ -1006,6 +1016,7 @@ class SupabaseDataSource:
             report_date=row["report_date"],
             downtime_minutes=row.get("downtime_minutes") or 0,
             waste_count=row.get("waste_count") or 0,
+            downtime_reasons=downtime_reasons,
             standard_hourly_rate=standard_hourly_rate,
             cost_per_unit=cost_per_unit,
         )
@@ -1090,6 +1101,85 @@ class SupabaseDataSource:
             logger.error(f"Failed to get financial metrics: {e}")
             raise DataSourceQueryError(
                 f"Failed to get financial metrics: {str(e)}",
+                source_name=self.source_name,
+                table_name="daily_summaries",
+            )
+
+    # =========================================================================
+    # Cost of Loss Methods (Story 6.3)
+    # =========================================================================
+
+    async def get_cost_of_loss(
+        self,
+        start_date: date,
+        end_date: date,
+        area: Optional[str] = None,
+    ) -> DataResult:
+        """
+        Get cost of loss data for analysis.
+
+        Story 6.3: Query daily_summaries joined with cost_centers and assets
+        for cost of loss analysis. Includes downtime_reasons JSONB for
+        root cause extraction.
+
+        Args:
+            start_date: Start of date range (inclusive)
+            end_date: End of date range (inclusive)
+            area: Optional area name to filter by
+
+        Returns:
+            DataResult with list of FinancialMetrics objects including
+            downtime_reasons for root cause extraction
+        """
+        try:
+            # Build query with joins to assets and cost_centers
+            # Include downtime_reasons for root cause extraction
+            select_fields = """
+                id, asset_id, report_date, downtime_minutes, waste_count, downtime_reasons,
+                assets!inner(id, name, area),
+                cost_centers(standard_hourly_rate, cost_per_unit)
+            """
+
+            # Start building query based on area filter
+            if area:
+                # Use inner join when filtering by area
+                query = self.client.table("daily_summaries").select(select_fields)
+                # Area filter through joined assets table
+                query = query.ilike("assets.area", area)
+            else:
+                # No filter - get all
+                query = self.client.table("daily_summaries").select(select_fields)
+
+            # Apply date range filter
+            query = (
+                query.gte("report_date", start_date.isoformat())
+                .lte("report_date", end_date.isoformat())
+                .order("report_date", desc=True)
+            )
+
+            result = query.execute()
+
+            metrics = [self._parse_financial_metrics(row) for row in (result.data or [])]
+
+            # Build query description
+            filters_str = f"area={area}" if area else "all"
+
+            return self._create_result(
+                data=metrics,
+                table_name="daily_summaries",
+                query=(
+                    f"SELECT * FROM daily_summaries "
+                    f"JOIN assets ON daily_summaries.asset_id = assets.id "
+                    f"LEFT JOIN cost_centers ON assets.id = cost_centers.asset_id "
+                    f"WHERE report_date BETWEEN '{start_date}' AND '{end_date}' "
+                    f"({filters_str})"
+                ),
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to get cost of loss data: {e}")
+            raise DataSourceQueryError(
+                f"Failed to get cost of loss data: {str(e)}",
                 source_name=self.source_name,
                 table_name="daily_summaries",
             )

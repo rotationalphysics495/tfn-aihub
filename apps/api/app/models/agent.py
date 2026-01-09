@@ -898,3 +898,232 @@ class FinancialImpactOutput(BaseModel):
     data_freshness: str = Field(
         ..., description="Data freshness timestamp (ISO format)"
     )
+
+
+# =============================================================================
+# Story 6.3: Cost of Loss Tool Models
+# =============================================================================
+
+
+class LossCategory(str, Enum):
+    """Categories of financial losses."""
+    DOWNTIME = "downtime"   # Lost production from machine stoppages
+    WASTE = "waste"         # Scrap and rework costs
+    QUALITY = "quality"     # Quality defects, returns
+
+
+class TrendDirection(str, Enum):
+    """Direction of trend change."""
+    UP = "up"           # Increased loss (worse)
+    DOWN = "down"       # Decreased loss (better)
+    STABLE = "stable"   # Within 5% threshold
+
+
+class CostOfLossInput(BaseModel):
+    """
+    Input schema for Cost of Loss tool.
+
+    Story 6.3 AC#1-3: Query cost of loss with optional filters.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "time_range": "yesterday",
+                "area": None,
+                "limit": 10,
+                "include_trends": False
+            }
+        }
+    )
+
+    time_range: str = Field(
+        default="yesterday",
+        description=(
+            "Time range to query: 'today', 'yesterday', 'this week', "
+            "'last 7 days', 'last N days', or date range like '2026-01-01 to 2026-01-09'"
+        )
+    )
+    area: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=100,
+        description="Area name to filter by (e.g., 'Grinding', 'Packaging')"
+    )
+    limit: int = Field(
+        default=10,
+        ge=1,
+        le=100,
+        description="Maximum number of ranked items to return (default: 10)"
+    )
+    include_trends: bool = Field(
+        default=False,
+        description="Include trend comparison to previous period"
+    )
+
+
+class LossItem(BaseModel):
+    """
+    Single loss item in ranked list.
+
+    Story 6.3 AC#1: For each loss: asset, category, amount, root cause
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "asset_id": "ast-grd-005",
+                "asset_name": "Grinder 5",
+                "category": "downtime",
+                "amount": 3125.50,
+                "root_cause": "Material Jam",
+                "percentage_of_total": 25.1,
+                "duration_minutes": 78
+            }
+        }
+    )
+
+    asset_id: str = Field(..., description="Asset UUID")
+    asset_name: str = Field(..., description="Human-readable asset name")
+    category: str = Field(..., description="Loss category: 'downtime', 'waste', or 'quality'")
+    amount: float = Field(..., ge=0.0, description="Cost amount in dollars")
+    root_cause: Optional[str] = Field(
+        None, description="Root cause (e.g., 'Material Jam') - available for downtime category"
+    )
+    percentage_of_total: float = Field(
+        ..., ge=0.0, le=100.0, description="Percentage of total loss"
+    )
+    duration_minutes: Optional[int] = Field(
+        None, ge=0, description="Duration in minutes (for downtime category)"
+    )
+
+
+class CategorySummary(BaseModel):
+    """
+    Summary of losses by category.
+
+    Story 6.3 AC#4: Each category shows subtotal and percentage of total loss.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "category": "downtime",
+                "total_amount": 8750.50,
+                "item_count": 12,
+                "percentage_of_total": 70.3,
+                "top_contributors": ["Material Jam", "Safety Stop", "Blade Change"]
+            }
+        }
+    )
+
+    category: str = Field(..., description="Loss category: 'downtime', 'waste', or 'quality'")
+    total_amount: float = Field(..., ge=0.0, description="Total loss amount for this category")
+    item_count: int = Field(..., ge=0, description="Number of items in this category")
+    percentage_of_total: float = Field(
+        ..., ge=0.0, le=100.0, description="Percentage of total loss"
+    )
+    top_contributors: List[str] = Field(
+        default_factory=list,
+        description="Top reasons/contributors for this category (max 3)"
+    )
+
+
+class TrendComparison(BaseModel):
+    """
+    Trend comparison vs previous period.
+
+    Story 6.3 AC#2: Includes trend vs previous week (up/down/stable).
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "previous_period_total": 10200.00,
+                "current_period_total": 12450.75,
+                "change_amount": 2250.75,
+                "change_percent": 22.1,
+                "trend_direction": "up"
+            }
+        }
+    )
+
+    previous_period_total: float = Field(..., ge=0.0, description="Total loss in previous period")
+    current_period_total: float = Field(..., ge=0.0, description="Total loss in current period")
+    change_amount: float = Field(..., description="Absolute change in dollars (can be negative)")
+    change_percent: float = Field(..., description="Percentage change (can be negative)")
+    trend_direction: str = Field(..., description="Trend direction: 'up', 'down', or 'stable'")
+
+
+class AreaComparison(BaseModel):
+    """
+    Area comparison vs plant-wide average.
+
+    Story 6.3 AC#3: Compares area loss to plant-wide average.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "area_loss": 5125.50,
+                "plant_wide_average": 3112.69,
+                "variance": 2012.81,
+                "variance_percent": 64.7,
+                "comparison_text": "Grinding area is 64.7% above plant average"
+            }
+        }
+    )
+
+    area_loss: float = Field(..., ge=0.0, description="Total loss for the filtered area")
+    plant_wide_average: float = Field(..., ge=0.0, description="Plant-wide average loss")
+    variance: float = Field(..., description="Variance from average (can be negative)")
+    variance_percent: float = Field(..., description="Percentage variance from average")
+    comparison_text: str = Field(..., description="Human-readable comparison text")
+
+
+class CostOfLossOutput(BaseModel):
+    """
+    Output schema for Cost of Loss tool.
+
+    Story 6.3 AC#1-5: Complete cost of loss response.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "scope": "plant-wide",
+                "time_range": "yesterday",
+                "total_loss": 12450.75,
+                "ranked_items": [],
+                "category_summaries": [],
+                "trend_comparison": None,
+                "area_comparison": None,
+                "message": None,
+                "data_freshness": "2026-01-09T09:00:00Z"
+            }
+        }
+    )
+
+    scope: str = Field(..., description="Query scope: 'plant-wide' or area name")
+    time_range: str = Field(..., description="Time range queried")
+    total_loss: float = Field(..., ge=0.0, description="Total financial loss across all items")
+    ranked_items: List[LossItem] = Field(
+        default_factory=list,
+        description="Ranked list of losses (highest first)"
+    )
+    category_summaries: List[CategorySummary] = Field(
+        default_factory=list,
+        description="Summary by category (downtime, waste, quality)"
+    )
+    trend_comparison: Optional[TrendComparison] = Field(
+        None, description="Trend comparison to previous period (if include_trends=True)"
+    )
+    area_comparison: Optional[AreaComparison] = Field(
+        None, description="Area vs plant-wide comparison (if area filter applied)"
+    )
+    message: Optional[str] = Field(
+        None, description="Additional message (e.g., 'No data found')"
+    )
+    data_freshness: str = Field(
+        ..., description="Data freshness timestamp (ISO format)"
+    )

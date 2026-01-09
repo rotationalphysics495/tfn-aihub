@@ -111,7 +111,7 @@ development_status:
   # Story 6.2: Financial Impact Tool
   # - Calculate financial cost of downtime and waste
   # - Dollar losses using cost_centers data
-  6-2-financial-impact-tool: backlog
+  6-2-financial-impact-tool: done
 
   # Story 6.3: Cost of Loss Tool
   # - Ranked list of losses by financial impact

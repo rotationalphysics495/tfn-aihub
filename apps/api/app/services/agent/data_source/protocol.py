@@ -142,6 +142,7 @@ class FinancialMetrics(BaseModel):
     """Financial metrics from daily_summaries joined with cost_centers.
 
     Story 6.2: Enhanced metrics for financial impact calculation.
+    Story 6.3: Added downtime_reasons for root cause extraction.
     """
 
     id: str = Field(..., description="Record UUID (from daily_summaries)")
@@ -151,6 +152,10 @@ class FinancialMetrics(BaseModel):
     report_date: date = Field(..., description="Report date")
     downtime_minutes: int = Field(default=0, description="Total downtime in minutes")
     waste_count: int = Field(default=0, description="Number of waste items")
+    # Story 6.3: downtime_reasons JSONB for root cause extraction
+    downtime_reasons: Optional[dict] = Field(
+        None, description="Downtime reasons breakdown: {reason_code: minutes}"
+    )
     # Cost center data (may be None if not configured)
     standard_hourly_rate: Optional[Decimal] = Field(
         None, description="$/hour for downtime calculation (from cost_centers)"
@@ -515,5 +520,33 @@ class DataSource(Protocol):
         Returns:
             DataResult with list of FinancialMetrics objects
             DataResult.data includes has_cost_data flag for detecting missing cost centers
+        """
+        ...
+
+    # =========================================================================
+    # Cost of Loss Methods (Story 6.3)
+    # =========================================================================
+
+    async def get_cost_of_loss(
+        self,
+        start_date: date,
+        end_date: date,
+        area: Optional[str] = None,
+    ) -> DataResult:
+        """
+        Get cost of loss data for analysis.
+
+        Story 6.3: Query daily_summaries joined with cost_centers and assets
+        for cost of loss analysis. Includes downtime_reasons JSONB for
+        root cause extraction.
+
+        Args:
+            start_date: Start of date range (inclusive)
+            end_date: End of date range (inclusive)
+            area: Optional area name to filter by
+
+        Returns:
+            DataResult with list of FinancialMetrics objects including
+            downtime_reasons for root cause extraction
         """
         ...
