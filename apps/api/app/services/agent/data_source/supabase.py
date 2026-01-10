@@ -1183,3 +1183,206 @@ class SupabaseDataSource:
                 source_name=self.source_name,
                 table_name="daily_summaries",
             )
+
+    # =========================================================================
+    # Trend Analysis Methods (Story 6.4)
+    # =========================================================================
+
+    async def get_trend_data(
+        self,
+        start_date: date,
+        end_date: date,
+        metric: str = "oee",
+        asset_id: Optional[str] = None,
+        area: Optional[str] = None,
+    ) -> DataResult:
+        """
+        Get time series data for trend analysis.
+
+        Story 6.4: Query daily_summaries for trend analysis with
+        metric selection and filtering.
+
+        Args:
+            start_date: Start of date range (inclusive)
+            end_date: End of date range (inclusive)
+            metric: Metric to retrieve ('oee', 'output', 'downtime', 'waste',
+                   'availability', 'performance', 'quality')
+            asset_id: Optional UUID of specific asset
+            area: Optional area name to filter by
+
+        Returns:
+            DataResult with list of dicts containing date and metric values,
+            plus downtime_reasons for anomaly cause detection
+        """
+        try:
+            # Map metric names to database column names
+            metric_column_map = {
+                "oee": "oee_percentage",
+                "output": "actual_output",
+                "downtime": "downtime_minutes",
+                "waste": "waste_count",
+                "availability": "availability",
+                "performance": "performance",
+                "quality": "quality",
+            }
+
+            # Validate metric
+            metric_lower = metric.lower()
+            if metric_lower not in metric_column_map:
+                raise DataSourceQueryError(
+                    f"Invalid metric: {metric}. Must be one of: {list(metric_column_map.keys())}",
+                    source_name=self.source_name,
+                    table_name="daily_summaries",
+                )
+
+            metric_column = metric_column_map[metric_lower]
+
+            # Build select fields - include all OEE components for comprehensive data
+            select_fields = f"""
+                id, asset_id, report_date, {metric_column}, downtime_reasons,
+                assets!inner(id, name, area)
+            """
+
+            # Start building query
+            if area:
+                # Inner join when filtering by area
+                query = self.client.table("daily_summaries").select(select_fields)
+                query = query.ilike("assets.area", area)
+            elif asset_id:
+                # Filter by specific asset
+                query = self.client.table("daily_summaries").select(select_fields)
+                query = query.eq("asset_id", asset_id)
+            else:
+                # No filter - get all (plant-wide)
+                query = self.client.table("daily_summaries").select(select_fields)
+
+            # Apply date range filter and order chronologically for time series
+            query = (
+                query.gte("report_date", start_date.isoformat())
+                .lte("report_date", end_date.isoformat())
+                .order("report_date", desc=False)  # Chronological order
+            )
+
+            result = query.execute()
+
+            # Transform data to include metric value with standard key name
+            transformed_data = []
+            for row in (result.data or []):
+                # Parse downtime_reasons if present
+                downtime_reasons = row.get("downtime_reasons")
+                if isinstance(downtime_reasons, str):
+                    import json
+                    try:
+                        downtime_reasons = json.loads(downtime_reasons)
+                    except (json.JSONDecodeError, TypeError):
+                        downtime_reasons = None
+
+                asset_data = row.get("assets", {}) or {}
+
+                transformed_row = {
+                    "date": row["report_date"],
+                    "value": row.get(metric_column),
+                    "asset_id": row["asset_id"],
+                    "asset_name": asset_data.get("name"),
+                    "area": asset_data.get("area"),
+                    "downtime_reasons": downtime_reasons,
+                }
+                transformed_data.append(transformed_row)
+
+            # For area queries without specific asset, aggregate by date
+            if area and not asset_id:
+                transformed_data = self._aggregate_trend_by_date(
+                    transformed_data, metric_lower
+                )
+
+            # Build query description
+            filters_desc = []
+            if asset_id:
+                filters_desc.append(f"asset_id={asset_id}")
+            if area:
+                filters_desc.append(f"area={area}")
+            filters_str = ", ".join(filters_desc) if filters_desc else "plant-wide"
+
+            return self._create_result(
+                data=transformed_data,
+                table_name="daily_summaries",
+                query=(
+                    f"SELECT report_date, {metric_column}, downtime_reasons "
+                    f"FROM daily_summaries "
+                    f"WHERE report_date BETWEEN '{start_date}' AND '{end_date}' "
+                    f"({filters_str}) ORDER BY report_date ASC"
+                ),
+            )
+
+        except DataSourceQueryError:
+            raise
+        except Exception as e:
+            logger.error(f"Failed to get trend data: {e}")
+            raise DataSourceQueryError(
+                f"Failed to get trend data: {str(e)}",
+                source_name=self.source_name,
+                table_name="daily_summaries",
+            )
+
+    def _aggregate_trend_by_date(
+        self,
+        data: List[Dict[str, Any]],
+        metric: str,
+    ) -> List[Dict[str, Any]]:
+        """
+        Aggregate trend data by date for area-level analysis.
+
+        For area queries, we need to aggregate multiple assets per day.
+        Uses mean for percentage metrics (oee, availability, performance, quality)
+        and sum for count metrics (output, downtime, waste).
+
+        Args:
+            data: Raw data with multiple assets per day
+            metric: Metric being analyzed
+
+        Returns:
+            Aggregated data with one row per date
+        """
+        from collections import defaultdict
+
+        # Metrics that should be summed vs averaged
+        sum_metrics = {"output", "downtime", "waste"}
+
+        # Group by date
+        by_date = defaultdict(list)
+        for row in data:
+            date_key = row["date"]
+            if row["value"] is not None:
+                by_date[date_key].append(row)
+
+        # Aggregate
+        aggregated = []
+        for date_key in sorted(by_date.keys()):
+            rows = by_date[date_key]
+            values = [r["value"] for r in rows if r["value"] is not None]
+
+            if not values:
+                continue
+
+            if metric in sum_metrics:
+                agg_value = sum(values)
+            else:
+                agg_value = sum(values) / len(values)
+
+            # Merge downtime reasons from all assets for this date
+            merged_reasons = {}
+            for row in rows:
+                if row.get("downtime_reasons"):
+                    for reason, minutes in row["downtime_reasons"].items():
+                        merged_reasons[reason] = merged_reasons.get(reason, 0) + minutes
+
+            aggregated.append({
+                "date": date_key,
+                "value": agg_value,
+                "asset_id": None,  # Aggregated
+                "asset_name": None,
+                "area": rows[0].get("area") if rows else None,
+                "downtime_reasons": merged_reasons if merged_reasons else None,
+            })
+
+        return aggregated

@@ -116,7 +116,7 @@ development_status:
   # Story 6.3: Cost of Loss Tool
   # - Ranked list of losses by financial impact
   # - Grouped by category (downtime, waste, quality)
-  6-3-cost-of-loss-tool: backlog
+  6-3-cost-of-loss-tool: done
 
   # Story 6.4: Trend Analysis Tool
   # - Performance trends over 7-90 day windows

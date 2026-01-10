@@ -1127,3 +1127,278 @@ class CostOfLossOutput(BaseModel):
     data_freshness: str = Field(
         ..., description="Data freshness timestamp (ISO format)"
     )
+
+
+# =============================================================================
+# Story 6.4: Trend Analysis Tool Models
+# =============================================================================
+
+
+class MetricType(str, Enum):
+    """Supported metrics for trend analysis."""
+    OEE = "oee"                    # Overall Equipment Effectiveness
+    OUTPUT = "output"              # Production output (units)
+    DOWNTIME = "downtime"          # Downtime minutes
+    WASTE = "waste"                # Waste/scrap count
+    AVAILABILITY = "availability"  # OEE availability component
+    PERFORMANCE = "performance"    # OEE performance component
+    QUALITY = "quality"            # OEE quality component
+
+
+class TrendAnalysisDirection(str, Enum):
+    """Direction of trend change for trend analysis tool."""
+    IMPROVING = "improving"   # Slope > +5% normalized
+    DECLINING = "declining"   # Slope < -5% normalized
+    STABLE = "stable"         # Slope within +/- 5%
+
+
+class TrendAnalysisInput(BaseModel):
+    """
+    Input schema for Trend Analysis tool.
+
+    Story 6.4 AC#1-3: Query trends with optional filters and time range.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "asset_id": "ast-grd-005",
+                "area": None,
+                "metric": "oee",
+                "time_range_days": 30
+            }
+        }
+    )
+
+    asset_id: Optional[str] = Field(
+        default=None,
+        description="Specific asset UUID to analyze trend for"
+    )
+    area: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=100,
+        description="Area name to analyze trend for (e.g., 'Grinding', 'Packaging')"
+    )
+    metric: str = Field(
+        default="oee",
+        description=(
+            "Metric to analyze: 'oee', 'output', 'downtime', 'waste', "
+            "'availability', 'performance', 'quality'"
+        )
+    )
+    time_range_days: int = Field(
+        default=30,
+        ge=7,
+        le=90,
+        description="Number of days to analyze (7, 14, 30, 60, or 90 days)"
+    )
+
+
+class MinMaxValue(BaseModel):
+    """Min or max value with date for trend statistics."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "value": 62.3,
+                "date": "2025-12-15"
+            }
+        }
+    )
+
+    value: float = Field(..., description="The metric value")
+    date: str = Field(..., description="Date when this value occurred (ISO format)")
+
+
+class TrendStatistics(BaseModel):
+    """
+    Statistical summary of trend data.
+
+    Story 6.4 AC#1: Includes mean, min/max with dates, std dev, and slope.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "mean": 78.5,
+                "min": {"value": 62.3, "date": "2025-12-15"},
+                "max": {"value": 89.2, "date": "2026-01-05"},
+                "std_dev": 6.8,
+                "trend_slope": 0.42
+            }
+        }
+    )
+
+    mean: float = Field(..., description="Average metric value over the period")
+    min: MinMaxValue = Field(..., description="Minimum value with date")
+    max: MinMaxValue = Field(..., description="Maximum value with date")
+    std_dev: float = Field(..., ge=0.0, description="Standard deviation")
+    trend_slope: float = Field(..., description="Linear regression slope (per day)")
+
+
+class TrendAnomaly(BaseModel):
+    """
+    Detected anomaly in trend data.
+
+    Story 6.4 AC#5: Anomalies >2 standard deviations from mean.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "date": "2025-12-15",
+                "value": 62.3,
+                "expected_value": 78.5,
+                "deviation": 16.2,
+                "deviation_std_devs": 2.38,
+                "possible_cause": "Material Jam"
+            }
+        }
+    )
+
+    date: str = Field(..., description="Date of the anomaly (ISO format)")
+    value: float = Field(..., description="Actual metric value")
+    expected_value: float = Field(..., description="Expected value (mean)")
+    deviation: float = Field(..., ge=0.0, description="Absolute deviation from mean")
+    deviation_std_devs: float = Field(
+        ..., ge=0.0, description="Deviation in standard deviations"
+    )
+    possible_cause: Optional[str] = Field(
+        None, description="Possible cause from downtime reasons (if available)"
+    )
+
+
+class TrendBaselinePeriod(BaseModel):
+    """Period definition for baseline comparison."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "start": "2025-12-10",
+                "end": "2025-12-16"
+            }
+        }
+    )
+
+    start: str = Field(..., description="Start date of baseline period (ISO format)")
+    end: str = Field(..., description="End date of baseline period (ISO format)")
+
+
+class TrendBaselineComparison(BaseModel):
+    """
+    Comparison of current period to baseline (first 7 days).
+
+    Story 6.4 AC#1: Compare current performance to baseline.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "baseline_period": {"start": "2025-12-10", "end": "2025-12-16"},
+                "baseline_value": 74.2,
+                "current_value": 82.8,
+                "change_amount": 8.6,
+                "change_percent": 11.6
+            }
+        }
+    )
+
+    baseline_period: TrendBaselinePeriod = Field(
+        ..., description="Time period used as baseline"
+    )
+    baseline_value: float = Field(..., description="Average value during baseline period")
+    current_value: float = Field(..., description="Average value during current period")
+    change_amount: float = Field(..., description="Absolute change from baseline")
+    change_percent: float = Field(..., description="Percentage change from baseline")
+
+
+class TrendDataPoint(BaseModel):
+    """Single data point in trend time series."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "date": "2026-01-08",
+                "value": 85.2
+            }
+        }
+    )
+
+    date: str = Field(..., description="Date of data point (ISO format)")
+    value: float = Field(..., description="Metric value for this date")
+
+
+class TrendAnalysisOutput(BaseModel):
+    """
+    Output schema for Trend Analysis tool.
+
+    Story 6.4 AC#1-6: Complete trend analysis response.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "scope": "asset: Grinder 5",
+                "metric": "oee",
+                "time_range_days": 30,
+                "trend_direction": "improving",
+                "statistics": {
+                    "mean": 78.5,
+                    "min": {"value": 62.3, "date": "2025-12-15"},
+                    "max": {"value": 89.2, "date": "2026-01-05"},
+                    "std_dev": 6.8,
+                    "trend_slope": 0.42
+                },
+                "anomalies": [],
+                "baseline_comparison": {
+                    "baseline_period": {"start": "2025-12-10", "end": "2025-12-16"},
+                    "baseline_value": 74.2,
+                    "current_value": 82.8,
+                    "change_amount": 8.6,
+                    "change_percent": 11.6
+                },
+                "conclusion_text": "Grinder 5's OEE has been improving over the last 30 days.",
+                "granularity": "daily",
+                "data_points": None,
+                "available_data": None,
+                "suggestion": None,
+                "data_freshness": "2026-01-09T09:00:00Z"
+            }
+        }
+    )
+
+    scope: str = Field(..., description="Query scope: asset name, area name, or 'plant-wide'")
+    metric: str = Field(..., description="Metric analyzed (oee, output, downtime, etc.)")
+    time_range_days: int = Field(..., description="Number of days analyzed")
+    trend_direction: Optional[str] = Field(
+        None, description="Trend direction: 'improving', 'declining', or 'stable' (None if insufficient data)"
+    )
+    statistics: Optional[TrendStatistics] = Field(
+        None, description="Statistical summary (None if insufficient data)"
+    )
+    anomalies: List[TrendAnomaly] = Field(
+        default_factory=list,
+        description="Detected anomalies (values >2 std dev from mean)"
+    )
+    baseline_comparison: Optional[TrendBaselineComparison] = Field(
+        None, description="Comparison to baseline period (first 7 days)"
+    )
+    conclusion_text: str = Field(
+        ..., description="Human-readable conclusion about the trend"
+    )
+    granularity: str = Field(
+        default="daily", description="Data granularity: 'daily' or 'weekly'"
+    )
+    data_points: Optional[List[TrendDataPoint]] = Field(
+        None, description="Time series data points (optional, for charting)"
+    )
+    available_data: Optional[List[Dict[str, Any]]] = Field(
+        None, description="Available point-in-time data when insufficient for trend (AC#4)"
+    )
+    suggestion: Optional[str] = Field(
+        None, description="Suggestion when insufficient data (AC#4)"
+    )
+    data_freshness: str = Field(
+        ..., description="Data freshness timestamp (ISO format)"
+    )

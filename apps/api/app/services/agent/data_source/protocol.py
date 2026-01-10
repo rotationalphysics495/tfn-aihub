@@ -550,3 +550,35 @@ class DataSource(Protocol):
             downtime_reasons for root cause extraction
         """
         ...
+
+    # =========================================================================
+    # Trend Analysis Methods (Story 6.4)
+    # =========================================================================
+
+    async def get_trend_data(
+        self,
+        start_date: date,
+        end_date: date,
+        metric: str = "oee",
+        asset_id: Optional[str] = None,
+        area: Optional[str] = None,
+    ) -> DataResult:
+        """
+        Get time series data for trend analysis.
+
+        Story 6.4: Query daily_summaries for trend analysis with
+        metric selection and filtering.
+
+        Args:
+            start_date: Start of date range (inclusive)
+            end_date: End of date range (inclusive)
+            metric: Metric to retrieve ('oee', 'output', 'downtime', 'waste',
+                   'availability', 'performance', 'quality')
+            asset_id: Optional UUID of specific asset
+            area: Optional area name to filter by
+
+        Returns:
+            DataResult with list of dicts containing date and metric values,
+            plus downtime_reasons for anomaly cause detection
+        """
+        ...
