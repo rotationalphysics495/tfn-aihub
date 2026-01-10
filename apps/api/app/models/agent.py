@@ -2286,3 +2286,296 @@ class AlertCheckOutput(BaseModel):
         ...,
         description="Data freshness timestamp (ISO format)"
     )
+
+
+# =============================================================================
+# Story 7.5: Recommendation Engine Tool Models
+# =============================================================================
+
+
+class ConfidenceLevel(str, Enum):
+    """Confidence level for recommendations."""
+    HIGH = "high"      # >80% pattern match
+    MEDIUM = "medium"  # 60-80% pattern match
+    # LOW is filtered out and not shown
+
+
+class FocusArea(str, Enum):
+    """Focus areas for recommendations."""
+    OEE = "oee"
+    WASTE = "waste"
+    SAFETY = "safety"
+    COST = "cost"
+    DOWNTIME = "downtime"
+
+
+class RecommendationInput(BaseModel):
+    """
+    Input schema for Recommendation Engine tool.
+
+    Story 7.5 AC#1, AC#2, AC#3: Query for improvement recommendations.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "subject": "Grinder 5",
+                "focus_area": "oee",
+                "time_range_days": 30
+            }
+        }
+    )
+
+    subject: str = Field(
+        ...,
+        min_length=1,
+        max_length=200,
+        description=(
+            "Asset name (e.g., 'Grinder 5') or 'plant-wide' for overall analysis"
+        )
+    )
+    focus_area: Optional[str] = Field(
+        default=None,
+        description="Specific area to focus recommendations on: 'oee', 'waste', 'safety', 'cost', 'downtime'"
+    )
+    time_range_days: int = Field(
+        default=30,
+        ge=7,
+        le=90,
+        description="Days of historical data to analyze for patterns (default: 30)"
+    )
+
+
+class PatternEvidence(BaseModel):
+    """
+    Evidence supporting a detected pattern.
+
+    Story 7.5 AC#1, AC#5: Data patterns that led to the recommendation.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "pattern_type": "recurring_downtime",
+                "description": "'Blade Change' occurs frequently (38% of days)",
+                "frequency": 0.38,
+                "affected_periods": ["38 occurrences in 30 days"],
+                "data_points": 38,
+                "confidence_score": 0.87
+            }
+        }
+    )
+
+    pattern_type: str = Field(
+        ...,
+        description="Type of pattern: 'recurring_downtime', 'time_of_day', 'cross_asset'"
+    )
+    description: str = Field(
+        ...,
+        description="Human-readable description of the pattern"
+    )
+    frequency: float = Field(
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="How often the pattern occurs (0.0-1.0)"
+    )
+    affected_periods: List[str] = Field(
+        default_factory=list,
+        description="Time periods or conditions where pattern occurs (e.g., 'Monday mornings')"
+    )
+    data_points: int = Field(
+        ...,
+        ge=0,
+        description="Number of observations supporting this pattern"
+    )
+    confidence_score: float = Field(
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="Confidence score (0.6-1.0 shown, <0.6 filtered)"
+    )
+
+
+class Recommendation(BaseModel):
+    """
+    A single improvement recommendation.
+
+    Story 7.5 AC#1: What to do, expected impact, supporting evidence.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "title": "Address Recurring Downtime: Blade Change",
+                "description": "This issue accounts for 38% of downtime events",
+                "what_to_do": "Review blade change SOP and implement predictive maintenance schedule",
+                "expected_impact": "35% reduction in blade-related downtime ($4,200/month savings)",
+                "estimated_roi": "4200.00",
+                "confidence": "high",
+                "confidence_score": 0.87,
+                "supporting_evidence": [],
+                "similar_past_solutions": ["Implemented 72-hour blade change schedule on Grinder 3"],
+                "priority": 1
+            }
+        }
+    )
+
+    title: str = Field(
+        ...,
+        description="Recommendation title (e.g., 'Address Recurring Downtime: Blade Change')"
+    )
+    description: str = Field(
+        ...,
+        description="Description of why this is recommended"
+    )
+    what_to_do: str = Field(
+        ...,
+        description="Specific action to take"
+    )
+    expected_impact: str = Field(
+        ...,
+        description="Expected impact (e.g., '$X savings' or 'Y% improvement')"
+    )
+    estimated_roi: Optional[str] = Field(
+        None,
+        description="Estimated ROI as string (for JSON serialization of Decimal)"
+    )
+    confidence: str = Field(
+        ...,
+        description="Confidence level: 'high' (>80%) or 'medium' (60-80%)"
+    )
+    confidence_score: float = Field(
+        ...,
+        ge=0.6,
+        le=1.0,
+        description="Confidence score (0.6-1.0)"
+    )
+    supporting_evidence: List[PatternEvidence] = Field(
+        default_factory=list,
+        description="Pattern evidence supporting this recommendation"
+    )
+    similar_past_solutions: List[str] = Field(
+        default_factory=list,
+        description="Similar solutions from memory that worked (max 2)"
+    )
+    priority: int = Field(
+        default=1,
+        ge=1,
+        le=10,
+        description="Priority rank (1 = highest, set after ranking)"
+    )
+
+
+class RecommendationCitation(BaseModel):
+    """
+    Citation for recommendation data.
+
+    Story 7.5 AC#6: All recommendations cite specific data sources.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "source_type": "daily_summaries",
+                "date_range": "Dec 10, 2025 - Jan 09, 2026",
+                "asset_id": "grinder-5",
+                "pattern_types": ["recurring_downtime", "time_of_day"],
+                "display_text": "[Source: daily_summaries Dec 10 - Jan 09, 2026]"
+            }
+        }
+    )
+
+    source_type: str = Field(
+        default="daily_summaries",
+        description="Source table identifier"
+    )
+    date_range: str = Field(
+        ...,
+        description="Date range analyzed"
+    )
+    asset_id: Optional[str] = Field(
+        None,
+        description="Asset ID if asset-specific"
+    )
+    pattern_types: List[str] = Field(
+        default_factory=list,
+        description="Types of patterns analyzed"
+    )
+    display_text: str = Field(
+        ...,
+        description="Human-readable citation text"
+    )
+
+
+class RecommendationOutput(BaseModel):
+    """
+    Output schema for Recommendation Engine tool.
+
+    Story 7.5 AC#1-6: Complete recommendation response.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "recommendations": [],
+                "analysis_summary": "Found 3 patterns for Grinder 5. Generated 2 actionable recommendations.",
+                "patterns_detected": 3,
+                "patterns_filtered": 1,
+                "data_coverage": "30 days, 245 data points",
+                "insufficient_data": False,
+                "data_gaps": [],
+                "subject": "Grinder 5",
+                "focus_area": None,
+                "citations": [],
+                "data_freshness": "2026-01-09T09:00:00Z"
+            }
+        }
+    )
+
+    recommendations: List[Recommendation] = Field(
+        default_factory=list,
+        description="Ranked list of recommendations (max 3)"
+    )
+    analysis_summary: str = Field(
+        ...,
+        description="Summary of analysis performed"
+    )
+    patterns_detected: int = Field(
+        default=0,
+        ge=0,
+        description="Total number of patterns detected"
+    )
+    patterns_filtered: int = Field(
+        default=0,
+        ge=0,
+        description="Number of low-confidence patterns filtered out"
+    )
+    data_coverage: str = Field(
+        ...,
+        description="Data coverage description (e.g., '30 days, 245 data points')"
+    )
+    insufficient_data: bool = Field(
+        default=False,
+        description="True if insufficient data to make recommendations"
+    )
+    data_gaps: List[str] = Field(
+        default_factory=list,
+        description="Areas needing more data"
+    )
+    subject: str = Field(
+        ...,
+        description="Subject analyzed (asset name or 'plant-wide')"
+    )
+    focus_area: Optional[str] = Field(
+        None,
+        description="Focus area filter applied, if any"
+    )
+    citations: List[RecommendationCitation] = Field(
+        default_factory=list,
+        description="Data source citations"
+    )
+    data_freshness: str = Field(
+        ...,
+        description="Data freshness timestamp (ISO format)"
+    )
