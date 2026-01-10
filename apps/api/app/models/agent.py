@@ -2082,3 +2082,207 @@ class ActionListOutput(BaseModel):
         ...,
         description="Data freshness timestamp (ISO format)"
     )
+
+
+# =============================================================================
+# Story 7.4: Alert Check Tool Models
+# =============================================================================
+
+
+class AlertSeverity(str, Enum):
+    """Severity levels for alerts (ordered by priority)."""
+    CRITICAL = "critical"  # Immediate action required (safety stops, critical failures)
+    WARNING = "warning"    # Attention needed soon (production variance, equipment issues)
+    INFO = "info"          # Informational (scheduled maintenance, minor anomalies)
+
+
+class AlertType(str, Enum):
+    """Types of alerts from different sources."""
+    SAFETY = "safety"                          # From safety_events table
+    PRODUCTION_VARIANCE = "production_variance"  # From live_snapshots
+    EQUIPMENT_STATUS = "equipment_status"      # From equipment status changes
+
+
+class AlertCheckInput(BaseModel):
+    """
+    Input schema for Alert Check tool.
+
+    Story 7.4 AC#1, AC#2, AC#6: Query alerts with optional filters.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "severity_filter": "critical",
+                "area_filter": "Grinding",
+                "include_resolved": False,
+                "force_refresh": False
+            }
+        }
+    )
+
+    severity_filter: Optional[str] = Field(
+        default=None,
+        description="Filter by severity level: 'critical', 'warning', 'info'"
+    )
+    area_filter: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=100,
+        description="Filter to specific area (e.g., 'Grinding', 'Packaging')"
+    )
+    include_resolved: bool = Field(
+        default=False,
+        description="Include recently resolved alerts (last 4 hours)"
+    )
+    force_refresh: bool = Field(
+        default=False,
+        description="Bypass cache and fetch fresh data"
+    )
+
+
+class Alert(BaseModel):
+    """
+    A single active alert.
+
+    Story 7.4 AC#1, AC#4: Alert with full details and stale flagging.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "alert_id": "safety-evt-001",
+                "type": "safety",
+                "severity": "critical",
+                "asset": "Packaging Line 2",
+                "area": "Packaging",
+                "description": "Safety interlock triggered - operator investigation required",
+                "recommended_response": "IMMEDIATE - Confirm lockout/tagout complete, notify supervisor",
+                "triggered_at": "2026-01-09T14:00:00Z",
+                "duration_minutes": 45,
+                "requires_attention": False,
+                "escalation_status": "under_investigation",
+                "source_table": "safety_events"
+            }
+        }
+    )
+
+    alert_id: str = Field(..., description="Unique alert identifier")
+    type: str = Field(
+        ...,
+        description="Alert type: 'safety', 'production_variance', 'equipment_status'"
+    )
+    severity: str = Field(
+        ...,
+        description="Severity level: 'critical', 'warning', 'info'"
+    )
+    asset: str = Field(..., description="Asset name")
+    area: Optional[str] = Field(None, description="Plant area")
+    description: str = Field(..., description="Alert description")
+    recommended_response: str = Field(..., description="Recommended action to take")
+    triggered_at: datetime = Field(..., description="When the alert was triggered")
+    duration_minutes: int = Field(
+        default=0,
+        ge=0,
+        description="Minutes since alert was triggered"
+    )
+    requires_attention: bool = Field(
+        default=False,
+        description="True if alert is >1 hour unresolved (AC#4)"
+    )
+    escalation_status: Optional[str] = Field(
+        None,
+        description="Escalation status: 'none', 'notified', 'escalated', 'under_investigation'"
+    )
+    source_table: str = Field(..., description="Source table for citation")
+
+
+class AlertCheckCitation(BaseModel):
+    """
+    Citation for alert check data.
+
+    Story 7.4 AC#7: All alerts include citations with source and timestamp.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "source_type": "database",
+                "source_table": "safety_events",
+                "record_id": "evt-001",
+                "timestamp": "2026-01-09T14:45:00Z",
+                "display_text": "[Source: safety_events @ 14:00:00]"
+            }
+        }
+    )
+
+    source_type: str = Field(
+        default="database",
+        description="Source type identifier"
+    )
+    source_table: str = Field(..., description="Source table name")
+    record_id: Optional[str] = Field(None, description="Record identifier")
+    timestamp: str = Field(..., description="Data timestamp (ISO format)")
+    display_text: str = Field(..., description="Human-readable citation text")
+
+
+class AlertCheckOutput(BaseModel):
+    """
+    Output schema for Alert Check tool.
+
+    Story 7.4 AC#1-7: Complete alert check response.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "alerts": [],
+                "count_by_severity": {"critical": 1, "warning": 2, "info": 0},
+                "total_count": 3,
+                "summary": "Active Alerts: 3 (1 Critical, 2 Warning)",
+                "last_alert_time": "2026-01-09T14:00:00Z",
+                "all_clear_since": None,
+                "filter_applied": None,
+                "citations": [],
+                "data_freshness": "2026-01-09T14:45:00Z"
+            }
+        }
+    )
+
+    alerts: List[Alert] = Field(
+        default_factory=list,
+        description="List of active alerts sorted by severity (critical first)"
+    )
+    count_by_severity: Dict[str, int] = Field(
+        default_factory=lambda: {"critical": 0, "warning": 0, "info": 0},
+        description="Count of alerts by severity level"
+    )
+    total_count: int = Field(
+        default=0,
+        ge=0,
+        description="Total number of active alerts"
+    )
+    summary: str = Field(
+        ...,
+        description="Human-readable summary of alert status"
+    )
+    last_alert_time: Optional[datetime] = Field(
+        None,
+        description="When the most recent alert was triggered"
+    )
+    all_clear_since: Optional[datetime] = Field(
+        None,
+        description="When operations became clear (if no active alerts)"
+    )
+    filter_applied: Optional[str] = Field(
+        None,
+        description="Description of any filter applied (e.g., 'critical only')"
+    )
+    citations: List[AlertCheckCitation] = Field(
+        default_factory=list,
+        description="Data source citations for all alerts"
+    )
+    data_freshness: str = Field(
+        ...,
+        description="Data freshness timestamp (ISO format)"
+    )

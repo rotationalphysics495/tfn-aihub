@@ -1,6 +1,6 @@
 # Story 7.4: Alert Check Tool
 
-Status: ready-for-dev
+Status: Done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -773,10 +773,109 @@ Want me to show all alerts?
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
-### Debug Log References
+### Implementation Summary
 
-### Completion Notes List
+Implemented the Alert Check Tool (Story 7.4) for checking active alerts and warnings across the plant. The tool aggregates alerts from multiple sources (safety events, production variance), supports severity and area filtering, flags stale alerts, and includes comprehensive citations.
 
-### File List
+### Files Created/Modified
+
+**Created:**
+- `apps/api/app/services/agent/tools/alert_check.py` - Main Alert Check tool implementation
+- `apps/api/tests/services/agent/tools/test_alert_check.py` - Comprehensive test suite (46 tests)
+
+**Modified:**
+- `apps/api/app/models/agent.py` - Added Alert Check schemas (AlertCheckInput, Alert, AlertCheckCitation, AlertCheckOutput, AlertSeverity, AlertType)
+
+### Key Decisions
+
+1. **Resilient Error Handling**: Individual data source failures don't crash the tool - it continues with partial results from working sources. This ensures plant managers always get some data even if one source is unavailable.
+
+2. **Cache Tier**: Used "live" cache tier with 60-second TTL for alert data freshness (per AC#6).
+
+3. **Severity Mapping**: Safety event severities (critical/high/medium/low) mapped to alert severities (critical/warning/info) to provide consistent categorization.
+
+4. **Stale Alert Threshold**: Alerts >60 minutes old flagged as "Requires Attention" per AC#4.
+
+5. **Production Variance Threshold**: 20% variance threshold for production alerts per AC#5.
+
+### Tests Added
+
+46 unit tests covering all acceptance criteria:
+- Tool properties and schema validation
+- Active alerts query (AC#1)
+- Severity filtering (AC#2)
+- No alerts scenario (AC#3)
+- Stale alert flagging (AC#4)
+- Alert sources aggregation (AC#5)
+- Cache tier and TTL (AC#6)
+- Citation compliance (AC#7)
+- Area filtering
+- Error handling/resilience
+- Summary generation
+
+### Test Results
+
+```
+apps/api/tests/services/agent/tools/test_alert_check.py - 46 passed in 0.07s
+```
+
+### Notes for Reviewer
+
+1. The tool uses the existing `@cached_tool` decorator with "live" tier (60 second TTL)
+2. Production variance alerts come from `live_snapshots` table
+3. Safety alerts come from `safety_events` table via DataSource protocol
+4. Equipment status alerts are stubbed (placeholder for future implementation)
+5. Follow-up questions are context-aware based on alert status
+
+### Acceptance Criteria Status
+
+- [x] **AC#1: Active Alerts Query** - Implemented in `_arun()` method with count by severity, alert details, duration calculation, and severity sorting (`alert_check.py:104-218`)
+- [x] **AC#2: Severity Filtering** - Filter support via `severity_filter` parameter, filter indicated in response (`alert_check.py:168-178`)
+- [x] **AC#3: No Alerts Scenario** - Returns "No active alerts - all systems normal" with `all_clear_since` timestamp (`alert_check.py:185-189`, `_generate_summary:456-460`)
+- [x] **AC#4: Stale Alert Flagging** - Alerts >60 minutes flagged as `requires_attention=True` (`alert_check.py:161-166`)
+- [x] **AC#5: Alert Sources** - Safety events and production variance (>20%) aggregated (`_get_safety_alerts:238-315`, `_get_variance_alerts:317-381`)
+- [x] **AC#6: Data Freshness & Caching** - 60-second cache TTL with `force_refresh` support (`alert_check.py:102-103`)
+- [x] **AC#7: Citation Compliance** - Citations generated for all data sources (`_build_alert_citations:491-518`)
+
+## Code Review Record
+
+**Reviewer**: Code Review Agent
+**Date**: 2026-01-09
+
+### Issues Found
+| # | Description | Severity | Status |
+|---|-------------|----------|--------|
+| 1 | Unused import: `get_force_refresh` is imported but never used (the `@cached_tool` decorator handles it internally) | LOW | Documented |
+
+**Totals**: 0 HIGH, 0 MEDIUM, 1 LOW
+
+### Acceptance Criteria Verification
+
+| AC | Description | Implemented | Tested |
+|----|-------------|-------------|--------|
+| AC#1 | Active Alerts Query - count by severity, alert details, sorted by severity | ✅ Yes | ✅ 5 tests |
+| AC#2 | Severity Filtering - filter by critical/warning/info | ✅ Yes | ✅ 3 tests |
+| AC#3 | No Alerts Scenario - "No active alerts - all systems normal" | ✅ Yes | ✅ 3 tests |
+| AC#4 | Stale Alert Flagging - >1 hour flagged as "Requires Attention" | ✅ Yes | ✅ 3 tests |
+| AC#5 | Alert Sources - safety events, production variance >20% | ✅ Yes | ✅ 4 tests |
+| AC#6 | Data Freshness & Caching - 60s TTL, force_refresh support | ✅ Yes | ✅ 2 tests |
+| AC#7 | Citation Compliance - source citations included | ✅ Yes | ✅ 4 tests |
+
+### Code Quality Assessment
+
+- **Follows existing patterns**: ✅ Tool follows `ManufacturingTool` base class patterns consistent with other Epic 7 tools
+- **Error handling**: ✅ Resilient design - individual data source failures return empty lists rather than crashing
+- **Test coverage**: ✅ 46 comprehensive unit tests covering all acceptance criteria
+- **Security**: ✅ No hardcoded secrets, no SQL injection risks (uses DataSource protocol)
+- **Caching**: ✅ Uses `@cached_tool(tier="live")` decorator with 60-second TTL
+
+### Fixes Applied
+None required - only LOW severity issues found, which are documented but not fixed per policy.
+
+### Remaining Issues
+- LOW: `get_force_refresh` import in `alert_check.py:32` is unused (the decorator handles force_refresh via kwargs). This is a minor cleanup item for future refactoring.
+
+### Final Status
+**Approved** - All acceptance criteria verified, comprehensive test coverage, follows established patterns.
