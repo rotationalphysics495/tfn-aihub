@@ -278,6 +278,11 @@ class ManufacturingAgent:
         # Story 5.8: Set force_refresh in context for cache decorator to access
         from app.services.agent.cache import set_force_refresh
         set_force_refresh(force_refresh)
+
+        # Story 7.1: Set user_id in context for memory recall tool
+        from app.services.agent.tools.memory_recall import set_current_user_id
+        set_current_user_id(user_id)
+
         start_time = time.time()
 
         # Ensure agent is initialized

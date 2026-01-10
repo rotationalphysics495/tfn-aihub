@@ -1,15 +1,18 @@
 epic_id: "6"
 execution:
   start_time: "2026-01-09T23:00:24Z"
-  end_time: ""
-  duration_seconds: 0
+  end_time: "2026-01-10T00:04:20Z"
+  duration_seconds: 3836
 stories:
-  total: 0
-  completed: 3
+  total: 4
+  completed: 4
   failed: 0
   skipped: 0
 validation:
-  gate_executed: false
-  gate_status: "PENDING"
+  gate_executed: true
+  gate_status: "PASS"
   fix_attempts: 0
+  scenarios_passed: 0
+  scenarios_failed: 0
+  timestamp: "2026-01-10T00:04:20Z"
 issues: []

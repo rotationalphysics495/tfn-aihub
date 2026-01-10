@@ -121,7 +121,7 @@ development_status:
   # Story 6.4: Trend Analysis Tool
   # - Performance trends over 7-90 day windows
   # - Anomaly detection, trend direction
-  6-4-trend-analysis-tool: backlog
+  6-4-trend-analysis-tool: done
 
   epic-6-retrospective: optional
 

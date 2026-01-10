@@ -1402,3 +1402,197 @@ class TrendAnalysisOutput(BaseModel):
     data_freshness: str = Field(
         ..., description="Data freshness timestamp (ISO format)"
     )
+
+
+# =============================================================================
+# Story 7.1: Memory Recall Tool Models
+# =============================================================================
+
+
+class MemoryRecallInput(BaseModel):
+    """
+    Input schema for Memory Recall tool.
+
+    Story 7.1 AC#1, AC#2: Query memories with optional filters.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "query": "Grinder 5 maintenance",
+                "asset_id": "grinder-5",
+                "time_range_days": 30,
+                "max_results": 5
+            }
+        }
+    )
+
+    query: str = Field(
+        ...,
+        min_length=1,
+        max_length=500,
+        description="The topic, asset, or question to recall memories about"
+    )
+    asset_id: Optional[str] = Field(
+        default=None,
+        description="Optional asset ID to filter memories"
+    )
+    time_range_days: Optional[int] = Field(
+        default=None,
+        ge=1,
+        le=365,
+        description="Limit to memories within X days"
+    )
+    max_results: int = Field(
+        default=5,
+        ge=1,
+        le=20,
+        description="Maximum memories to return"
+    )
+
+
+class RecalledMemory(BaseModel):
+    """
+    A single recalled memory with provenance.
+
+    Story 7.1 AC#1, AC#5: Memory with full provenance information.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "memory_id": "mem-abc123",
+                "content": "Discussed Grinder 5 blade change schedule - concluded SOP review needed",
+                "created_at": "2026-01-05T14:30:00Z",
+                "relevance_score": 0.85,
+                "asset_id": "grinder-5",
+                "topic_category": "maintenance",
+                "is_stale": False,
+                "days_ago": 4
+            }
+        }
+    )
+
+    memory_id: str = Field(..., description="Unique memory identifier for traceability")
+    content: str = Field(..., description="The memory content")
+    created_at: datetime = Field(..., description="When the memory was created")
+    relevance_score: float = Field(
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="Semantic similarity score (0.0-1.0)"
+    )
+    asset_id: Optional[str] = Field(None, description="Asset ID if memory is asset-specific")
+    topic_category: Optional[str] = Field(None, description="Topic category (e.g., maintenance, safety)")
+    is_stale: bool = Field(
+        default=False,
+        description="True if memory is older than 30 days"
+    )
+    days_ago: int = Field(
+        default=0,
+        ge=0,
+        description="Number of days since memory was created"
+    )
+
+
+class MemoryCitation(BaseModel):
+    """
+    Citation for a recalled memory.
+
+    Story 7.1 AC#5: Memory citations with traceability.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "source_type": "memory",
+                "memory_id": "mem-abc123",
+                "timestamp": "2026-01-05T14:30:00Z",
+                "relevance_score": 0.85,
+                "is_stale": False,
+                "display_text": "[Memory: mem-abc123 @ Jan 05, 2026]"
+            }
+        }
+    )
+
+    source_type: str = Field(
+        default="memory",
+        description="Source type identifier (always 'memory' for this tool)"
+    )
+    memory_id: str = Field(..., description="Memory identifier for traceability")
+    timestamp: str = Field(..., description="When the memory was created (ISO format)")
+    relevance_score: float = Field(
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="Relevance/confidence score"
+    )
+    is_stale: bool = Field(
+        default=False,
+        description="True if memory is older than 30 days"
+    )
+    display_text: str = Field(
+        ...,
+        description="Human-readable citation text for display"
+    )
+
+
+class MemoryRecallOutput(BaseModel):
+    """
+    Output schema for Memory Recall tool.
+
+    Story 7.1 AC#1-5: Complete memory recall response.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "memories": [],
+                "summary": "Found 3 relevant conversations about 'Grinder 5'.",
+                "unresolved_items": ["Output variance still occurring - need more data"],
+                "related_topics": ["maintenance", "Asset: grinder-5"],
+                "citations": [],
+                "has_stale_memories": False,
+                "stale_memory_note": None,
+                "query": "Grinder 5",
+                "no_memories_found": False
+            }
+        }
+    )
+
+    memories: List[RecalledMemory] = Field(
+        default_factory=list,
+        description="List of recalled memories sorted by relevance"
+    )
+    summary: str = Field(
+        ...,
+        description="Summary of recalled memories or 'no memories' message"
+    )
+    unresolved_items: List[str] = Field(
+        default_factory=list,
+        description="Highlighted unresolved items from memories"
+    )
+    related_topics: List[str] = Field(
+        default_factory=list,
+        description="Related topics extracted from memories"
+    )
+    citations: List[MemoryCitation] = Field(
+        default_factory=list,
+        description="Memory citations for traceability"
+    )
+    has_stale_memories: bool = Field(
+        default=False,
+        description="True if any recalled memories are older than 30 days"
+    )
+    stale_memory_note: Optional[str] = Field(
+        None,
+        description="Note about stale memories if applicable"
+    )
+    query: str = Field(
+        ...,
+        description="The original query for context"
+    )
+    no_memories_found: bool = Field(
+        default=False,
+        description="True if no relevant memories were found"
+    )

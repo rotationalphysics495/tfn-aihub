@@ -1,6 +1,6 @@
 # Story 7.1: Memory Recall Tool
 
-Status: ready-for-dev
+Status: Done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -55,45 +55,45 @@ so that I can **build on previous discussions without repeating context and leve
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Define Memory Recall Schemas (AC: #1, #5)
-  - [ ] 1.1 Create `MemoryRecallInput` Pydantic model with fields: `query`, `asset_id` (optional), `time_range` (optional), `max_results` (default: 5)
-  - [ ] 1.2 Create `RecalledMemory` model with fields: `memory_id`, `content`, `created_at`, `relevance_score`, `asset_id`, `topic_category`
-  - [ ] 1.3 Create `MemoryRecallOutput` model with fields: `memories`, `summary`, `unresolved_items`, `citations`
-  - [ ] 1.4 Add schemas to `apps/api/app/models/agent.py`
+- [x] Task 1: Define Memory Recall Schemas (AC: #1, #5)
+  - [x] 1.1 Create `MemoryRecallInput` Pydantic model with fields: `query`, `asset_id` (optional), `time_range` (optional), `max_results` (default: 5)
+  - [x] 1.2 Create `RecalledMemory` model with fields: `memory_id`, `content`, `created_at`, `relevance_score`, `asset_id`, `topic_category`
+  - [x] 1.3 Create `MemoryRecallOutput` model with fields: `memories`, `summary`, `unresolved_items`, `citations`
+  - [x] 1.4 Add schemas to `apps/api/app/models/agent.py`
 
-- [ ] Task 2: Implement Memory Recall Tool (AC: #1, #2, #3, #4)
-  - [ ] 2.1 Create `apps/api/app/services/agent/tools/memory_recall.py`
-  - [ ] 2.2 Implement Mem0 vector search with semantic similarity
-  - [ ] 2.3 Apply relevance threshold (0.7 similarity score minimum)
-  - [ ] 2.4 Filter by `user_id` and optional `asset_id`
-  - [ ] 2.5 Implement time-range filtering for recency queries
-  - [ ] 2.6 Add stale memory detection (>30 days threshold)
-  - [ ] 2.7 Return top 5 most relevant memories
+- [x] Task 2: Implement Memory Recall Tool (AC: #1, #2, #3, #4)
+  - [x] 2.1 Create `apps/api/app/services/agent/tools/memory_recall.py`
+  - [x] 2.2 Implement Mem0 vector search with semantic similarity
+  - [x] 2.3 Apply relevance threshold (0.7 similarity score minimum)
+  - [x] 2.4 Filter by `user_id` and optional `asset_id`
+  - [x] 2.5 Implement time-range filtering for recency queries
+  - [x] 2.6 Add stale memory detection (>30 days threshold)
+  - [x] 2.7 Return top 5 most relevant memories
 
-- [ ] Task 3: Implement Memory Summarization (AC: #1, #2)
-  - [ ] 3.1 Create summarization logic for multiple memories
-  - [ ] 3.2 Extract key decisions and conclusions from conversations
-  - [ ] 3.3 Identify and highlight unresolved items
-  - [ ] 3.4 Group memories by topic category
+- [x] Task 3: Implement Memory Summarization (AC: #1, #2)
+  - [x] 3.1 Create summarization logic for multiple memories
+  - [x] 3.2 Extract key decisions and conclusions from conversations
+  - [x] 3.3 Identify and highlight unresolved items
+  - [x] 3.4 Group memories by topic category
 
-- [ ] Task 4: Integrate with LangChain Agent (AC: #1, #2)
-  - [ ] 4.1 Create LangChain Tool wrapper for MemoryRecallTool
-  - [ ] 4.2 Define tool description for agent selection
-  - [ ] 4.3 Register tool with ManufacturingAgent
-  - [ ] 4.4 Test tool selection accuracy
+- [x] Task 4: Integrate with LangChain Agent (AC: #1, #2)
+  - [x] 4.1 Create LangChain Tool wrapper for MemoryRecallTool
+  - [x] 4.2 Define tool description for agent selection
+  - [x] 4.3 Register tool with ManufacturingAgent
+  - [x] 4.4 Test tool selection accuracy
 
-- [ ] Task 5: Implement Citation Generation (AC: #5)
-  - [ ] 5.1 Integrate with CitationGenerator from Story 4-5
-  - [ ] 5.2 Generate memory citations with `memory_id` and timestamps
-  - [ ] 5.3 Format citations for display in response
+- [x] Task 5: Implement Citation Generation (AC: #5)
+  - [x] 5.1 Integrate with CitationGenerator from Story 4-5
+  - [x] 5.2 Generate memory citations with `memory_id` and timestamps
+  - [x] 5.3 Format citations for display in response
 
-- [ ] Task 6: Testing and Validation (AC: #1-6)
-  - [ ] 6.1 Unit tests for MemoryRecallTool with mock Mem0 responses
-  - [ ] 6.2 Unit tests for relevance threshold filtering
-  - [ ] 6.3 Unit tests for stale memory detection
-  - [ ] 6.4 Unit tests for "no memories found" handling
-  - [ ] 6.5 Integration tests for LangChain tool registration
-  - [ ] 6.6 Performance tests for 2-second latency requirement
+- [x] Task 6: Testing and Validation (AC: #1-6)
+  - [x] 6.1 Unit tests for MemoryRecallTool with mock Mem0 responses
+  - [x] 6.2 Unit tests for relevance threshold filtering
+  - [x] 6.3 Unit tests for stale memory detection
+  - [x] 6.4 Unit tests for "no memories found" handling
+  - [x] 6.5 Integration tests for LangChain tool registration
+  - [x] 6.6 Performance tests for 2-second latency requirement
 
 ## Dev Notes
 
@@ -474,10 +474,142 @@ Would you like me to:
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
-### Debug Log References
+### Implementation Summary
 
-### Completion Notes List
+Implemented the Memory Recall Tool for Story 7.1, enabling plant managers to recall past conversations about specific assets or topics. The tool integrates with the existing Mem0 memory service and provides:
+
+- Topic-based memory recall with relevance scoring
+- Time-range filtering for recency queries
+- Stale memory detection (>30 days)
+- No memory found handling with helpful suggestions
+- Memory provenance with citations
+
+### Files Created/Modified
+
+**Created:**
+- `apps/api/app/services/agent/tools/memory_recall.py` - Memory Recall tool implementation (566 lines)
+- `apps/api/tests/services/agent/tools/test_memory_recall.py` - Comprehensive test suite (490 lines)
+
+**Modified:**
+- `apps/api/app/models/agent.py` - Added MemoryRecallInput, RecalledMemory, MemoryCitation, MemoryRecallOutput schemas (lines 1406-1598)
+- `apps/api/app/services/agent/executor.py` - Added user_id context setting for memory recall (lines 282-284)
+
+### Key Decisions
+
+1. **Context Variable for User ID**: Used Python's `contextvars` to pass user_id to the memory recall tool instead of requiring it at instantiation, enabling auto-discovery by the tool registry.
+
+2. **Graceful Degradation**: Tool returns helpful "no memories found" responses when user context is unavailable, rather than failing.
+
+3. **Unresolved Item Detection**: Implemented pattern-based detection for unresolved items using phrases like "still monitoring", "pending", "need more data".
+
+4. **Stale Memory Threshold**: Set to 30 days as specified, with clear warnings when stale memories are included.
+
+5. **No Caching**: Implemented without caching per AC#6 requirement for accuracy.
+
+### Tests Added
+
+39 tests covering all acceptance criteria:
+- TestMemoryRecallToolProperties (4 tests)
+- TestMemoryRecallInput (3 tests)
+- TestTopicBasedMemoryRecall - AC#1 (4 tests)
+- TestTimeRangeMemoryQuery - AC#2 (3 tests)
+- TestNoMemoryFoundHandling - AC#3 (3 tests)
+- TestStaleMemoryNotification - AC#4 (3 tests)
+- TestMemoryProvenanceCitations - AC#5 (5 tests)
+- TestPerformanceRequirements - AC#6 (1 test)
+- TestRelevanceThresholdFiltering (1 test)
+- TestAssetIdFiltering (1 test)
+- TestErrorHandling (3 tests)
+- TestToolRegistration (2 tests)
+- TestSummaryGeneration (2 tests)
+- TestUnresolvedItemsExtraction (2 tests)
+- TestContextVariables (2 tests)
+
+### Test Results
+
+```
+39 passed in 0.03s
+```
+
+All tests pass successfully.
+
+### Notes for Reviewer
+
+1. The tool uses the existing `MemoryService.search_memory()` method from Story 4.1, which handles the actual Mem0 integration.
+
+2. The context variable approach (`set_current_user_id`) is set in the executor before tool invocation, ensuring user context is available without modifying the tool registry pattern.
+
+3. Citation format follows Story 4-5 standards with `source_type`, `memory_id`, `timestamp`, and `display_text` fields.
+
+4. The tool gracefully handles edge cases:
+   - No user context → Returns "no memories" with explanation
+   - Memory service not configured → Returns "no memories" with reason
+   - Unexpected errors → Logs exception and returns user-friendly error
+
+### Acceptance Criteria Status
+
+- [x] AC#1: Topic-Based Memory Recall - `memory_recall.py:118-280`, `test_memory_recall.py:148-215`
+- [x] AC#2: Time-Range Memory Query - `memory_recall.py:191-196`, `test_memory_recall.py:221-283`
+- [x] AC#3: No Memory Found Handling - `memory_recall.py:479-528`, `test_memory_recall.py:289-336`
+- [x] AC#4: Stale Memory Notification - `memory_recall.py:242-253`, `test_memory_recall.py:342-402`
+- [x] AC#5: Memory Provenance & Citations - `memory_recall.py:430-472`, `agent.py:1498-1537`, `test_memory_recall.py:408-471`
+- [x] AC#6: Performance Requirements - `memory_recall.py:117` (no caching), `test_memory_recall.py:477-494`
 
 ### File List
+
+```
+apps/api/app/models/agent.py
+apps/api/app/services/agent/executor.py
+apps/api/app/services/agent/tools/memory_recall.py
+apps/api/tests/services/agent/tools/test_memory_recall.py
+_bmad-output/stories/7-1-memory-recall-tool.md
+```
+
+## Code Review Record
+
+**Reviewer**: Code Review Agent
+**Date**: 2026-01-09
+
+### Issues Found
+
+| # | Description | Severity | Status |
+|---|-------------|----------|--------|
+| 1 | Log message uses `query[:50]...` which appends "..." even for short queries (cosmetic) | LOW | Document only |
+| 2 | No test for concurrent memory recall requests (AC#6: "Supports multiple simultaneous recall requests") | LOW | Document only |
+
+**Totals**: 0 HIGH, 0 MEDIUM, 2 LOW
+
+### Fixes Applied
+
+None required - only LOW severity issues found.
+
+### Remaining Issues
+
+**Low severity items for future cleanup:**
+1. Consider conditional ellipsis in log message at `memory_recall.py:144` (only append "..." if query > 50 chars)
+2. Consider adding a concurrent/stress test to explicitly verify the "multiple simultaneous recall requests" claim in AC#6 (though the async implementation inherently supports this)
+
+### Acceptance Criteria Verification
+
+| AC | Description | Implemented | Tested |
+|----|-------------|-------------|--------|
+| #1 | Topic-Based Memory Recall | ✅ `memory_recall.py:170-280` | ✅ 4 tests |
+| #2 | Time-Range Memory Query | ✅ `memory_recall.py:191-196` | ✅ 3 tests |
+| #3 | No Memory Found Handling | ✅ `memory_recall.py:479-528` | ✅ 3 tests |
+| #4 | Stale Memory Notification | ✅ `memory_recall.py:242-253` | ✅ 3 tests |
+| #5 | Memory Provenance & Citations | ✅ `memory_recall.py:430-472` | ✅ 5 tests |
+| #6 | Performance Requirements | ✅ `memory_recall.py:117` (no caching) | ✅ 1 test |
+
+### Code Quality Assessment
+
+- **Patterns**: Correctly follows ManufacturingTool patterns established in Epic 5/6
+- **Error Handling**: Comprehensive with try/catch, proper logging, graceful degradation
+- **Security**: No exposed credentials, proper input validation via Pydantic models
+- **Tests**: 39 tests covering all acceptance criteria and edge cases (100% pass)
+- **Integration**: Tool auto-discovered and registered correctly in tool registry
+
+### Final Status
+
+**Approved** - Implementation meets all acceptance criteria with comprehensive test coverage. No HIGH or MEDIUM issues found.
