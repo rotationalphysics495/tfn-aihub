@@ -1872,3 +1872,213 @@ class ComparativeAnalysisOutput(BaseModel):
     data_as_of: str = Field(
         ..., description="Data freshness timestamp (ISO format)"
     )
+
+
+# =============================================================================
+# Story 7.3: Action List Tool Models
+# =============================================================================
+
+
+class PriorityCategory(str, Enum):
+    """Priority category for action items."""
+    SAFETY = "safety"       # Tier 1 - Always first (critical)
+    FINANCIAL = "financial" # Tier 2 - After all safety
+    OEE = "oee"             # Tier 3 - After all financial
+
+
+class ActionListInput(BaseModel):
+    """
+    Input schema for Action List tool.
+
+    Story 7.3 AC#1, AC#2, AC#6: Query daily actions with optional filters.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "area_filter": "Grinding",
+                "max_actions": 5,
+                "target_date": "2026-01-09",
+                "force_refresh": False
+            }
+        }
+    )
+
+    area_filter: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        max_length=100,
+        description="Filter to specific area (e.g., 'Grinding', 'Packaging')"
+    )
+    max_actions: int = Field(
+        default=5,
+        ge=1,
+        le=10,
+        description="Maximum number of actions to return (default: 5, max: 10)"
+    )
+    target_date: Optional[str] = Field(
+        default=None,
+        description="Date for actions in YYYY-MM-DD format (defaults to yesterday/T-1)"
+    )
+    force_refresh: bool = Field(
+        default=False,
+        description="Bypass cache and fetch fresh data"
+    )
+
+
+class ActionListItem(BaseModel):
+    """
+    A single prioritized action item for the daily action list.
+
+    Story 7.3 AC#1: Priority rank, asset, issue, recommended action, evidence, impact.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "priority": 1,
+                "priority_category": "safety",
+                "asset_id": "ast-pkg-002",
+                "asset_name": "Packaging Line 2",
+                "area": "Packaging",
+                "issue_type": "Safety Stop",
+                "description": "Unresolved safety stop triggered at 06:42 AM",
+                "recommended_action": "Confirm lockout/tagout complete before restart",
+                "evidence": "safety_events record showing unresolved incident",
+                "estimated_impact": "Safety severity: CRITICAL",
+                "confidence": 1.0
+            }
+        }
+    )
+
+    priority: int = Field(
+        ...,
+        ge=1,
+        le=10,
+        description="Priority rank (1 = highest priority)"
+    )
+    priority_category: str = Field(
+        ...,
+        description="Category: 'safety', 'financial', or 'oee'"
+    )
+    asset_id: str = Field(..., description="Asset UUID")
+    asset_name: str = Field(..., description="Human-readable asset name")
+    area: Optional[str] = Field(None, description="Plant area")
+    issue_type: str = Field(
+        ...,
+        description="Issue type (e.g., 'Safety Stop', 'OEE Gap', 'Financial Loss')"
+    )
+    description: str = Field(..., description="Issue description")
+    recommended_action: str = Field(..., description="Recommended action to take")
+    evidence: str = Field(..., description="Supporting evidence for the action")
+    estimated_impact: str = Field(
+        ...,
+        description="Impact estimate (e.g., '$2,340 loss' or '15% OEE gap')"
+    )
+    confidence: float = Field(
+        ...,
+        ge=0.0,
+        le=1.0,
+        description="Confidence score (0.0-1.0)"
+    )
+
+
+class ActionListCitation(BaseModel):
+    """
+    Citation for action list data.
+
+    Story 7.3 AC#1: All actions cite specific data sources.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "source_table": "safety_events",
+                "record_id": "evt-001",
+                "metric_name": "severity",
+                "metric_value": "critical",
+                "context": "Unresolved safety event at 06:42",
+                "display_text": "[Source: safety_events @ 06:42:00]"
+            }
+        }
+    )
+
+    source_table: str = Field(..., description="Source table name")
+    record_id: Optional[str] = Field(None, description="Record identifier")
+    metric_name: Optional[str] = Field(None, description="Metric name")
+    metric_value: Optional[str] = Field(None, description="Metric value")
+    context: Optional[str] = Field(None, description="Additional context")
+    display_text: str = Field(..., description="Human-readable citation text")
+
+
+class ActionListOutput(BaseModel):
+    """
+    Output schema for Action List tool.
+
+    Story 7.3 AC#1-6: Complete action list response.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "actions": [],
+                "summary": "Found 3 priority items requiring attention.",
+                "scope": "plant-wide",
+                "report_date": "2026-01-08",
+                "total_count": 3,
+                "counts_by_category": {"safety": 1, "financial": 1, "oee": 1},
+                "total_financial_impact": 4890.50,
+                "is_healthy": False,
+                "proactive_suggestions": [],
+                "citations": [],
+                "data_freshness": "2026-01-09T07:15:00Z"
+            }
+        }
+    )
+
+    actions: List[ActionListItem] = Field(
+        default_factory=list,
+        description="Prioritized list of action items (max 5 by default)"
+    )
+    summary: str = Field(
+        ...,
+        description="Summary of action list or 'operations healthy' message"
+    )
+    scope: str = Field(
+        ...,
+        description="Query scope: 'plant-wide' or specific area name"
+    )
+    report_date: str = Field(
+        ...,
+        description="Report date in YYYY-MM-DD format (typically T-1)"
+    )
+    total_count: int = Field(
+        default=0,
+        ge=0,
+        description="Total number of issues found (before limit applied)"
+    )
+    counts_by_category: Dict[str, int] = Field(
+        default_factory=lambda: {"safety": 0, "financial": 0, "oee": 0},
+        description="Count of items per category"
+    )
+    total_financial_impact: Optional[float] = Field(
+        None,
+        ge=0.0,
+        description="Total financial impact in USD (sum of all items)"
+    )
+    is_healthy: bool = Field(
+        default=False,
+        description="True if no critical issues identified (AC#3)"
+    )
+    proactive_suggestions: List[str] = Field(
+        default_factory=list,
+        description="Proactive improvement suggestions when operations are healthy"
+    )
+    citations: List[ActionListCitation] = Field(
+        default_factory=list,
+        description="Data source citations for all actions"
+    )
+    data_freshness: str = Field(
+        ...,
+        description="Data freshness timestamp (ISO format)"
+    )
