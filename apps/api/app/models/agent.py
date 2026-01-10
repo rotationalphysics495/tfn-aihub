@@ -1596,3 +1596,279 @@ class MemoryRecallOutput(BaseModel):
         default=False,
         description="True if no relevant memories were found"
     )
+
+
+# =============================================================================
+# Story 7.2: Comparative Analysis Tool Models
+# =============================================================================
+
+
+class ComparisonType(str, Enum):
+    """Type of comparison being performed."""
+    ASSET = "asset"   # Compare individual assets
+    AREA = "area"     # Compare plant areas (aggregated)
+
+
+class ComparativeAnalysisInput(BaseModel):
+    """
+    Input schema for Comparative Analysis tool.
+
+    Story 7.2 AC#1, AC#2: Compare assets or areas side-by-side.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "subjects": ["Grinder 5", "Grinder 3"],
+                "comparison_type": "asset",
+                "metrics": ["oee", "output", "downtime_hours", "waste_pct"],
+                "time_range_days": 7
+            }
+        }
+    )
+
+    subjects: List[str] = Field(
+        ...,
+        min_length=1,
+        max_length=10,
+        description=(
+            "Asset names, area names, or patterns to compare (2-10 items). "
+            "Use 'all grinders' to compare all assets matching 'grinder'. "
+            "Examples: ['Grinder 5', 'Grinder 3'], ['all grinders'], "
+            "['Grinding', 'Packaging']"
+        )
+    )
+    comparison_type: str = Field(
+        default="asset",
+        description="Type of comparison: 'asset' for individual assets, 'area' for plant areas"
+    )
+    metrics: Optional[List[str]] = Field(
+        default=None,
+        description=(
+            "Specific metrics to compare. Defaults to OEE, output, downtime, waste. "
+            "Options: 'oee', 'output', 'downtime_hours', 'waste_pct', 'availability', "
+            "'performance', 'quality'"
+        )
+    )
+    time_range_days: int = Field(
+        default=7,
+        ge=1,
+        le=90,
+        description="Number of days for comparison period (default: 7 days)"
+    )
+
+
+class ComparisonMetric(BaseModel):
+    """
+    A single metric compared across subjects.
+
+    Story 7.2 AC#1: Side-by-side metrics with variance indicators.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "metric_name": "oee",
+                "display_name": "OEE",
+                "unit": "%",
+                "values": {"Grinder 5": 78.3, "Grinder 3": 85.1},
+                "best_performer": "Grinder 3",
+                "worst_performer": "Grinder 5",
+                "variance_pct": 8.7,
+                "higher_is_better": True,
+                "normalized": False,
+                "comparability_note": None
+            }
+        }
+    )
+
+    metric_name: str = Field(..., description="Internal metric identifier")
+    display_name: str = Field(..., description="Human-readable metric name")
+    unit: str = Field(..., description="Unit of measurement (%, units, hours, etc.)")
+    values: Dict[str, float] = Field(
+        ..., description="Metric values keyed by subject name"
+    )
+    best_performer: str = Field(..., description="Subject with best value for this metric")
+    worst_performer: str = Field(..., description="Subject with worst value for this metric")
+    variance_pct: float = Field(
+        ..., description="Percentage difference between best and worst"
+    )
+    higher_is_better: bool = Field(
+        default=True,
+        description="True if higher values are better (e.g., OEE). False for downtime, waste."
+    )
+    normalized: bool = Field(
+        default=False,
+        description="True if values were normalized to percentage for fair comparison"
+    )
+    comparability_note: Optional[str] = Field(
+        None,
+        description="Note about metric compatibility (e.g., 'Different targets - using % of target')"
+    )
+
+
+class SubjectSummary(BaseModel):
+    """
+    Summary data for a comparison subject (asset or area).
+
+    Story 7.2 AC#2: Ranked subjects with composite scores.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "name": "Grinder 3",
+                "subject_type": "asset",
+                "subject_id": "ast-grd-003",
+                "area": "Grinding",
+                "metrics": {"oee": 85.1, "output": 4890, "downtime_hours": 2.1, "waste_pct": 1.9},
+                "rank": 1,
+                "score": 82.4,
+                "wins": 3,
+                "losses": 1
+            }
+        }
+    )
+
+    name: str = Field(..., description="Subject name (asset or area)")
+    subject_type: str = Field(..., description="Type: 'asset' or 'area'")
+    subject_id: Optional[str] = Field(None, description="Asset UUID if applicable")
+    area: Optional[str] = Field(None, description="Area name (for assets)")
+    metrics: Dict[str, float] = Field(
+        ..., description="Metric values for this subject"
+    )
+    rank: int = Field(..., ge=1, description="Overall rank (1 = best)")
+    score: float = Field(
+        ..., ge=0.0, le=100.0, description="Composite performance score (0-100)"
+    )
+    wins: int = Field(
+        default=0, ge=0, description="Number of metrics where this subject is best"
+    )
+    losses: int = Field(
+        default=0, ge=0, description="Number of metrics where this subject is worst"
+    )
+
+
+class AreaPerformerSummary(BaseModel):
+    """
+    Best and worst performers within an area.
+
+    Story 7.2 AC#3: Top/bottom performers within each area.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "area": "Grinding",
+                "best_performer": "Grinder 3",
+                "best_oee": 85.1,
+                "worst_performer": "Grinder 5",
+                "worst_oee": 72.1,
+                "asset_count": 4
+            }
+        }
+    )
+
+    area: str = Field(..., description="Area name")
+    best_performer: str = Field(..., description="Best performing asset in area")
+    best_oee: float = Field(..., description="Best asset's OEE")
+    worst_performer: str = Field(..., description="Worst performing asset in area")
+    worst_oee: float = Field(..., description="Worst asset's OEE")
+    asset_count: int = Field(..., ge=1, description="Number of assets in area")
+
+
+class ComparativeAnalysisCitation(BaseModel):
+    """
+    Citation for comparative analysis data.
+
+    Story 7.2 AC#6: All metrics include source citations.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "source_type": "daily_summaries",
+                "date_range": "Jan 02 - Jan 09, 2026",
+                "subjects_queried": ["Grinder 5", "Grinder 3"],
+                "display_text": "[Source: daily_summaries Jan 02-09, 2026]"
+            }
+        }
+    )
+
+    source_type: str = Field(
+        default="daily_summaries",
+        description="Source table identifier"
+    )
+    date_range: str = Field(..., description="Date range queried")
+    subjects_queried: List[str] = Field(
+        ..., description="Subjects included in the query"
+    )
+    display_text: str = Field(..., description="Human-readable citation text")
+
+
+class ComparativeAnalysisOutput(BaseModel):
+    """
+    Output schema for Comparative Analysis tool.
+
+    Story 7.2 AC#1-6: Complete comparison response.
+    """
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "subjects": [],
+                "metrics": [],
+                "comparison_type": "asset",
+                "time_range": "Jan 02 - Jan 09, 2026",
+                "summary": "Grinder 3 outperforms Grinder 5 overall with higher OEE and lower downtime.",
+                "winner": "Grinder 3",
+                "recommendations": [
+                    "Investigate Grinder 5's downtime causes - 50% higher than Grinder 3"
+                ],
+                "comparability_notes": [],
+                "area_performers": None,
+                "citations": [],
+                "data_as_of": "2026-01-09T09:00:00Z"
+            }
+        }
+    )
+
+    subjects: List[SubjectSummary] = Field(
+        default_factory=list,
+        description="Ranked list of compared subjects"
+    )
+    metrics: List[ComparisonMetric] = Field(
+        default_factory=list,
+        description="Comparison data for each metric"
+    )
+    comparison_type: str = Field(
+        ..., description="Type of comparison performed: 'asset' or 'area'"
+    )
+    time_range: str = Field(
+        ..., description="Human-readable time range (e.g., 'Jan 02 - Jan 09, 2026')"
+    )
+    summary: str = Field(
+        ..., description="Natural language summary of key differences"
+    )
+    winner: Optional[str] = Field(
+        None, description="Clear overall winner if score gap >= 5 points"
+    )
+    recommendations: List[str] = Field(
+        default_factory=list,
+        description="Actionable recommendations based on comparison (max 3)"
+    )
+    comparability_notes: List[str] = Field(
+        default_factory=list,
+        description="Notes about metric compatibility or normalization applied"
+    )
+    area_performers: Optional[List[AreaPerformerSummary]] = Field(
+        None,
+        description="Best/worst performers within each area (for area comparisons)"
+    )
+    citations: List[ComparativeAnalysisCitation] = Field(
+        default_factory=list,
+        description="Data source citations"
+    )
+    data_as_of: str = Field(
+        ..., description="Data freshness timestamp (ISO format)"
+    )
