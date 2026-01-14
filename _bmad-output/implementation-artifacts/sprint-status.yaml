@@ -153,7 +153,7 @@ development_status:
   # Story 7.5: Recommendation Engine
   # - Suggest improvements based on detected patterns
   # - Actionable recommendations with expected impact
-  7-5-recommendation-engine: ready-for-dev
+  7-5-recommendation-engine: done
 
   epic-7-retrospective: optional
 
