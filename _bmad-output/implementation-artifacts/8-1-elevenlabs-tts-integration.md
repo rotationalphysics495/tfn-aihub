@@ -229,11 +229,43 @@ apps/web/src/
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.5
 
 ### Debug Log References
 
+N/A
+
 ### Completion Notes List
 
+- Created voice services package with ElevenLabs API client
+- Implemented TTSService with graceful degradation (returns None, not exceptions)
+- Added fallback_reason tracking for all failure modes (timeout, api_unavailable, rate_limited, etc.)
+- Created voice models (TTSRequest, TTSResponse, VoiceConfig, BriefingSection, BriefingResponse)
+- Updated config.py with ElevenLabs settings (api_key, model, voice_id, timeout)
+- Added elevenlabs_configured property to Settings
+- Created frontend ElevenLabsClient for audio streaming with full playback controls
+- Created audio-context.ts utilities for Web Audio API and autoplay unlock
+- Built BriefingPlayer component with dual text/audio delivery and section pause points
+- Created comprehensive backend tests for ElevenLabsClient and TTSService
+- Created frontend tests for BriefingPlayer component
+
 ### File List
+
+Backend:
+- apps/api/app/services/voice/__init__.py
+- apps/api/app/services/voice/elevenlabs.py
+- apps/api/app/services/voice/tts.py
+- apps/api/app/models/voice.py
+- apps/api/app/core/config.py (modified)
+- apps/api/app/tests/services/voice/__init__.py
+- apps/api/app/tests/services/voice/test_voice_elevenlabs.py
+- apps/api/app/tests/services/voice/test_voice_tts.py
+
+Frontend:
+- apps/web/src/lib/voice/elevenlabs-client.ts
+- apps/web/src/lib/voice/audio-context.ts
+- apps/web/src/lib/voice/index.ts
+- apps/web/src/components/voice/BriefingPlayer.tsx
+- apps/web/src/components/voice/index.ts
+- apps/web/src/components/voice/__tests__/BriefingPlayer.test.tsx
 

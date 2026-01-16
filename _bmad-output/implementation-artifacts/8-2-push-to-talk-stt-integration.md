@@ -291,10 +291,41 @@ ELEVENLABS_STT_WEBSOCKET_URL=wss://api.elevenlabs.io/v1/speech-to-text
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.5
 
 ### Debug Log References
 
+N/A
+
 ### Completion Notes List
 
+- Created STT service with WebSocket handler for ElevenLabs Scribe API
+- Implemented state machine (disconnected -> connected -> recording -> processing)
+- Added noise threshold filtering (<0.5s recordings silently rejected)
+- Implemented error handling for no speech, timeout, API errors, network issues
+- Extended voice models with STT schemas (STTRequest, STTResult, WebSocket messages)
+- Created Voice API endpoints (REST + WebSocket) and added router to main.py
+- Built PushToTalk utility class with MediaRecorder, WebSocket streaming, audio level detection
+- Created PushToTalkButton component with press-and-hold interaction, visual states, 44px touch target
+- Created TranscriptPanel component for voice interaction display
+- Wrote comprehensive backend tests for STT service
+- Wrote frontend component tests for PushToTalkButton and TranscriptPanel
+
 ### File List
+
+Backend:
+- apps/api/app/services/voice/stt.py
+- apps/api/app/services/voice/__init__.py (modified)
+- apps/api/app/models/voice.py (modified - added STT schemas)
+- apps/api/app/api/voice.py
+- apps/api/app/main.py (modified - added voice router)
+- apps/api/app/tests/services/voice/test_voice_stt.py
+
+Frontend:
+- apps/web/src/lib/voice/push-to-talk.ts
+- apps/web/src/lib/voice/index.ts (modified)
+- apps/web/src/components/voice/PushToTalkButton.tsx
+- apps/web/src/components/voice/TranscriptPanel.tsx
+- apps/web/src/components/voice/index.ts (modified)
+- apps/web/src/components/voice/__tests__/PushToTalkButton.test.tsx
+- apps/web/src/components/voice/__tests__/TranscriptPanel.test.tsx

@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import health, assets, summaries, actions, auth, pipelines, production, oee, downtime, safety, financial, live_pulse, memory, chat, asset_history, citations, agent, cache
+from app.api import health, assets, summaries, actions, auth, pipelines, production, oee, downtime, safety, financial, live_pulse, memory, chat, asset_history, citations, agent, cache, voice, briefing
 from app.core.database import initialize_database, shutdown_database
 from app.services.scheduler import get_scheduler
 from app.services.pipelines.live_pulse import run_live_pulse_poll
@@ -83,6 +83,10 @@ app.include_router(citations.router, prefix="/api/citations", tags=["Citations"]
 app.include_router(agent.router, prefix="/api/agent", tags=["Agent"])
 # Story 5.8: Cache API for tool response cache management
 app.include_router(cache.router, prefix="/api/cache", tags=["Cache"])
+# Story 8.1/8.2: Voice API for TTS and STT features
+app.include_router(voice.router, prefix="/api/v1/voice", tags=["Voice"])
+# Story 8.4: Briefing API for morning briefings
+app.include_router(briefing.router, prefix="/api/v1/briefing", tags=["Briefing"])
 
 
 @app.get("/")

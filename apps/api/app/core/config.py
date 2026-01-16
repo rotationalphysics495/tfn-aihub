@@ -85,6 +85,12 @@ class Settings(BaseSettings):
     cache_daily_ttl: int = 900  # Daily tier TTL in seconds (15 minutes)
     cache_static_ttl: int = 3600  # Static tier TTL in seconds (1 hour)
 
+    # ElevenLabs TTS Configuration (Story 8.1)
+    elevenlabs_api_key: str = ""  # ElevenLabs API key
+    elevenlabs_model: str = "eleven_flash_v2_5"  # Flash v2.5 for low latency
+    elevenlabs_voice_id: str = ""  # Default voice ID
+    elevenlabs_timeout: int = 10  # Request timeout in seconds
+
     @property
     def mssql_connection_string(self) -> str:
         """Build MSSQL connection string with proper URL encoding for special characters."""
@@ -136,6 +142,11 @@ class Settings(BaseSettings):
             # Composite requires at least Supabase as primary
             return all([self.supabase_url, self.supabase_key])
         return False
+
+    @property
+    def elevenlabs_configured(self) -> bool:
+        """Check if ElevenLabs TTS is properly configured (Story 8.1 AC#1)."""
+        return bool(self.elevenlabs_api_key)
 
 
 @lru_cache()

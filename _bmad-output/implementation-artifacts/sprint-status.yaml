@@ -171,17 +171,17 @@ development_status:
   # Story 8.1: ElevenLabs TTS Integration
   # - Natural-sounding voice delivery via ElevenLabs Flash v2.5
   # - Streaming audio URL, graceful degradation to text
-  8-1-elevenlabs-tts-integration: ready-for-dev
+  8-1-elevenlabs-tts-integration: done
 
   # Story 8.2: Push-to-Talk STT Integration
   # - Voice input via ElevenLabs Scribe v2 Realtime
   # - WebSocket streaming, push-to-talk button
-  8-2-push-to-talk-stt-integration: ready-for-dev
+  8-2-push-to-talk-stt-integration: done
 
   # Story 8.3: Briefing Synthesis Engine
   # - Orchestrate LangChain tools into coherent narratives
   # - Section-based output with natural pause points
-  8-3-briefing-synthesis-engine: ready-for-dev
+  8-3-briefing-synthesis-engine: done
 
   # Story 8.4: Morning Briefing Workflow
   # - Plant-wide briefing covering all 7 production areas
