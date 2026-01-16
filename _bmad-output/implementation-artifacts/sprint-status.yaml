@@ -1,6 +1,6 @@
 # Sprint Status Tracking File
 # Generated for tfn-aihub - AI Agent Tools Implementation Phase
-# This file tracks the development lifecycle for Epics 5, 6, and 7
+# This file tracks the development lifecycle for Epics 5, 6, 7, and 8
 
 # STATUS DEFINITIONS:
 # ==================
@@ -49,6 +49,12 @@ story_location: "_bmad-output/implementation-artifacts"
 #       assets, and suggesting actions.
 # Dependencies: Epic 6 (Safety & Financial Intelligence Tools)
 # Stories: 5 (7.1 - 7.5)
+
+# Epic 8: Voice Briefing Foundation
+# Goal: Enable voice-first operations with Morning Briefing workflow, allowing Plant
+#       Managers and Supervisors to receive synthesized briefings hands-free.
+# Dependencies: Epic 7 (Proactive Agent Capabilities)
+# Stories: 9 (8.1 - 8.9)
 
 development_status:
   # ========================================
@@ -157,11 +163,145 @@ development_status:
 
   epic-7-retrospective: optional
 
+  # ========================================
+  # Epic 8: Voice Briefing Foundation
+  # ========================================
+  epic-8: backlog
+
+  # Story 8.1: ElevenLabs TTS Integration
+  # - Natural-sounding voice delivery via ElevenLabs Flash v2.5
+  # - Streaming audio URL, graceful degradation to text
+  8-1-elevenlabs-tts-integration: ready-for-dev
+
+  # Story 8.2: Push-to-Talk STT Integration
+  # - Voice input via ElevenLabs Scribe v2 Realtime
+  # - WebSocket streaming, push-to-talk button
+  8-2-push-to-talk-stt-integration: ready-for-dev
+
+  # Story 8.3: Briefing Synthesis Engine
+  # - Orchestrate LangChain tools into coherent narratives
+  # - Section-based output with natural pause points
+  8-3-briefing-synthesis-engine: ready-for-dev
+
+  # Story 8.4: Morning Briefing Workflow
+  # - Plant-wide briefing covering all 7 production areas
+  # - Area-by-area delivery with Q&A pause points
+  8-4-morning-briefing-workflow: ready-for-dev
+
+  # Story 8.5: Supervisor Scoped Briefings
+  # - Briefings filtered to assigned assets only
+  # - supervisor_assignments table for role-based scoping
+  8-5-supervisor-scoped-briefings: ready-for-dev
+
+  # Story 8.6: Voice Number Formatting
+  # - Format numbers for natural speech ("2.1 million" not "2,130,500")
+  # - Percentages, durations, currency conversions
+  8-6-voice-number-formatting: ready-for-dev
+
+  # Story 8.7: Area-by-Area Delivery UI
+  # - Visual progress indicator, transcript panel
+  # - Play/pause/skip controls, section stepper
+  8-7-area-by-area-delivery-ui: ready-for-dev
+
+  # Story 8.8: User Preference Onboarding
+  # - First-time onboarding flow for briefing preferences
+  # - Role, area order, detail level, voice settings
+  8-8-user-preference-onboarding: ready-for-dev
+
+  # Story 8.9: Mem0 Preference Storage
+  # - Dual storage: Supabase for queries, Mem0 for AI context
+  # - Semantic preference descriptions for personalization
+  8-9-mem0-preference-storage: ready-for-dev
+
+  epic-8-retrospective: optional
+
+  # ========================================
+  # Epic 9: Shift Handoff & EOD Summary
+  # ========================================
+  epic-9: backlog
+
+  # Story 9.1: Shift Handoff Trigger
+  # - Initiate shift handoff process
+  # - Pre-populate with assigned assets, auto-detect shift time
+  9-1-shift-handoff-trigger: ready-for-dev
+
+  # Story 9.2: Shift Data Synthesis
+  # - Auto-synthesize shift data into handoff summary
+  # - Reuse LangChain tools for production/downtime/safety data
+  9-2-shift-data-synthesis: ready-for-dev
+
+  # Story 9.3: Voice Note Attachment
+  # - Add voice notes to handoff
+  # - Push-to-talk recording, transcription
+  9-3-voice-note-attachment: ready-for-dev
+
+  # Story 9.4: Persistent Handoff Records
+  # - Store handoffs securely in shift_handoffs table
+  # - Immutable records, RLS policies
+  9-4-persistent-handoff-records: ready-for-dev
+
+  # Story 9.5: Handoff Review UI
+  # - Incoming supervisor views handoff
+  # - Play voice notes, view summary
+  9-5-handoff-review-ui: ready-for-dev
+
+  # Story 9.6: Handoff Q&A
+  # - Ask follow-up questions about handoff content
+  # - AI processes with handoff context
+  9-6-handoff-qa: ready-for-dev
+
+  # Story 9.7: Acknowledgment Flow
+  # - Acknowledge receipt of handoff
+  # - Audit trail, offline queue support
+  9-7-acknowledgment-flow: ready-for-dev
+
+  # Story 9.8: Handoff Notifications
+  # - Notify outgoing supervisor when handoff acknowledged
+  # - In-app and push notifications
+  9-8-handoff-notifications: ready-for-dev
+
+  # Story 9.9: Offline Handoff Caching
+  # - Service Worker + IndexedDB for offline handoff access
+  # - Cache-then-network strategy, auto-sync on reconnect
+  9-9-offline-handoff-caching: ready-for-dev
+
+  # Story 9.10: End of Day Summary Trigger
+  # - Plant Manager triggers EOD summary
+  # - Full day performance vs target
+  9-10-end-of-day-summary-trigger: ready-for-dev
+
+  # Story 9.11: Morning vs Actual Comparison
+  # - Compare morning predictions to actual outcomes
+  # - Prediction accuracy metrics
+  9-11-morning-vs-actual-comparison: ready-for-dev
+
+  # Story 9.12: EOD Push Notification Reminders
+  # - Optional reminder for EOD summary review
+  # - Web Push via Supabase Edge Function
+  9-12-eod-push-notification-reminders: ready-for-dev
+
+  # Story 9.13: Admin UI - Asset Assignment
+  # - Assign supervisors to assets/areas
+  # - Grid UI with preview
+  9-13-admin-ui-asset-assignment: ready-for-dev
+
+  # Story 9.14: Admin UI - Role Management
+  # - Assign roles to users
+  # - Role hierarchy and protection
+  9-14-admin-ui-role-management: ready-for-dev
+
+  # Story 9.15: Admin Audit Logging
+  # - Log all admin configuration changes
+  # - 90-day retention, tamper-evident
+  9-15-admin-audit-logging: ready-for-dev
+
+  epic-9-retrospective: optional
+
 # ========================================
 # Sprint Planning Summary
 # ========================================
-# Total Epics: 3
-# Total Stories: 17
+# Total Epics: 4
+# Total Stories: 26
 #
 # Epic 5 (Agent Foundation & Core Tools): 8 stories
 #   - Foundation stories (5.1-5.2): Framework setup and data abstraction
@@ -178,9 +318,16 @@ development_status:
 #   - Analysis (7.2): Comparative metrics
 #   - Proactive (7.3-7.5): Actions, alerts, recommendations
 #
+# Epic 8 (Voice Briefing Foundation): 9 stories
+#   - Voice I/O (8.1-8.2): ElevenLabs TTS and STT integration
+#   - Briefing Engine (8.3-8.4): Synthesis and morning workflow
+#   - Personalization (8.5-8.6): Supervisor scoping, number formatting
+#   - UI & Preferences (8.7-8.9): Delivery UI, onboarding, Mem0 storage
+#
 # Recommended Implementation Order:
 # 1. Epic 5 must be completed first (establishes agent framework)
 # 2. Epic 6 depends on Epic 5 (extends with safety/financial tools)
 # 3. Epic 7 depends on Epic 6 (adds proactive capabilities)
+# 4. Epic 8 depends on Epic 7 (voice-first briefing experience)
 #
-# Critical Path: 5.1 -> 5.2 -> (5.3-5.6 parallel) -> 5.7 -> 5.8 -> 6.x -> 7.x
+# Critical Path: 5.1 -> 5.2 -> (5.3-5.6 parallel) -> 5.7 -> 5.8 -> 6.x -> 7.x -> 8.x
