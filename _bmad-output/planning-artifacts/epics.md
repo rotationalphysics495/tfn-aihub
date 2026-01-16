@@ -2,10 +2,13 @@
 stepsCompleted: ["step-01-validate-prerequisites", "step-02-design-epics", "step-03-create-stories"]
 inputDocuments:
   - "_bmad/bmm/data/prd.md"
+  - "_bmad/bmm/data/prd/prd-functional-requirements.md"
+  - "_bmad/bmm/data/prd/prd-non-functional-requirements.md"
+  - "_bmad/bmm/data/prd/prd-epics.md"
   - "_bmad/bmm/data/architecture.md"
+  - "_bmad/bmm/data/architecture/voice-briefing.md"
   - "_bmad/bmm/data/ux-design.md"
-  - "_bmad-output/planning-artifacts/prd-addendum-ai-agent-tools.md"
-lastUpdated: "2026-01-09"
+lastUpdated: "2026-01-16"
 ---
 
 # Manufacturing Performance Assistant - Epic Breakdown
@@ -77,6 +80,13 @@ This document provides the complete epic and story breakdown for Manufacturing P
 | FR7.2 | Epic 6 | Safety & Financial Tools |
 | FR7.3 | Epic 6 + Epic 7 | Intelligence Tools (Trend Analysis in E6, Memory/Comparison in E7) |
 | FR7.4 | Epic 7 | Proactive Action Tools (Action List, Alerts, Recommendations) |
+| FR8-FR13 | Epic 8 | Voice & Briefing Delivery (TTS, STT, transcript) |
+| FR14-FR20 | Epic 8 | Morning Briefing Workflow |
+| FR35-FR45 | Epic 8 | User Preferences & Onboarding |
+| FR21-FR30 | Epic 9 | Shift Handoff Workflow |
+| FR31-FR34 | Epic 9 | End of Day Summary |
+| FR46-FR50 | Epic 9 | Admin & Configuration |
+| FR51-FR57 | Epic 9 | Data Citations & Audit |
 
 ## Epic List
 
@@ -86,9 +96,11 @@ This document provides the complete epic and story breakdown for Manufacturing P
 | 2 | Data Pipelines & Production Intelligence | Live monitoring + safety + financials | FR1, FR4, FR5 | ✅ Complete |
 | 3 | Action Engine & AI Synthesis | Prioritized Daily Action List | FR3 | ✅ Complete |
 | 4 | AI Chat & Memory | Natural language queries with context | FR6 | ✅ Complete |
-| 5 | Agent Foundation & Core Tools | Reliable, fast responses to common questions | FR7.1, NFR4-7 | Ready |
-| 6 | Safety & Financial Intelligence Tools | Safety visibility + financial context via chat | FR7.2, FR7.3 | Ready |
-| 7 | Proactive Agent Capabilities | Memory, comparison, recommendations | FR7.3, FR7.4 | Ready |
+| 5 | Agent Foundation & Core Tools | Reliable, fast responses to common questions | FR7.1, NFR4-7 | ✅ Complete |
+| 6 | Safety & Financial Intelligence Tools | Safety visibility + financial context via chat | FR7.2, FR7.3 | ✅ Complete |
+| 7 | Proactive Agent Capabilities | Memory, comparison, recommendations | FR7.3, FR7.4 | ✅ Complete |
+| 8 | Voice Briefing Foundation | Hands-free morning briefings with voice | FR8-FR20, FR35-FR45 | Ready |
+| 9 | Shift Handoff & EOD Summary | Persistent handoffs + accountability loop | FR21-FR34, FR46-FR57 | Ready |
 
 ---
 
@@ -215,3 +227,54 @@ This document provides the complete epic and story breakdown for Manufacturing P
 - Recommendation Engine (pattern-based suggestions)
 
 **Stories:** 5 | **Details:** See [epic-7.md](epic-7.md)
+
+---
+
+## Epic 8: Voice Briefing Foundation
+
+**Goal:** Enable voice-first operations with Morning Briefing workflow, allowing Plant Managers and Supervisors to receive synthesized briefings hands-free.
+
+**FRs Covered:** FR8-FR13 (Voice & Briefing Delivery), FR14-FR20 (Morning Briefing Workflow), FR35-FR45 (User Preferences & Onboarding)
+
+**Dependencies:** Epic 7 (Proactive Agent Capabilities)
+
+**Scope:**
+- ElevenLabs TTS integration (Flash v2.5)
+- Push-to-talk STT integration (Scribe v2)
+- Briefing Synthesis Engine (tool orchestration)
+- Morning Briefing Workflow (all areas for PM)
+- Supervisor Scoped Briefings (assigned assets only)
+- Voice Number Formatting ("2.1 million" not "2,130,500")
+- Area-by-Area Delivery UI with pause points
+- User Preference Onboarding flow
+- Mem0 Preference Storage and sync
+
+**Stories:** 9 | **Details:** See [epic-8.md](epic-8.md)
+
+---
+
+## Epic 9: Shift Handoff & EOD Summary
+
+**Goal:** Enable persistent shift handoffs and close the accountability loop with End of Day summaries, ensuring knowledge doesn't walk out the door when shifts change.
+
+**FRs Covered:** FR21-FR30 (Shift Handoff), FR31-FR34 (EOD Summary), FR46-FR50 (Admin), FR51-FR57 (Citations & Audit)
+
+**Dependencies:** Epic 8 (Voice Briefing Foundation)
+
+**Scope:**
+- Shift Handoff Trigger and Workflow
+- Shift Data Synthesis via LangChain tools
+- Voice Note Attachment for handoffs
+- Persistent Handoff Records (immutable)
+- Handoff Review UI for incoming supervisors
+- Handoff Q&A with AI assistance
+- Acknowledgment Flow with audit trail
+- Handoff Notifications (in-app + push)
+- Offline Handoff Caching (Service Worker + IndexedDB)
+- End of Day Summary with prediction comparison
+- EOD Push Notification Reminders
+- Admin UI for Asset Assignment
+- Admin UI for Role Management
+- Admin Audit Logging (90-day retention)
+
+**Stories:** 15 | **Details:** See [epic-9.md](epic-9.md)

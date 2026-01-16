@@ -7,6 +7,21 @@ This document outlines the complete fullstack architecture for the **Manufacturi
 | Date | Version | Description | Author |
 | :--- | :--- | :--- | :--- |
 | 2026-01-05 | 1.0 | Initial Architecture | Architect Agent |
+| 2026-01-15 | 1.1-1.6 | Voice Briefing Extension | Architect Agent |
+| 2026-01-15 | 2.0 | Architecture Sharding | Architect Agent |
+
+### Architecture Document Index
+
+This architecture is organized into focused documents:
+
+| Document | Purpose |
+|----------|---------|
+| **[architecture.md](./architecture.md)** (this file) | Core platform architecture (Sections 1-9) |
+| **[architecture/voice-briefing.md](./architecture/voice-briefing.md)** | Voice Briefing Extension - decisions, structure, integration |
+| **[architecture/implementation-patterns.md](./architecture/implementation-patterns.md)** | Code patterns & consistency rules for AI agents |
+| **[architecture/validation-results.md](./architecture/validation-results.md)** | Validation, readiness assessment, implementation handoff |
+
+---
 
 ## 2. High Level Architecture
 ### Technical Summary
@@ -139,3 +154,32 @@ To synthesize insights, we map raw MSSQL data to a semantic **Plant Object Model
 *   **Deployment:**
     *   Push to Main -> TurboRepo builds Web -> Deploys to Vercel/Railway.
     *   Railway detects `apps/api` changes -> Builds Docker image -> Deploys.
+
+---
+
+## Feature Extensions
+
+### Voice Briefing Extension
+
+The Voice Briefing feature extends the core platform with ElevenLabs TTS/STT, shift handoffs, and offline capabilities.
+
+**Full documentation:** [architecture/voice-briefing.md](./architecture/voice-briefing.md)
+
+**Key decisions:**
+- Dual delivery pattern (text primary, audio enhancement)
+- ElevenLabs Flash v2.5 for TTS, Scribe v2 for STT
+- Hybrid RBAC (Supabase RLS + service-level filtering)
+- Service Worker + IndexedDB for offline handoffs
+
+---
+
+## Implementation Resources
+
+- **Code Patterns:** [architecture/implementation-patterns.md](./architecture/implementation-patterns.md)
+- **Validation & Readiness:** [architecture/validation-results.md](./architecture/validation-results.md)
+
+---
+
+**Architecture Status:** READY FOR IMPLEMENTATION
+
+**Document Maintenance:** Update this architecture and its shards when major technical decisions are made during implementation.
