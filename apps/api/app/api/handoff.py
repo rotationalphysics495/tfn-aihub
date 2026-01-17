@@ -1,5 +1,5 @@
 """
-Handoff API Endpoints (Story 9.1, 9.2)
+Handoff API Endpoints (Story 9.1, 9.2, 9.4)
 
 REST endpoints for shift handoff creation and management.
 
@@ -13,9 +13,16 @@ Story 9.2:
 AC#1: GET /api/v1/handoff/synthesis - Synthesize shift data
 AC#2: POST /api/v1/handoff/{id}/synthesis - Generate and attach to handoff
 
+Story 9.4:
+AC#1: POST /api/v1/handoff - Create persistent handoff record
+AC#2: POST /api/v1/handoff/{id}/supplemental-note - Append supplemental note
+AC#3: POST /api/v1/handoff/{id}/voice-note - Upload voice note
+AC#4: Error handling with retry hints
+
 References:
 - [Source: architecture/voice-briefing.md#Shift-Handoff-Workflow]
 - [Source: prd-functional-requirements.md#FR21-FR30]
+- [Source: prd-non-functional-requirements.md#NFR24]
 """
 
 import logging
@@ -460,6 +467,114 @@ async def list_handoffs(
 # NOTE: These MUST be defined BEFORE parameterized routes like /{handoff_id}
 # to avoid FastAPI matching "synthesis" as a UUID parameter.
 # ============================================================================
+
+
+# ============================================================================
+# Story 9.4 Schemas (defined here to avoid circular imports)
+# ============================================================================
+
+
+class SupplementalNoteRequest(BaseModel):
+    """Request schema for adding a supplemental note (Story 9.4 AC#2)."""
+    note_text: str = Field(
+        ...,
+        description="The supplemental note text to append",
+        min_length=1,
+        max_length=2000
+    )
+
+
+class SupplementalNoteResponse(BaseModel):
+    """Response schema for supplemental note addition."""
+    success: bool = True
+    handoff_id: str
+    note_count: int
+    message: str = "Supplemental note added successfully"
+
+
+class PendingHandoffListResponse(BaseModel):
+    """Response schema for listing pending handoffs (AC#1)."""
+    handoffs: List[HandoffListItem]
+    total_count: int
+
+
+class HandoffErrorResponse(BaseModel):
+    """Error response with retry hints (AC#4)."""
+    error: str
+    code: str
+    retry_hint: bool = True
+    draft_key: Optional[str] = None
+
+
+# ============================================================================
+# Story 9.4: Pending Handoffs Endpoint (MUST be before /{handoff_id})
+# ============================================================================
+
+
+@router.get("/pending", response_model=PendingHandoffListResponse)
+async def list_pending_handoffs(
+    current_user: CurrentUser = Depends(get_current_user),
+    limit: int = Query(10, ge=1, le=50, description="Number of handoffs to return")
+):
+    """
+    List pending handoffs for incoming supervisor (Story 9.4 AC#1).
+
+    Returns handoffs with status 'pending_acknowledgment' that the user
+    is assigned to receive based on supervisor_assignments.
+
+    This endpoint returns handoffs created by OTHER users (not the current user)
+    that cover assets the current user is assigned to.
+    """
+    user_id = current_user.id
+
+    # Get user's assigned assets
+    assigned_assets = _get_supervisor_assignments(user_id)
+    if not assigned_assets:
+        return PendingHandoffListResponse(handoffs=[], total_count=0)
+
+    assigned_asset_ids = {str(a.asset_id) for a in assigned_assets}
+
+    # Find pending handoffs from other users that cover assigned assets
+    pending_handoffs = []
+    for handoff in _handoffs.values():
+        # Must be pending acknowledgment
+        if handoff.get("status") != HandoffStatus.PENDING_ACKNOWLEDGMENT.value:
+            continue
+
+        # Must be from another user
+        if handoff.get("user_id") == user_id:
+            continue
+
+        # Must cover at least one of user's assigned assets
+        handoff_assets = set(handoff.get("assets_covered", []))
+        if not handoff_assets.intersection(assigned_asset_ids):
+            continue
+
+        pending_handoffs.append(handoff)
+
+    # Sort by created_at descending (newest first)
+    pending_handoffs.sort(key=lambda h: h.get("created_at", ""), reverse=True)
+
+    # Apply limit
+    limited = pending_handoffs[:limit]
+
+    # Convert to response items
+    items = [
+        HandoffListItem(
+            id=h["id"],
+            shift_date=h["shift_date"],
+            shift_type=ShiftType(h["shift_type"]),
+            status=HandoffStatus(h["status"]),
+            created_at=h["created_at"],
+            asset_count=len(h.get("assets_covered", []))
+        )
+        for h in limited
+    ]
+
+    return PendingHandoffListResponse(
+        handoffs=items,
+        total_count=len(pending_handoffs)
+    )
 
 
 @router.get("/synthesis", response_model=HandoffSynthesisResponse)
@@ -1224,3 +1339,131 @@ async def delete_voice_note(
     logger.info(f"Voice note deleted: {note_id} from handoff {handoff_id}")
 
     return None
+
+
+# ============================================================================
+# Story 9.4: Additional Persistent Handoff Storage Endpoints
+# Note: /pending endpoint and schemas are defined above (before parameterized routes)
+# ============================================================================
+
+
+@router.post("/{handoff_id}/supplemental-note", response_model=SupplementalNoteResponse)
+async def add_supplemental_note(
+    handoff_id: UUID,
+    request: SupplementalNoteRequest,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Add a supplemental note to a submitted handoff (Story 9.4 AC#2).
+
+    Supplemental notes are the ONLY allowed modification after a handoff
+    is submitted, maintaining immutability of core fields (NFR24).
+
+    The note is appended to the supplemental_notes JSONB array and cannot
+    be removed or modified once added.
+
+    Raises:
+        400: Handoff is in draft status (submit first)
+        403: User is not authorized
+        404: Handoff not found
+    """
+    user_id = current_user.id
+    handoff = _get_handoff_by_id(str(handoff_id))
+
+    if not handoff:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "Handoff not found",
+                "code": "NOT_FOUND",
+                "retry_hint": False,
+            }
+        )
+
+    # Check authorization - creator can add supplemental notes
+    if handoff.get("user_id") != user_id:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "Access denied - not the handoff creator",
+                "code": "ACCESS_DENIED",
+                "retry_hint": False,
+            }
+        )
+
+    # Supplemental notes only allowed after submission
+    if handoff.get("status") == HandoffStatus.DRAFT.value:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "Submit the handoff before adding supplemental notes",
+                "code": "INVALID_STATUS",
+                "retry_hint": False,
+            }
+        )
+
+    # Create the supplemental note
+    now = datetime.now(timezone.utc)
+    new_note = {
+        "added_at": now.isoformat(),
+        "added_by": user_id,
+        "note_text": request.note_text,
+    }
+
+    # Append to existing notes (in-memory for MVP)
+    existing_notes = handoff.get("supplemental_notes", [])
+    if existing_notes is None:
+        existing_notes = []
+    existing_notes.append(new_note)
+
+    handoff["supplemental_notes"] = existing_notes
+    handoff["updated_at"] = now.isoformat()
+    _save_handoff(handoff)
+
+    logger.info(
+        f"Added supplemental note to handoff {handoff_id} "
+        f"(total notes: {len(existing_notes)})"
+    )
+
+    return SupplementalNoteResponse(
+        success=True,
+        handoff_id=str(handoff_id),
+        note_count=len(existing_notes),
+        message="Supplemental note added successfully",
+    )
+
+
+@router.get("/{handoff_id}/supplemental-notes")
+async def get_supplemental_notes(
+    handoff_id: UUID,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Get all supplemental notes for a handoff (Story 9.4 AC#2).
+
+    Returns the list of supplemental notes that have been added
+    after the handoff was submitted.
+    """
+    user_id = current_user.id
+    handoff = _get_handoff_by_id(str(handoff_id))
+
+    if not handoff:
+        raise HTTPException(status_code=404, detail="Handoff not found")
+
+    # Check authorization
+    if handoff.get("user_id") != user_id:
+        # Check if user is assigned to receive this handoff
+        assigned_assets = _get_supervisor_assignments(user_id)
+        assigned_asset_ids = {str(a.asset_id) for a in assigned_assets}
+        handoff_assets = set(handoff.get("assets_covered", []))
+
+        if not handoff_assets.intersection(assigned_asset_ids):
+            raise HTTPException(status_code=403, detail="Access denied")
+
+    notes = handoff.get("supplemental_notes", [])
+
+    return {
+        "handoff_id": str(handoff_id),
+        "notes": notes,
+        "count": len(notes),
+    }
