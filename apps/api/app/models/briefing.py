@@ -37,6 +37,19 @@ class BriefingSectionStatus(str, Enum):
     TIMED_OUT = "timed_out"
 
 
+class EODSection(str, Enum):
+    """
+    Section types for End of Day summary (Story 9.10).
+
+    AC#2: Summary Content Structure
+    """
+    PERFORMANCE = "performance"  # Day's overall vs target
+    COMPARISON = "comparison"    # Morning vs actual (if morning briefing exists)
+    WINS = "wins"                # Areas that exceeded targets
+    CONCERNS = "concerns"        # Issues that escalated or resolved
+    OUTLOOK = "outlook"          # Tomorrow's predicted focus areas
+
+
 class BriefingMetric(BaseModel):
     """
     A single metric in a briefing section (Task 2.4).
@@ -262,3 +275,95 @@ class BriefingData(BaseModel):
             if field and not field.success:
                 tools.append(name)
         return tools
+
+
+# =============================================================================
+# End of Day Summary Models (Story 9.10)
+# =============================================================================
+
+
+class MorningComparisonResult(BaseModel):
+    """
+    Result of comparing morning briefing predictions to actual outcomes (Story 9.10).
+
+    AC#2: Summary Content Structure - comparison to morning briefing highlights
+    """
+    morning_briefing_id: str = Field(..., description="ID of the morning briefing")
+    morning_generated_at: datetime = Field(..., description="When morning briefing was generated")
+    flagged_concerns: List[str] = Field(
+        default_factory=list,
+        description="Concerns flagged in morning briefing"
+    )
+    concerns_resolved: List[str] = Field(
+        default_factory=list,
+        description="Concerns that were resolved during the day"
+    )
+    concerns_escalated: List[str] = Field(
+        default_factory=list,
+        description="Concerns that escalated during the day"
+    )
+    predicted_wins: List[str] = Field(
+        default_factory=list,
+        description="Wins predicted in morning briefing"
+    )
+    actual_wins: List[str] = Field(
+        default_factory=list,
+        description="Wins that actually materialized"
+    )
+    prediction_summary: str = Field(
+        "",
+        description="Natural language summary of morning vs actual comparison"
+    )
+
+
+class EODSummaryResponse(BriefingResponse):
+    """
+    Extended response for End of Day summary (Story 9.10).
+
+    AC#1: EOD Summary Trigger (FR31)
+    AC#2: Summary Content Structure
+    AC#3: No Morning Briefing Fallback
+
+    Extends BriefingResponse with EOD-specific fields.
+    """
+    morning_briefing_id: Optional[str] = Field(
+        None,
+        description="ID of today's morning briefing (if exists)"
+    )
+    comparison_available: bool = Field(
+        False,
+        description="Whether morning briefing comparison is available"
+    )
+    morning_comparison: Optional[MorningComparisonResult] = Field(
+        None,
+        description="Detailed comparison to morning briefing (if available)"
+    )
+    prediction_accuracy: Optional[float] = Field(
+        None,
+        description="Prediction accuracy percentage (for Story 9.11)"
+    )
+    summary_date: datetime = Field(
+        default_factory=_utcnow,
+        description="Date this EOD summary covers"
+    )
+    time_range_start: Optional[datetime] = Field(
+        None,
+        description="Start of the day's time range (typically 06:00 AM)"
+    )
+    time_range_end: Optional[datetime] = Field(
+        None,
+        description="End of the day's time range (current time or shift end)"
+    )
+
+
+class EODRequest(BaseModel):
+    """
+    Request for End of Day summary generation (Story 9.10).
+
+    AC#1: EOD Summary Trigger
+    """
+    date: Optional[str] = Field(
+        None,
+        description="Date for EOD summary (ISO format). Defaults to today."
+    )
+    include_audio: bool = Field(True, description="Generate TTS audio")

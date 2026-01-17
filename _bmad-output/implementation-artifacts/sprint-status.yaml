@@ -263,12 +263,12 @@ development_status:
   # Story 9.9: Offline Handoff Caching
   # - Service Worker + IndexedDB for offline handoff access
   # - Cache-then-network strategy, auto-sync on reconnect
-  9-9-offline-handoff-caching: ready-for-dev
+  9-9-offline-handoff-caching: done
 
   # Story 9.10: End of Day Summary Trigger
   # - Plant Manager triggers EOD summary
   # - Full day performance vs target
-  9-10-end-of-day-summary-trigger: ready-for-dev
+  9-10-end-of-day-summary-trigger: done
 
   # Story 9.11: Morning vs Actual Comparison
   # - Compare morning predictions to actual outcomes

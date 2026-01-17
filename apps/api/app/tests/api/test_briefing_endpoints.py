@@ -557,3 +557,242 @@ class TestEndBriefingEndpoint:
 
             assert data["status"] == "ended"
             assert data["briefing_id"] == briefing_id
+
+
+# ============================================================================
+# EOD Summary Endpoint Tests (Story 9.10)
+# ============================================================================
+
+
+class TestEODSummaryEndpoint:
+    """Tests for POST /api/v1/briefing/eod endpoint."""
+
+    @pytest.fixture
+    def mock_eod_response(self):
+        """Create a mock EOD summary response."""
+        from datetime import datetime, timezone
+        from app.models.briefing import (
+            EODSummaryResponse,
+            MorningComparisonResult,
+        )
+
+        return EODSummaryResponse(
+            id="test-eod-123",
+            title="End of Day Summary - Thursday, January 16",
+            scope="eod",
+            user_id="test-user",
+            sections=[
+                BriefingSection(
+                    section_type="performance",
+                    title="Day's Performance",
+                    content="Today's total output: about 10 thousand units.",
+                    status=BriefingSectionStatus.COMPLETE,
+                    pause_point=True,
+                ),
+                BriefingSection(
+                    section_type="comparison",
+                    title="Morning vs Actual",
+                    content="No morning briefing was generated today.",
+                    status=BriefingSectionStatus.COMPLETE,
+                    pause_point=False,
+                ),
+                BriefingSection(
+                    section_type="wins",
+                    title="Wins That Materialized",
+                    content="5 assets exceeded targets.",
+                    status=BriefingSectionStatus.COMPLETE,
+                    pause_point=True,
+                ),
+                BriefingSection(
+                    section_type="concerns",
+                    title="Concerns Status",
+                    content="No major concerns.",
+                    status=BriefingSectionStatus.COMPLETE,
+                    pause_point=True,
+                ),
+                BriefingSection(
+                    section_type="outlook",
+                    title="Tomorrow's Outlook",
+                    content="Focus on maintaining momentum.",
+                    status=BriefingSectionStatus.COMPLETE,
+                    pause_point=True,
+                ),
+            ],
+            audio_stream_url=None,
+            total_duration_estimate=90,
+            metadata=BriefingResponseMetadata(
+                generated_at=datetime.now(timezone.utc),
+                generation_duration_ms=500,
+                completion_percentage=100.0,
+                timed_out=False,
+                tool_failures=[],
+            ),
+            morning_briefing_id=None,
+            comparison_available=False,
+            morning_comparison=None,
+            summary_date=datetime.now(timezone.utc),
+            time_range_start=datetime.now(timezone.utc).replace(hour=6, minute=0),
+            time_range_end=datetime.now(timezone.utc),
+        )
+
+    def test_generate_eod_summary_success(self, mock_eod_response):
+        """Test successful EOD summary generation (Story 9.10 AC#1)."""
+        with patch('app.api.briefing.get_eod_service') as mock_service:
+            mock_service.return_value.generate_eod_summary = AsyncMock(
+                return_value=mock_eod_response
+            )
+
+            response = client.post(
+                "/api/v1/briefing/eod",
+                json={
+                    "user_id": "test-user",
+                    "include_audio": True,
+                },
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+
+            assert "summary_id" in data
+            assert "title" in data
+            assert "sections" in data
+            assert len(data["sections"]) == 5  # All 5 EOD sections
+            assert data["comparison_available"] is False
+
+    def test_generate_eod_summary_with_date(self, mock_eod_response):
+        """Test EOD summary generation with specific date."""
+        with patch('app.api.briefing.get_eod_service') as mock_service:
+            mock_service.return_value.generate_eod_summary = AsyncMock(
+                return_value=mock_eod_response
+            )
+
+            response = client.post(
+                "/api/v1/briefing/eod",
+                json={
+                    "user_id": "test-user",
+                    "date": "2024-01-15",
+                    "include_audio": False,
+                },
+            )
+
+            assert response.status_code == 200
+
+            # Verify date was passed to service
+            mock_service.return_value.generate_eod_summary.assert_called_once()
+            call_args = mock_service.return_value.generate_eod_summary.call_args
+            from datetime import date as date_type
+            assert call_args.kwargs.get("summary_date") == date_type(2024, 1, 15)
+
+    def test_generate_eod_summary_invalid_date(self):
+        """Test EOD summary with invalid date format."""
+        response = client.post(
+            "/api/v1/briefing/eod",
+            json={
+                "user_id": "test-user",
+                "date": "invalid-date",
+            },
+        )
+
+        assert response.status_code == 400
+        assert "Invalid date format" in response.json()["detail"]
+
+    def test_generate_eod_summary_includes_section_structure(self, mock_eod_response):
+        """Test EOD response includes proper section structure (AC#2)."""
+        with patch('app.api.briefing.get_eod_service') as mock_service:
+            mock_service.return_value.generate_eod_summary = AsyncMock(
+                return_value=mock_eod_response
+            )
+
+            response = client.post(
+                "/api/v1/briefing/eod",
+                json={"user_id": "test-user"},
+            )
+
+            data = response.json()
+            section_types = [s["section_type"] for s in data["sections"]]
+
+            # AC#2: Should include all 5 section types
+            assert "performance" in section_types
+            assert "comparison" in section_types
+            assert "wins" in section_types
+            assert "concerns" in section_types
+            assert "outlook" in section_types
+
+    def test_generate_eod_summary_with_morning_comparison(self):
+        """Test EOD summary with morning briefing comparison."""
+        from datetime import datetime, timezone
+        from app.models.briefing import (
+            EODSummaryResponse,
+            MorningComparisonResult,
+        )
+
+        mock_comparison = MorningComparisonResult(
+            morning_briefing_id="morning-456",
+            morning_generated_at=datetime.now(timezone.utc).replace(hour=7),
+            flagged_concerns=["Watch Packer 3"],
+            concerns_resolved=["Packer 3 back on track"],
+            concerns_escalated=[],
+            predicted_wins=["Roasting ahead"],
+            actual_wins=["Roasting exceeded by 10%"],
+            prediction_summary="Morning predictions were accurate.",
+        )
+
+        mock_response = EODSummaryResponse(
+            id="test-eod-with-comparison",
+            title="End of Day Summary",
+            scope="eod",
+            user_id="test-user",
+            sections=[
+                BriefingSection(
+                    section_type="performance",
+                    title="Day's Performance",
+                    content="Great day overall.",
+                    status=BriefingSectionStatus.COMPLETE,
+                    pause_point=True,
+                ),
+            ],
+            metadata=BriefingResponseMetadata(
+                generated_at=datetime.now(timezone.utc),
+                completion_percentage=100.0,
+            ),
+            morning_briefing_id="morning-456",
+            comparison_available=True,
+            morning_comparison=mock_comparison,
+            summary_date=datetime.now(timezone.utc),
+            time_range_start=datetime.now(timezone.utc).replace(hour=6),
+            time_range_end=datetime.now(timezone.utc),
+        )
+
+        with patch('app.api.briefing.get_eod_service') as mock_service:
+            mock_service.return_value.generate_eod_summary = AsyncMock(
+                return_value=mock_response
+            )
+
+            response = client.post(
+                "/api/v1/briefing/eod",
+                json={"user_id": "test-user"},
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+
+            assert data["comparison_available"] is True
+            assert data["morning_briefing_id"] == "morning-456"
+            assert data["morning_comparison"] is not None
+            assert data["morning_comparison"]["concerns_resolved"] == ["Packer 3 back on track"]
+            assert data["morning_comparison"]["actual_wins"] == ["Roasting exceeded by 10%"]
+
+    def test_generate_eod_summary_error_handling(self):
+        """Test error handling during EOD summary generation."""
+        with patch('app.api.briefing.get_eod_service') as mock_service:
+            mock_service.return_value.generate_eod_summary = AsyncMock(
+                side_effect=Exception("Database connection failed")
+            )
+
+            response = client.post(
+                "/api/v1/briefing/eod",
+                json={"user_id": "test-user"},
+            )
+
+            assert response.status_code == 500
+            assert "Failed to generate EOD summary" in response.json()["detail"]
