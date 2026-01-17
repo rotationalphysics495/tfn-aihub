@@ -1,10 +1,24 @@
 # User Acceptance Testing Document
 # Epic 8: Voice Briefing Foundation
 
-**Version:** 1.0
+**Version:** 1.1
 **Date:** January 17, 2026
+**Last Updated:** January 17, 2026
 **Prepared For:** Plant Managers and Supervisors
 **Test Environment:** TFN AI Hub - Voice Briefing System
+**Document Status:** Ready for Testing
+
+---
+
+## Table of Contents
+
+1. [Overview](#1-overview)
+2. [Prerequisites](#2-prerequisites)
+3. [Test Scenarios](#3-test-scenarios)
+4. [Success Criteria](#4-success-criteria)
+5. [Known Limitations](#5-known-limitations)
+6. [Issue Reporting](#6-issue-reporting)
+7. [Sign-Off Section](#7-sign-off-section)
 
 ---
 
@@ -12,17 +26,31 @@
 
 ### What Was Built
 
-Epic 8 introduces a **hands-free voice briefing system** for the TFN AI Hub. This feature allows you to receive your morning production updates through spoken audio instead of reading dashboards. Key capabilities include:
+Epic 8 introduces a **hands-free voice briefing system** for the TFN AI Hub. This feature transforms the traditional 45-minute morning dashboard review into a 3-minute spoken briefing. You can receive production updates through natural-sounding audio while walking to your office, pouring coffee, or preparing for the day.
 
-- **Morning Voice Briefings**: Start your day with a spoken summary of overnight production across all plant areas
-- **Push-to-Talk Questions**: Ask follow-up questions using your voice during briefings
-- **Personalized Content**: Supervisors see only their assigned assets; Plant Managers see the full plant
-- **Customizable Preferences**: Choose your preferred area order, detail level, and voice settings
-- **Natural Number Reading**: Numbers are spoken naturally (e.g., "about 2 million units" instead of "2,130,500 units")
+| Feature | What It Does | User Benefit |
+|---------|--------------|--------------|
+| **Voice Briefings** | Receive spoken updates via ElevenLabs TTS technology | Hands-free operation, multitask while staying informed |
+| **Morning Workflow** | Comprehensive overview of all 7 production areas | Quick plant-wide situational awareness |
+| **Push-to-Talk** | Ask follow-up questions by voice during briefings | Natural interaction without touching your device |
+| **Smart Number Formatting** | "About 2.1 million units" instead of "2,130,500 units" | Easier to understand spoken metrics |
+| **Progress Tracking UI** | Visual display of current area, upcoming areas, and completion | Always know where you are in the briefing |
+| **Supervisor Scoping** | Briefings limited to assigned assets only | Focused information relevant to your role |
+| **User Preferences** | Customize area order, detail level, and voice on/off | Personalized experience tailored to your needs |
+| **Onboarding Flow** | 2-minute setup for first-time users | Quick personalization from first interaction |
+| **Mem0 AI Context** | Preferences sync to AI memory for smarter responses | AI understands your preferences and priorities |
 
 ### Who This Is For
 
-- **Plant Managers**: Receive complete plant-wide briefings covering all 7 production areas
+- **Plant Managers**: Receive complete plant-wide briefings covering all 7 production areas:
+  - Packing (CAMA, Pack Cells, Variety Pack, Bag Lines, Nuspark)
+  - Rychigers (101-109, 1009)
+  - Grinding (Grinders 1-5)
+  - Powder (1002-1004 Fill & Pack, Manual Bulk)
+  - Roasting (Roasters 1-4)
+  - Green Bean (Manual, Silo Transfer)
+  - Flavor Room (Coffee Flavor Room)
+
 - **Supervisors**: Receive focused briefings on only your assigned assets
 
 ### What You Can Do
@@ -31,8 +59,9 @@ Epic 8 introduces a **hands-free voice briefing system** for the TFN AI Hub. Thi
 2. Listen to production updates while walking to your station
 3. Ask questions about any area using your voice
 4. Pause, skip, or end the briefing at any time
-5. Set your preferences during first-time onboarding
-6. Modify your preferences later through Settings
+5. Set your preferences during first-time onboarding (under 2 minutes)
+6. Modify your preferences later through Settings > Preferences
+7. Fall back to text-only mode when voice is unavailable
 
 ---
 
@@ -348,34 +377,114 @@ Request test accounts from your IT administrator:
 
 ---
 
+### Scenario 13: Performance Requirements Verification
+
+**Purpose**: Verify that system meets all performance requirements (NFR7-NFR10).
+
+**Steps**:
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Start a Morning Briefing and time it | Briefing generation completes within 30 seconds (NFR8) |
+| 2 | Wait for voice to start after generation | Audio playback begins within 2 seconds (NFR9) |
+| 3 | Use Push-to-Talk to ask a question | Transcription completes within 2 seconds (NFR10) |
+| 4 | Wait for Q&A response | Response delivered within 2 seconds (NFR7) |
+| 5 | Repeat the above 3 times | Consistent performance across attempts |
+
+**Performance Tracking Table**:
+
+| Metric | Target | Attempt 1 | Attempt 2 | Attempt 3 |
+|--------|--------|-----------|-----------|-----------|
+| Briefing generation | < 30 sec | | | |
+| Voice playback start | < 2 sec | | | |
+| STT transcription | < 2 sec | | | |
+| Q&A response | < 2 sec | | | |
+
+**Pass/Fail Criteria**:
+- [ ] Briefing generation under 30 seconds (all attempts)
+- [ ] Voice playback started within 2 seconds (all attempts)
+- [ ] Transcription completed within 2 seconds (all attempts)
+- [ ] Q&A responses delivered within 2 seconds (all attempts)
+
+---
+
+### Scenario 14: AI Preference Context (Mem0 Integration)
+
+**Purpose**: Verify that user preferences are reflected in AI responses.
+
+**Steps**:
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Set area order to put "Grinding" first in Settings | Preferences saved successfully |
+| 2 | Start a new Morning Briefing | Grinding area is presented first |
+| 3 | During briefing, ask: "Why did you start with Grinding?" | AI acknowledges your preference |
+| 4 | Ask: "What are my current preferences?" | AI can describe your settings |
+
+**Pass/Fail Criteria**:
+- [ ] Briefing reflected area order preference
+- [ ] AI response acknowledged user preference
+- [ ] AI demonstrated awareness of user settings
+
+---
+
+### Scenario 15: Briefing Content Quality (Synthesis Engine)
+
+**Purpose**: Verify that briefings contain meaningful, synthesized insights rather than raw data.
+
+**Steps**:
+
+| Step | Action | Expected Result |
+|------|--------|-----------------|
+| 1 | Start a Morning Briefing | Briefing generates and plays |
+| 2 | Listen/read for a Headline Summary | Brief overview of overall plant status |
+| 3 | Listen/read for "Top Wins" section | Areas performing above target are highlighted |
+| 4 | Listen/read for "Top Concerns" section | Issues, gaps, and downtime are identified |
+| 5 | Listen/read for Recommended Actions | Actionable items with supporting evidence |
+| 6 | Check for citations | Data sources are referenced (e.g., "[Source: daily_summaries]") |
+
+**Pass/Fail Criteria**:
+- [ ] Briefing included a headline summary
+- [ ] Top wins (>100% target) were identified
+- [ ] Top concerns (gaps, issues) were called out
+- [ ] Recommended actions were provided
+- [ ] All metrics included citations to data sources
+- [ ] Content was synthesized (narrative), not just raw numbers
+
+---
+
 ## 4. Success Criteria
 
-### Must Pass (Critical)
+### Must Pass (Critical) - Epic Acceptance Criteria
 
-All of the following must work for Epic 8 to be accepted:
+All of the following must work for Epic 8 to be accepted. These map directly to the Epic's acceptance criteria:
 
-| # | Criterion | Verified |
-|---|-----------|----------|
-| 1 | Plant Managers can start and receive full plant briefings | ☐ |
-| 2 | Supervisors receive briefings with only their assigned assets | ☐ |
-| 3 | Voice playback begins within 2 seconds of briefing generation | ☐ |
-| 4 | Briefing generation completes within 30 seconds | ☐ |
-| 5 | Push-to-talk transcription completes within 2 seconds | ☐ |
-| 6 | Numbers are formatted naturally for voice (millions, percentages) | ☐ |
-| 7 | Users can pause, skip, and end briefings | ☐ |
-| 8 | First-time onboarding appears and can be completed | ☐ |
-| 9 | Preferences persist after logout/login | ☐ |
-| 10 | System falls back to text-only if voice is disabled/unavailable | ☐ |
+| # | Criterion | NFR/FR | Verified |
+|---|-----------|--------|----------|
+| 1 | ElevenLabs TTS begins playback within 2 seconds | NFR9 | ☐ |
+| 2 | Push-to-talk transcription completes within 2 seconds | NFR10 | ☐ |
+| 3 | Briefing generation completes within 30 seconds | NFR8 | ☐ |
+| 4 | Plant Managers see all 7 production areas | FR14-FR17 | ☐ |
+| 5 | Supervisors see only their assigned assets | FR15 | ☐ |
+| 6 | Numbers formatted for voice (e.g., "2.1 million" not "2,130,500") | FR19 | ☐ |
+| 7 | Users can pause and ask follow-up questions with cited answers | FR20 | ☐ |
+| 8 | Onboarding completes in under 2 minutes | FR43 | ☐ |
+| 9 | Preferences persist across sessions via Supabase + Mem0 | FR40 | ☐ |
+| 10 | Voice gracefully degrades to text-only if ElevenLabs unavailable | NFR22 | ☐ |
+| 11 | Q&A interactions complete within 2 seconds | NFR7 | ☐ |
 
 ### Should Pass (Important)
 
 | # | Criterion | Verified |
 |---|-----------|----------|
-| 1 | Q&A responses include citations to data sources | ☐ |
-| 2 | Silence detection auto-continues after 3-4 seconds | ☐ |
-| 3 | Onboarding completes in under 2 minutes | ☐ |
-| 4 | Progress stepper accurately reflects briefing status | ☐ |
-| 5 | Keyboard shortcuts work (Space for pause, Arrow for skip) | ☐ |
+| 1 | Q&A responses include citations to data sources (FR20) | ☐ |
+| 2 | Silence detection auto-continues after 3-4 seconds (FR12) | ☐ |
+| 3 | Areas delivered in user's preferred order (FR36) | ☐ |
+| 4 | Detail level matches user's preference (FR37) | ☐ |
+| 5 | Progress stepper accurately reflects briefing status | ☐ |
+| 6 | Keyboard shortcuts work (Space for pause, Arrow for skip) | ☐ |
+| 7 | Preferences sync to Mem0 within 5 seconds for AI context | ☐ |
+| 8 | Briefing content includes synthesized insights, not raw data | ☐ |
 
 ### Nice to Have (Enhancements)
 
@@ -384,6 +493,7 @@ All of the following must work for Epic 8 to be accepted:
 | 1 | Transcript auto-scrolls to current content | ☐ |
 | 2 | Visual audio level indicator during recording | ☐ |
 | 3 | Countdown timer visible during silence detection | ☐ |
+| 4 | AI can describe user's current preferences when asked | ☐ |
 
 ---
 
@@ -452,12 +562,53 @@ Screenshot: [Attached if available]
 | | | | |
 | | | | |
 
+*Severity Levels: Critical / High / Medium / Low*
+*Status: Open / In Progress / Resolved / Deferred*
+
+### Test Summary
+
+| Category | Total Tests | Passed | Failed | Blocked |
+|----------|-------------|--------|--------|---------|
+| Onboarding (Scenarios 1-2) | 2 | | | |
+| Morning Briefing (Scenarios 3-4) | 2 | | | |
+| Push-to-Talk & Q&A (Scenario 5) | 1 | | | |
+| Briefing Controls (Scenario 6) | 1 | | | |
+| Voice Number Formatting (Scenario 7) | 1 | | | |
+| Graceful Degradation (Scenario 8) | 1 | | | |
+| Preferences Management (Scenario 9) | 1 | | | |
+| Edge Cases (Scenarios 10-12) | 3 | | | |
+| Performance (Scenario 13) | 1 | | | |
+| AI Context (Scenario 14) | 1 | | | |
+| Content Quality (Scenario 15) | 1 | | | |
+| **TOTAL** | **15** | | | |
+
 ### Additional Notes
 
 _Space for any additional comments from testers or stakeholders._
+
+```
+Observations, concerns, or feedback:
+
+
+
+
+```
+
+---
+
+### Document History
+
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| 1.0 | January 17, 2026 | QA Specialist | Initial UAT document creation |
+| 1.1 | January 17, 2026 | QA Specialist | Enhanced coverage, added test summary table |
 
 ---
 
 **Document Prepared By**: QA Specialist
 **Date**: January 17, 2026
 **Epic Reference**: Epic 8 - Voice Briefing Foundation
+
+---
+
+*End of UAT Document - Epic 8: Voice Briefing Foundation*
