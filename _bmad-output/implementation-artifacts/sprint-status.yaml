@@ -186,7 +186,7 @@ development_status:
   # Story 8.4: Morning Briefing Workflow
   # - Plant-wide briefing covering all 7 production areas
   # - Area-by-area delivery with Q&A pause points
-  8-4-morning-briefing-workflow: ready-for-dev
+  8-4-morning-briefing-workflow: done
 
   # Story 8.5: Supervisor Scoped Briefings
   # - Briefings filtered to assigned assets only

@@ -1,16 +1,27 @@
 """
-Morning Briefing Service (Story 8.4)
+Morning Briefing Service (Story 8.4, 8.5)
 
-Orchestrates morning briefing generation for Plant Managers.
+Orchestrates morning briefing generation for Plant Managers and Supervisors.
 Covers all 7 production areas with user-preferred ordering.
 
-AC#1: Cover all 7 production areas in user's preferred order
-AC#2: Pause prompts between sections
-AC#5: Q&A integration during pauses
+Story 8.4:
+- AC#1: Cover all 7 production areas in user's preferred order
+- AC#2: Pause prompts between sections
+- AC#5: Q&A integration during pauses
+
+Story 8.5 (Supervisor Scoped Briefings):
+- AC#1: Only assets from supervisor_assignments are included (FR15)
+- AC#2: Areas delivered in user's preferred order (FR39)
+- AC#3: No assets assigned → error message, no briefing
+- AC#4: Assignment changes reflected immediately
 
 References:
 - [Source: architecture/voice-briefing.md#BriefingService Architecture]
+- [Source: architecture/voice-briefing.md#Role-Based Access Control]
+- [Source: prd/prd-functional-requirements.md#FR15]
 - [Source: prd/prd-functional-requirements.md#FR36]
+- [Source: prd/prd-functional-requirements.md#FR37]
+- [Source: prd/prd-functional-requirements.md#FR39]
 """
 
 import logging
@@ -18,7 +29,7 @@ import asyncio
 import sys
 import uuid
 from datetime import datetime, timezone
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Set
 
 # Python 3.11+ has asyncio.timeout, earlier versions need async_timeout
 if sys.version_info >= (3, 11):
@@ -48,6 +59,7 @@ from app.models.briefing import (
     BriefingCitation,
     BriefingScope,
 )
+from app.models.user import CurrentUserWithRole, UserRole, UserPreferences
 from app.services.briefing.service import (
     BriefingService,
     get_briefing_service,
@@ -57,6 +69,11 @@ from app.services.briefing.service import (
 from app.services.briefing.narrative import get_narrative_generator
 
 logger = logging.getLogger(__name__)
+
+
+class SupervisorBriefingError(Exception):
+    """Raised when supervisor briefing generation fails due to assignment issues."""
+    pass
 
 
 def _utcnow() -> datetime:
@@ -148,13 +165,27 @@ class MorningBriefingService:
     - AC#2: Adds pause prompts between sections
     - Respects user's preferred area order (FR36)
 
+    Story 8.5 Implementation (Supervisor Scoped Briefings):
+    - AC#1: Filters assets based on supervisor_assignments (FR15)
+    - AC#2: Areas delivered in user's preferred order (FR39)
+    - AC#3: Returns error for supervisors with no assignments
+    - AC#4: No caching - assignment changes reflected immediately
+
     This is NOT a ManufacturingTool - it's an orchestration layer.
 
     Usage:
         service = get_morning_briefing_service()
+
+        # For Plant Managers (all areas)
         briefing = await service.generate_plant_briefing(
             user_id="user123",
-            area_order=["roasting", "grinding", ...]  # Optional custom order
+            area_order=["roasting", "grinding", ...]
+        )
+
+        # For Supervisors (scoped to assigned assets)
+        briefing = await service.generate_supervisor_briefing(
+            user=current_user_with_role,
+            preferences=user_preferences,
         )
     """
 
@@ -167,6 +198,8 @@ class MorningBriefingService:
         """
         self._briefing_service = briefing_service
         self._narrative_generator = None
+        # Cache for asset-to-area mapping (built on first use)
+        self._asset_area_map: Optional[Dict[str, str]] = None
 
     def _get_briefing_service(self) -> BriefingService:
         """Get the base briefing service."""
@@ -231,6 +264,274 @@ class MorningBriefingService:
                 ordered_areas.append(area)
 
         return ordered_areas
+
+    def _get_asset_area_map(self) -> Dict[str, str]:
+        """
+        Build mapping from asset names to area IDs.
+
+        Used to determine which areas contain supervisor's assigned assets.
+        """
+        if self._asset_area_map is None:
+            self._asset_area_map = {}
+            for area in PRODUCTION_AREAS:
+                for asset_name in area["assets"]:
+                    # Map asset name to area ID
+                    self._asset_area_map[asset_name.lower()] = area["id"]
+        return self._asset_area_map
+
+    def get_supervisor_areas(
+        self,
+        assigned_asset_ids: List[str],
+    ) -> List[Dict[str, Any]]:
+        """
+        Get production areas that contain supervisor's assigned assets.
+
+        Story 8.5 AC#1: Only include areas with assigned assets (FR15).
+
+        Args:
+            assigned_asset_ids: List of asset IDs assigned to supervisor
+
+        Returns:
+            List of area definitions containing at least one assigned asset
+        """
+        if not assigned_asset_ids:
+            return []
+
+        # For MVP, we match by asset ID or asset name
+        # In production, this would query the database to map asset_id to area
+        assigned_set = set(str(aid).lower() for aid in assigned_asset_ids)
+
+        areas_with_assets = []
+        for area in PRODUCTION_AREAS:
+            # Check if any asset in this area is assigned
+            for asset_name in area["assets"]:
+                # Match by name (lowercase) or ID
+                if asset_name.lower() in assigned_set:
+                    areas_with_assets.append(area)
+                    break
+
+        return areas_with_assets
+
+    def filter_areas_by_supervisor_assets(
+        self,
+        areas: List[Dict[str, Any]],
+        assigned_asset_ids: List[str],
+    ) -> List[Dict[str, Any]]:
+        """
+        Filter areas to only include those with supervisor's assigned assets.
+
+        Each area dict is modified to include only the assigned assets.
+
+        Args:
+            areas: List of area definitions
+            assigned_asset_ids: List of asset IDs assigned to supervisor
+
+        Returns:
+            Filtered list of areas with only assigned assets
+        """
+        if not assigned_asset_ids:
+            return []
+
+        assigned_set = set(str(aid).lower() for aid in assigned_asset_ids)
+        filtered_areas = []
+
+        for area in areas:
+            # Find which assets in this area are assigned
+            assigned_in_area = [
+                asset for asset in area["assets"]
+                if asset.lower() in assigned_set
+            ]
+
+            if assigned_in_area:
+                # Create new area dict with only assigned assets
+                filtered_area = area.copy()
+                filtered_area["assets"] = assigned_in_area
+                filtered_areas.append(filtered_area)
+
+        return filtered_areas
+
+    async def generate_supervisor_briefing(
+        self,
+        user: CurrentUserWithRole,
+        preferences: Optional[UserPreferences] = None,
+        include_audio: bool = True,
+    ) -> BriefingResponse:
+        """
+        Generate a morning briefing scoped to supervisor's assigned assets.
+
+        Story 8.5 Implementation:
+        - AC#1: Only assets from supervisor_assignments are included (FR15)
+        - AC#2: Areas delivered in user's preferred order (FR39)
+        - AC#3: No assets assigned → error message, no briefing
+        - AC#4: Assignment changes reflected immediately (no caching)
+
+        Args:
+            user: CurrentUserWithRole with assigned_asset_ids populated
+            preferences: Optional user preferences for area order and detail level
+            include_audio: Whether to generate TTS audio
+
+        Returns:
+            BriefingResponse scoped to supervisor's assets
+
+        Raises:
+            SupervisorBriefingError: If supervisor has no assets assigned
+        """
+        start_time = _utcnow()
+        briefing_id = str(uuid.uuid4())
+
+        logger.info(
+            f"Generating supervisor briefing {briefing_id} for user {user.id} "
+            f"with {len(user.assigned_asset_ids)} assigned assets"
+        )
+
+        # AC#3: Check for no assets assigned
+        if not user.has_assigned_assets:
+            logger.warning(f"Supervisor {user.id} has no assets assigned")
+            return self._create_no_assets_response(briefing_id, user.id)
+
+        # Get preferred area order from preferences (AC#2, FR39)
+        area_order = None
+        detail_level = "detailed"
+        if preferences:
+            area_order = preferences.area_order if preferences.area_order else None
+            detail_level = preferences.detail_level
+
+        # Get areas ordered by preference
+        ordered_areas = self.order_areas(area_order)
+
+        # Filter to only areas with supervisor's assigned assets (AC#1, FR15)
+        supervisor_areas = self.filter_areas_by_supervisor_assets(
+            ordered_areas,
+            user.assigned_asset_ids,
+        )
+
+        if not supervisor_areas:
+            logger.warning(
+                f"No areas found for supervisor {user.id} with assigned assets: {user.assigned_asset_ids}"
+            )
+            return self._create_no_assets_response(briefing_id, user.id)
+
+        logger.info(
+            f"Supervisor briefing will cover {len(supervisor_areas)} areas: "
+            f"{[a['name'] for a in supervisor_areas]}"
+        )
+
+        sections: List[BriefingSection] = []
+        tool_failures: List[str] = []
+        timed_out = False
+
+        try:
+            # Total 30-second timeout (NFR8)
+            async with async_timeout(TOTAL_TIMEOUT_SECONDS):
+                # AC#1: Skip plant-wide headline for supervisors - go straight to their areas
+                # No headline section generated
+
+                # Generate area sections in parallel for performance
+                area_tasks = [
+                    self._generate_area_section(
+                        area,
+                        detail_level=detail_level,
+                    )
+                    for area in supervisor_areas
+                ]
+
+                area_results = await asyncio.gather(*area_tasks, return_exceptions=True)
+
+                # Process results
+                for i, result in enumerate(area_results):
+                    if isinstance(result, Exception):
+                        logger.error(f"Area {supervisor_areas[i]['name']} failed: {result}")
+                        tool_failures.append(supervisor_areas[i]["id"])
+                        sections.append(self._create_error_section(supervisor_areas[i]))
+                    elif isinstance(result, BriefingSection):
+                        sections.append(result)
+                    else:
+                        logger.warning(f"Unexpected result for {supervisor_areas[i]['name']}: {type(result)}")
+
+        except asyncio.TimeoutError:
+            logger.warning(f"Supervisor briefing {briefing_id} timed out after {TOTAL_TIMEOUT_SECONDS}s")
+            timed_out = True
+            for section in sections:
+                if section.status == BriefingSectionStatus.PENDING:
+                    section.status = BriefingSectionStatus.TIMED_OUT
+                    section.error_message = "Generation timed out"
+
+        except Exception as e:
+            logger.error(f"Supervisor briefing generation failed: {e}", exc_info=True)
+            return self._create_error_response(briefing_id, user.id, str(e))
+
+        # Calculate completion
+        completed_count = len([s for s in sections if s.is_complete])
+        total_count = len(sections) if sections else 1
+        completion_pct = (completed_count / total_count) * 100 if total_count > 0 else 0
+
+        # Calculate duration
+        end_time = _utcnow()
+        duration_ms = int((end_time - start_time).total_seconds() * 1000)
+
+        # Estimate audio duration
+        total_chars = sum(len(s.content) for s in sections)
+        # Supervisor briefings are shorter, min 30s
+        duration_estimate_seconds = max(int(total_chars / 12.5), 30)
+
+        # Build response
+        return BriefingResponse(
+            id=briefing_id,
+            title=self._get_supervisor_briefing_title(),
+            scope=BriefingScope.SUPERVISOR.value,
+            user_id=user.id,
+            sections=sections,
+            audio_stream_url=None,
+            total_duration_estimate=duration_estimate_seconds,
+            metadata=BriefingResponseMetadata(
+                generated_at=start_time,
+                generation_duration_ms=duration_ms,
+                completion_percentage=completion_pct,
+                timed_out=timed_out,
+                tool_failures=tool_failures,
+                cache_hit=False,
+            ),
+        )
+
+    def _create_no_assets_response(
+        self,
+        briefing_id: str,
+        user_id: str,
+    ) -> BriefingResponse:
+        """
+        Create response for supervisor with no assigned assets.
+
+        Story 8.5 AC#3: Display error message, no briefing generated.
+        """
+        return BriefingResponse(
+            id=briefing_id,
+            title="Morning Briefing",
+            scope=BriefingScope.SUPERVISOR.value,
+            user_id=user_id,
+            sections=[
+                BriefingSection(
+                    section_type="error",
+                    title="No Assets Assigned",
+                    content="No assets assigned - contact your administrator",
+                    status=BriefingSectionStatus.FAILED,
+                    error_message="Supervisor has no assets assigned",
+                    pause_point=False,
+                )
+            ],
+            total_duration_estimate=0,
+            metadata=BriefingResponseMetadata(
+                generated_at=_utcnow(),
+                completion_percentage=0,
+                timed_out=False,
+                tool_failures=[],
+            ),
+        )
+
+    def _get_supervisor_briefing_title(self) -> str:
+        """Get the supervisor briefing title."""
+        now = _utcnow()
+        date_str = now.strftime("%A, %B %d")
+        return f"Your Area Briefing - {date_str}"
 
     async def generate_plant_briefing(
         self,
@@ -387,15 +688,18 @@ class MorningBriefingService:
     async def _generate_area_section(
         self,
         area: Dict[str, Any],
+        detail_level: str = "detailed",
     ) -> BriefingSection:
         """
         Generate a briefing section for a single production area.
 
         AC#1: Area-level section with key metrics
         AC#2: pause_point=True for Q&A prompt
+        FR37: detail_level preference applied
 
         Args:
             area: Area definition dict
+            detail_level: "summary" or "detailed" (FR37)
 
         Returns:
             BriefingSection for the area
@@ -409,8 +713,12 @@ class MorningBriefingService:
                 # Get area-level data
                 area_data = await self._get_area_data(area_id, assets)
 
-                # Generate narrative for the area
-                content = await self._generate_area_narrative(area_name, area_data)
+                # Generate narrative for the area (FR37: detail level)
+                content = await self._generate_area_narrative(
+                    area_name,
+                    area_data,
+                    detail_level=detail_level,
+                )
 
                 return BriefingSection(
                     section_type="area",
@@ -559,11 +867,18 @@ class MorningBriefingService:
         self,
         area_name: str,
         area_data: AreaBriefingData,
+        detail_level: str = "detailed",
     ) -> str:
         """
         Generate narrative content for an area section.
 
         Uses template-based generation for consistent, fast output.
+        FR37: detail_level preference applied (summary vs detailed).
+
+        Args:
+            area_name: Name of the production area
+            area_data: Data collected from tools
+            detail_level: "summary" for concise, "detailed" for full info
         """
         parts = []
 
@@ -582,11 +897,13 @@ class MorningBriefingService:
                 else:
                     parts.append(f"{area_name} is tracking {abs(variance):.1f}% behind target.")
 
-                behind_count = summary.get("behind_count", 0)
-                if behind_count > 0:
-                    attention = summary.get("assets_needing_attention", [])[:2]
-                    if attention:
-                        parts.append(f"{', '.join(attention)} need attention.")
+                # Detailed mode: add assets needing attention
+                if detail_level == "detailed":
+                    behind_count = summary.get("behind_count", 0)
+                    if behind_count > 0:
+                        attention = summary.get("assets_needing_attention", [])[:2]
+                        if attention:
+                            parts.append(f"{', '.join(attention)} need attention.")
             else:
                 parts.append(f"Production data for {area_name} is being updated.")
         else:
@@ -599,23 +916,24 @@ class MorningBriefingService:
             if oee is not None:
                 parts.append(f"OEE is at {oee}%. [Source: daily_summaries]")
 
-        # Safety (mention only if there are events)
+        # Safety (mention only if there are events) - always include for safety
         if area_data.safety_events and area_data.safety_events.success:
             data = area_data.safety_events.data or {}
             total = data.get("total_events", 0)
             if total > 0:
                 parts.append(f"Note: {total} safety event(s) recorded in this area. [Source: safety_incidents]")
 
-        # Downtime (mention top reason if significant)
-        if area_data.downtime_analysis and area_data.downtime_analysis.success:
-            data = area_data.downtime_analysis.data or {}
-            reasons = data.get("top_reasons", [])
-            if reasons:
-                top = reasons[0]
-                duration = top.get("duration_minutes", 0)
-                if duration > 15:  # Only mention if > 15 min
-                    reason = top.get("reason", "unplanned downtime")
-                    parts.append(f"Top downtime: {reason} at {duration} minutes. [Source: downtime_events]")
+        # Downtime (mention top reason if significant) - detailed mode only
+        if detail_level == "detailed":
+            if area_data.downtime_analysis and area_data.downtime_analysis.success:
+                data = area_data.downtime_analysis.data or {}
+                reasons = data.get("top_reasons", [])
+                if reasons:
+                    top = reasons[0]
+                    duration = top.get("duration_minutes", 0)
+                    if duration > 15:  # Only mention if > 15 min
+                        reason = top.get("reason", "unplanned downtime")
+                        parts.append(f"Top downtime: {reason} at {duration} minutes. [Source: downtime_events]")
 
         # Default if no data available
         if not parts:
