@@ -367,3 +367,131 @@ class EODRequest(BaseModel):
         description="Date for EOD summary (ISO format). Defaults to today."
     )
     include_audio: bool = Field(True, description="Generate TTS audio")
+
+
+# =============================================================================
+# Morning vs Actual Comparison Models (Story 9.11)
+# =============================================================================
+
+
+class ConcernOutcome(str, Enum):
+    """
+    Outcome classification for a morning concern (Story 9.11 AC#2).
+
+    Indicates how a concern flagged in the morning briefing
+    materialized (or didn't) during the day.
+    """
+    MATERIALIZED = "materialized"  # Issue occurred as predicted
+    AVERTED = "averted"            # Issue was prevented/resolved
+    ESCALATED = "escalated"        # Worse than predicted
+    UNEXPECTED = "unexpected"      # New issue not predicted
+
+
+class ConcernComparison(BaseModel):
+    """
+    Comparison of a morning concern to its actual outcome (Story 9.11 AC#2).
+
+    Links a morning concern to what actually happened during the day.
+
+    Attributes:
+        concern_id: Unique identifier for the concern
+        asset_id: Optional asset ID the concern relates to
+        asset_name: Optional asset name for display
+        area: Optional area the concern relates to
+        issue_type: Type of issue (safety, downtime, quality, production)
+        morning_description: Description from morning briefing
+        morning_severity: Predicted severity (high/medium/low)
+        actual_description: What actually happened
+        outcome: Classification of the outcome
+        notes: Additional context on the comparison
+    """
+    concern_id: str = Field(..., description="Unique identifier for this concern")
+    asset_id: Optional[str] = Field(None, description="Asset ID if concern is asset-specific")
+    asset_name: Optional[str] = Field(None, description="Asset name for display")
+    area: Optional[str] = Field(None, description="Area if concern is area-level")
+    issue_type: str = Field(..., description="Type: safety/downtime/quality/production")
+    morning_description: str = Field(..., description="Description from morning briefing")
+    morning_severity: str = Field("medium", description="Predicted severity: high/medium/low")
+    actual_description: Optional[str] = Field(None, description="What actually happened")
+    outcome: ConcernOutcome = Field(..., description="Outcome classification")
+    notes: Optional[str] = Field(None, description="Additional comparison notes")
+
+
+class AccuracyMetrics(BaseModel):
+    """
+    Prediction accuracy metrics for morning vs actual comparison (Story 9.11 AC#3).
+
+    Quantifies how accurate the morning predictions were.
+
+    Attributes:
+        accuracy_percentage: Overall prediction accuracy (0-100)
+        total_predictions: Total number of concerns flagged in morning
+        correct_predictions: Predictions that materialized or were correctly averted
+        false_positives: Flagged but didn't occur (predicted issues that never happened)
+        misses: Occurred but not flagged (issues that happened but weren't predicted)
+        averted_count: Issues that were successfully prevented
+        escalated_count: Issues that were worse than predicted
+    """
+    accuracy_percentage: float = Field(0.0, description="Prediction accuracy (0-100)")
+    total_predictions: int = Field(0, description="Total morning concerns flagged")
+    correct_predictions: int = Field(0, description="Predictions that materialized or averted")
+    false_positives: int = Field(0, description="Predicted but didn't occur")
+    misses: int = Field(0, description="Occurred but not predicted")
+    averted_count: int = Field(0, description="Issues successfully prevented")
+    escalated_count: int = Field(0, description="Issues worse than predicted")
+
+
+class EODComparisonResult(BaseModel):
+    """
+    Complete comparison result for morning vs actual (Story 9.11 AC#1-3).
+
+    Aggregates all concern comparisons and accuracy metrics for
+    the end-of-day summary.
+
+    Attributes:
+        morning_briefing_id: ID of the morning briefing being compared
+        morning_generated_at: When the morning briefing was generated
+        eod_summary_id: ID of the EOD summary this comparison belongs to
+        comparisons: List of individual concern comparisons
+        accuracy_metrics: Calculated accuracy metrics
+        unexpected_issues: Issues that occurred but weren't predicted
+        comparison_summary: Natural language summary of the comparison
+        has_morning_briefing: Whether a morning briefing existed
+    """
+    morning_briefing_id: Optional[str] = Field(
+        None,
+        description="ID of morning briefing (null if no briefing)"
+    )
+    morning_generated_at: Optional[datetime] = Field(
+        None,
+        description="When morning briefing was generated"
+    )
+    eod_summary_id: Optional[str] = Field(
+        None,
+        description="ID of the EOD summary"
+    )
+    comparisons: List[ConcernComparison] = Field(
+        default_factory=list,
+        description="Individual concern comparisons"
+    )
+    accuracy_metrics: AccuracyMetrics = Field(
+        default_factory=AccuracyMetrics,
+        description="Calculated accuracy metrics"
+    )
+    unexpected_issues: List[str] = Field(
+        default_factory=list,
+        description="Issues that occurred but weren't predicted"
+    )
+    comparison_summary: str = Field(
+        "",
+        description="Natural language comparison summary"
+    )
+    has_morning_briefing: bool = Field(
+        False,
+        description="Whether a morning briefing existed for comparison"
+    )
+
+    @property
+    def prediction_accuracy(self) -> float:
+        """Get the prediction accuracy percentage."""
+        return self.accuracy_metrics.accuracy_percentage
