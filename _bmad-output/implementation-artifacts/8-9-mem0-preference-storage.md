@@ -1,6 +1,6 @@
 # Story 8.9: Mem0 Preference Storage
 
-Status: ready-for-dev
+Status: Done
 
 ## Story
 
@@ -22,44 +22,44 @@ So that **preferences are queryable AND available for AI context**.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create Supabase `user_preferences` table (AC: #1, #3)
-  - [ ] 1.1 Create migration file `20260116_001_user_preferences.sql`
-  - [ ] 1.2 Define schema: user_id (PK, FK auth.users), role, area_order[], detail_level, voice_enabled, updated_at
-  - [ ] 1.3 Add RLS policies: users can only read/write their own preferences
-  - [ ] 1.4 Add updated_at trigger using existing `update_updated_at_column()` function
+- [x] Task 1: Create Supabase `user_preferences` table (AC: #1, #3)
+  - [x] 1.1 Create migration file `20260116_001_user_preferences.sql` - Already exists from Story 8.8
+  - [x] 1.2 Define schema: user_id (PK, FK auth.users), role, area_order[], detail_level, voice_enabled, updated_at
+  - [x] 1.3 Add RLS policies: users can only read/write their own preferences
+  - [x] 1.4 Add updated_at trigger using existing `update_updated_at_column()` function
 
-- [ ] Task 2: Create preference Pydantic models (AC: #1, #2)
-  - [ ] 2.1 Create `apps/api/app/models/preferences.py`
-  - [ ] 2.2 Define `UserPreferences` schema with validation
-  - [ ] 2.3 Define `PreferenceUpdate` schema for partial updates
-  - [ ] 2.4 Define `Mem0PreferenceContext` schema for AI-ready format
+- [x] Task 2: Create preference Pydantic models (AC: #1, #2)
+  - [x] 2.1 Create `apps/api/app/models/preferences.py` - Extended existing file
+  - [x] 2.2 Define `UserPreferences` schema with validation
+  - [x] 2.3 Define `PreferenceUpdate` schema for partial updates
+  - [x] 2.4 Define `Mem0PreferenceContext` schema for AI-ready format
 
-- [ ] Task 3: Implement PreferenceService CRUD (AC: #1, #3)
-  - [ ] 3.1 Create `apps/api/app/services/preferences/__init__.py`
-  - [ ] 3.2 Create `apps/api/app/services/preferences/service.py`
-  - [ ] 3.3 Implement `get_preferences(user_id)` - returns defaults if not found
-  - [ ] 3.4 Implement `save_preferences(user_id, preferences)` - upsert pattern
-  - [ ] 3.5 Implement `update_preferences(user_id, partial)` - merge updates
+- [x] Task 3: Implement PreferenceService CRUD (AC: #1, #3)
+  - [x] 3.1 Create `apps/api/app/services/preferences/__init__.py`
+  - [x] 3.2 Create `apps/api/app/services/preferences/service.py`
+  - [x] 3.3 Implement `get_preferences(user_id)` - returns defaults if not found
+  - [x] 3.4 Implement `save_preferences(user_id, preferences)` - upsert pattern
+  - [x] 3.5 Implement `update_preferences(user_id, partial)` - merge updates
 
-- [ ] Task 4: Implement Mem0 sync logic (AC: #2, #4)
-  - [ ] 4.1 Create `apps/api/app/services/preferences/sync.py`
-  - [ ] 4.2 Implement `sync_preferences_to_mem0(user_id, preferences)` - creates semantic context
-  - [ ] 4.3 Implement semantic formatting: convert structured prefs to natural language
-  - [ ] 4.4 Implement retry logic for Mem0 failures with exponential backoff
-  - [ ] 4.5 Implement version history via Mem0 metadata timestamps
+- [x] Task 4: Implement Mem0 sync logic (AC: #2, #4)
+  - [x] 4.1 Create `apps/api/app/services/preferences/sync.py`
+  - [x] 4.2 Implement `sync_preferences_to_mem0(user_id, preferences)` - creates semantic context
+  - [x] 4.3 Implement semantic formatting: convert structured prefs to natural language
+  - [x] 4.4 Implement retry logic for Mem0 failures with exponential backoff
+  - [x] 4.5 Implement version history via Mem0 metadata timestamps
 
-- [ ] Task 5: Create Preference API endpoints (AC: #1, #3, #5)
-  - [ ] 5.1 Create `apps/api/app/api/preferences.py`
-  - [ ] 5.2 Implement `GET /api/v1/preferences` - get current user preferences
-  - [ ] 5.3 Implement `PUT /api/v1/preferences` - save full preferences
-  - [ ] 5.4 Implement `PATCH /api/v1/preferences` - partial update
-  - [ ] 5.5 Wire sync_to_mem0 as background task after Supabase write
+- [x] Task 5: Create Preference API endpoints (AC: #1, #3, #5)
+  - [x] 5.1 Create `apps/api/app/api/preferences.py` - Extended existing file
+  - [x] 5.2 Implement `GET /api/v1/preferences` - get current user preferences
+  - [x] 5.3 Implement `PUT /api/v1/preferences` - save full preferences
+  - [x] 5.4 Implement `PATCH /api/v1/preferences` - partial update
+  - [x] 5.5 Wire sync_to_mem0 as background task after Supabase write
 
-- [ ] Task 6: Write tests (All AC)
-  - [ ] 6.1 Create `apps/api/tests/services/preferences/test_service.py`
-  - [ ] 6.2 Create `apps/api/tests/services/preferences/test_sync.py`
-  - [ ] 6.3 Create `apps/api/tests/api/test_preferences.py`
-  - [ ] 6.4 Test graceful degradation when Mem0 unavailable
+- [x] Task 6: Write tests (All AC)
+  - [x] 6.1 Create `apps/api/tests/services/preferences/test_service.py`
+  - [x] 6.2 Create `apps/api/tests/services/preferences/test_sync.py`
+  - [x] 6.3 Create `apps/api/tests/test_preferences_api.py`
+  - [x] 6.4 Test graceful degradation when Mem0 unavailable
 
 ## Dev Notes
 
@@ -234,11 +234,91 @@ DEFAULT_PREFERENCES = {
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Debug Log References
 
+N/A
+
 ### Completion Notes List
 
+**Implementation Summary:**
+Implemented dual storage for user preferences with Supabase as primary storage and Mem0 for AI context enrichment. The implementation follows a fire-and-forget pattern where Supabase writes are synchronous and Mem0 sync happens in the background via FastAPI BackgroundTasks.
+
+**Key Implementation Decisions:**
+
+1. **Extended existing files:** Rather than creating new files from scratch, extended the existing `preferences.py` model and API files that were created in Story 8.8. This maintains consistency and avoids code duplication.
+
+2. **Semantic Formatting:** Created `Mem0PreferenceContext` model that transforms structured preferences into natural language descriptions suitable for AI context. Examples:
+   - `role: "plant_manager"` → "User is a Plant Manager with full visibility across all plant areas and assets"
+   - `area_order: ["Grinding", "Packing"]` → "User prefers to hear about Grinding first, followed by Packing in their briefings"
+
+3. **Retry Logic:** Implemented exponential backoff (1s, 2s, 4s) with max 3 retries for Mem0 sync failures.
+
+4. **Graceful Degradation:** Mem0 failures never block Supabase operations. The `sync_preferences_to_mem0` function catches all exceptions and returns False rather than raising.
+
+5. **Version History:** Mem0 metadata includes `preference_version` timestamp to maintain historical context per NFR26.
+
+6. **PreferenceService:** Created a service abstraction layer with singleton pattern for cleaner architecture, though the API endpoints still use direct Supabase client for consistency with existing patterns.
+
+**Tests Added:**
+- 14 service tests (test_service.py)
+- 24 sync tests (test_sync.py)
+- 13 API tests (test_preferences_api.py)
+- Total: 51 tests, all passing
+
+**Test Results:**
+```
+51 passed, 24 warnings in 0.13s
+```
+
+### Acceptance Criteria Status
+
+| AC | Status | Implementation Reference |
+|----|--------|-------------------------|
+| AC#1 | ✅ PASS | `apps/api/app/api/preferences.py:103-197` - POST/PUT endpoints write to Supabase immediately, then trigger background Mem0 sync |
+| AC#2 | ✅ PASS | `apps/api/app/models/preferences.py:167-254` - `Mem0PreferenceContext.from_preferences()` creates semantic descriptions |
+| AC#3 | ✅ PASS | `apps/api/app/api/preferences.py:200-269` - PUT endpoint updates Supabase immediately, adds Mem0 sync to background tasks |
+| AC#4 | ✅ PASS | `apps/api/app/services/preferences/sync.py:99-140` - Metadata includes `preference_version` timestamp for version history |
+| AC#5 | ✅ PASS | `apps/api/app/services/preferences/sync.py:64-98` - Retry logic with exponential backoff, returns False on failure |
+
 ### File List
+
+**Created Files:**
+- `apps/api/app/services/preferences/__init__.py` - Service module exports
+- `apps/api/app/services/preferences/service.py` - PreferenceService CRUD operations
+- `apps/api/app/services/preferences/sync.py` - Mem0 sync logic with retry
+- `apps/api/tests/services/preferences/__init__.py` - Test module init
+- `apps/api/tests/services/preferences/test_service.py` - PreferenceService unit tests
+- `apps/api/tests/services/preferences/test_sync.py` - Mem0 sync unit tests
+- `apps/api/tests/test_preferences_api.py` - API endpoint integration tests
+
+**Modified Files:**
+- `apps/api/app/models/preferences.py` - Added `Mem0PreferenceContext` schema
+- `apps/api/app/api/preferences.py` - Added BackgroundTasks for Mem0 sync, added PATCH endpoint
+
+## Code Review Record
+
+**Reviewer**: Code Review Agent
+**Date**: 2026-01-17
+
+### Issues Found
+| # | Description | Severity | Status |
+|---|-------------|----------|--------|
+| 1 | `datetime.utcnow()` is deprecated (Python 3.12+). Used in `sync.py:60` and `models/preferences.py:251` while codebase uses `datetime.now(timezone.utc)` elsewhere. | LOW | Document only |
+| 2 | API tests mock `sync_preferences_to_mem0` but don't explicitly verify it was called with correct arguments via BackgroundTasks | LOW | Document only |
+| 3 | PreferenceService class created but not used in API endpoints (intentional per dev notes for consistency) | LOW | Document only |
+
+**Totals**: 0 HIGH, 0 MEDIUM, 3 LOW
+
+### Fixes Applied
+None required - all issues are LOW severity.
+
+### Remaining Issues
+- Consider migrating `datetime.utcnow()` to `datetime.now(timezone.utc)` for consistency in future cleanup
+- Consider more explicit BackgroundTasks testing in integration tests
+- PreferenceService provides useful abstraction for future use cases
+
+### Final Status
+**Approved** - All acceptance criteria verified and passing. 51 tests pass. No HIGH or MEDIUM severity issues found.
 

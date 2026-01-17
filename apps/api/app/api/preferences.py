@@ -1,11 +1,17 @@
 """
-User Preferences API Endpoints (Story 8.8)
+User Preferences API Endpoints (Story 8.8, 8.9)
 
-REST endpoints for user preferences management.
+REST endpoints for user preferences management with Mem0 sync.
 
+Story 8.8:
 AC#3: GET /api/v1/preferences - Get current user preferences
       POST /api/v1/preferences - Create preferences (onboarding)
 AC#5: PUT /api/v1/preferences - Update preferences (settings page)
+
+Story 8.9:
+AC#1: Preferences written to user_preferences table immediately, synced to Mem0 within 5 seconds
+AC#3: Supabase record updated immediately, Mem0 context reflects change
+AC#5: Mem0 sync failures don't block Supabase saves (graceful degradation)
 
 References:
 - [Source: architecture/voice-briefing.md#User Preferences Architecture]
@@ -16,7 +22,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, BackgroundTasks
 from supabase import Client, create_client
 
 from app.core.security import get_current_user
@@ -28,6 +34,7 @@ from app.models.preferences import (
     UserPreferencesResponse,
     DEFAULT_AREA_ORDER,
 )
+from app.services.preferences.sync import sync_preferences_to_mem0
 
 logger = logging.getLogger(__name__)
 
@@ -96,13 +103,16 @@ async def get_preferences(
 @router.post("", response_model=UserPreferencesResponse, status_code=status.HTTP_201_CREATED)
 async def create_preferences(
     request: CreateUserPreferencesRequest,
+    background_tasks: BackgroundTasks,
     current_user: CurrentUser = Depends(get_current_user),
     supabase: Client = Depends(get_supabase_client),
 ):
     """
     Create user preferences (onboarding completion).
 
-    AC#3: Store preferences in user_preferences table.
+    Story 8.8 AC#3: Store preferences in user_preferences table.
+    Story 8.9 AC#1: Sync to Mem0 within 5 seconds via background task.
+    Story 8.9 AC#5: Mem0 failures don't block Supabase saves.
     """
     logger.info(f"Creating preferences for user {current_user.id}")
 
@@ -133,7 +143,17 @@ async def create_preferences(
                     detail="Failed to update preferences",
                 )
 
-            return _format_preferences_response(result.data[0], current_user.id)
+            response = _format_preferences_response(result.data[0], current_user.id)
+
+            # Story 8.9: Fire-and-forget Mem0 sync (AC#1, AC#5)
+            background_tasks.add_task(
+                sync_preferences_to_mem0,
+                current_user.id,
+                response,
+                "Preferences updated via onboarding re-submission",
+            )
+
+            return response
 
         # Create new preferences
         insert_data = {
@@ -155,7 +175,17 @@ async def create_preferences(
                 detail="Failed to create preferences",
             )
 
-        return _format_preferences_response(result.data[0], current_user.id)
+        response = _format_preferences_response(result.data[0], current_user.id)
+
+        # Story 8.9: Fire-and-forget Mem0 sync (AC#1, AC#5)
+        background_tasks.add_task(
+            sync_preferences_to_mem0,
+            current_user.id,
+            response,
+            "Initial preferences set during onboarding",
+        )
+
+        return response
 
     except HTTPException:
         raise
@@ -170,13 +200,16 @@ async def create_preferences(
 @router.put("", response_model=UserPreferencesResponse)
 async def update_preferences(
     request: UpdateUserPreferencesRequest,
+    background_tasks: BackgroundTasks,
     current_user: CurrentUser = Depends(get_current_user),
     supabase: Client = Depends(get_supabase_client),
 ):
     """
     Update existing user preferences (settings page).
 
-    AC#5: All onboarding options available to edit.
+    Story 8.8 AC#5: All onboarding options available to edit.
+    Story 8.9 AC#3: Supabase updated immediately, Mem0 reflects change.
+    Story 8.9 AC#5: Mem0 failures don't block Supabase saves.
     """
     logger.info(f"Updating preferences for user {current_user.id}")
 
@@ -214,7 +247,17 @@ async def update_preferences(
                 detail="Failed to update preferences",
             )
 
-        return _format_preferences_response(result.data[0], current_user.id)
+        response = _format_preferences_response(result.data[0], current_user.id)
+
+        # Story 8.9: Fire-and-forget Mem0 sync (AC#3, AC#5)
+        background_tasks.add_task(
+            sync_preferences_to_mem0,
+            current_user.id,
+            response,
+            "Preferences updated via settings page",
+        )
+
+        return response
 
     except HTTPException:
         raise
@@ -224,3 +267,22 @@ async def update_preferences(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update preferences",
         )
+
+
+@router.patch("", response_model=UserPreferencesResponse)
+async def patch_preferences(
+    request: UpdateUserPreferencesRequest,
+    background_tasks: BackgroundTasks,
+    current_user: CurrentUser = Depends(get_current_user),
+    supabase: Client = Depends(get_supabase_client),
+):
+    """
+    Partially update user preferences (Story 8.9).
+
+    Story 8.9 AC#3: Supabase updated immediately, Mem0 reflects change.
+    Story 8.9 AC#5: Mem0 failures don't block Supabase saves.
+
+    This endpoint is an alias for PUT with the same behavior,
+    allowing semantic PATCH requests for partial updates.
+    """
+    return await update_preferences(request, background_tasks, current_user, supabase)
