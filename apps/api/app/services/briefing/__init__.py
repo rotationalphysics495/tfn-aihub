@@ -1,5 +1,5 @@
 """
-Briefing Services Package (Story 8.3, 8.6)
+Briefing Services Package (Story 8.3, 8.6, 9.2)
 
 Provides briefing synthesis and generation services.
 Orchestrates existing LangChain tools into coherent narratives.
@@ -8,6 +8,7 @@ Components:
 - BriefingService: Main orchestration service
 - NarrativeGenerator: LLM-powered narrative formatting
 - Voice formatters: Natural language formatting for numbers (Story 8.6)
+- HandoffSynthesisService: Shift handoff synthesis (Story 9.2)
 """
 
 from app.services.briefing.service import BriefingService, get_briefing_service
@@ -19,6 +20,10 @@ from app.services.briefing.formatters import (
     format_duration_for_voice,
     format_for_voice,
     detect_and_format,
+)
+from app.services.briefing.handoff import (
+    HandoffSynthesisService,
+    get_handoff_synthesis_service,
 )
 
 __all__ = [
@@ -33,4 +38,7 @@ __all__ = [
     "format_duration_for_voice",
     "format_for_voice",
     "detect_and_format",
+    # Handoff synthesis (Story 9.2)
+    "HandoffSynthesisService",
+    "get_handoff_synthesis_service",
 ]

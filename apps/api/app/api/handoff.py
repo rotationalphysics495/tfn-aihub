@@ -1,12 +1,17 @@
 """
-Handoff API Endpoints (Story 9.1)
+Handoff API Endpoints (Story 9.1, 9.2)
 
 REST endpoints for shift handoff creation and management.
 
+Story 9.1:
 AC#1: POST /api/v1/handoff/ - Create new shift handoff
 AC#2: GET /api/v1/handoff/ - List user's handoffs
 AC#3: GET /api/v1/handoff/{id} - Get handoff details
 AC#4: PATCH /api/v1/handoff/{id} - Update draft handoff
+
+Story 9.2:
+AC#1: GET /api/v1/handoff/synthesis - Synthesize shift data
+AC#2: POST /api/v1/handoff/{id}/synthesis - Generate and attach to handoff
 
 References:
 - [Source: architecture/voice-briefing.md#Shift-Handoff-Workflow]
@@ -33,8 +38,10 @@ from app.models.handoff import (
     SupervisorAsset,
     HandoffExistsResponse,
     HandoffCreationResponse,
+    HandoffSynthesisResponse,
 )
 from app.services.handoff import detect_current_shift, get_shift_time_range
+from app.services.briefing.handoff import get_handoff_synthesis_service
 from app.core.config import get_settings
 from app.core.security import get_current_user
 from app.models.user import CurrentUser
@@ -440,6 +447,52 @@ async def list_handoffs(
     )
 
 
+# ============================================================================
+# Synthesis Endpoints (Story 9.2)
+# NOTE: These MUST be defined BEFORE parameterized routes like /{handoff_id}
+# to avoid FastAPI matching "synthesis" as a UUID parameter.
+# ============================================================================
+
+
+@router.get("/synthesis", response_model=HandoffSynthesisResponse)
+async def synthesize_shift_data(
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Synthesize shift data for handoff (Story 9.2 AC#1).
+
+    Orchestrates Production Status, Downtime Analysis, Safety Events,
+    and Alert Check tools to generate a shift handoff summary.
+
+    Returns:
+        HandoffSynthesisResponse with narrative sections and citations
+
+    Features:
+    - AC#1: Tool Composition for Synthesis
+    - AC#2: Narrative Summary Structure (overview, issues, concerns, focus)
+    - AC#3: Graceful Degradation on Tool Failure
+    - AC#4: Progressive Loading (15-second timeout)
+    - AC#5: Supervisor Scope Filtering
+    - AC#6: Citation Compliance
+    - AC#7: Shift Time Range Detection
+    """
+    user_id = current_user.id
+    logger.info(f"Synthesizing shift data for user {user_id}")
+
+    # Get supervisor's assigned assets for filtering
+    assigned_assets = _get_supervisor_assignments(user_id)
+    asset_ids = [str(a.asset_id) for a in assigned_assets] if assigned_assets else None
+
+    # Get synthesis service and generate
+    service = get_handoff_synthesis_service()
+    synthesis = await service.synthesize_shift_data(
+        user_id=user_id,
+        supervisor_assignments=asset_ids,
+    )
+
+    return synthesis
+
+
 @router.get("/{handoff_id}", response_model=HandoffDetailResponse)
 async def get_handoff(
     handoff_id: UUID,
@@ -610,3 +663,70 @@ async def submit_handoff(
         created_at=handoff["created_at"],
         updated_at=handoff["updated_at"],
     )
+
+
+@router.post("/{handoff_id}/synthesis", response_model=HandoffSynthesisResponse)
+async def generate_handoff_synthesis(
+    handoff_id: UUID,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Generate and attach synthesis to an existing handoff (Story 9.2 AC#2).
+
+    Synthesizes shift data and stores the summary in the handoff record.
+    The synthesis is stored in the handoff's 'summary' field.
+
+    Returns:
+        HandoffSynthesisResponse with narrative sections and citations
+
+    Raises:
+        404: Handoff not found
+        403: User is not the owner of the handoff
+        400: Handoff is not in draft status
+    """
+    user_id = current_user.id
+    handoff = _get_handoff_by_id(str(handoff_id))
+
+    if not handoff:
+        raise HTTPException(status_code=404, detail="Handoff not found")
+
+    if handoff.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    if handoff.get("status") != HandoffStatus.DRAFT.value:
+        raise HTTPException(
+            status_code=400,
+            detail="Synthesis can only be generated for draft handoffs"
+        )
+
+    logger.info(f"Generating synthesis for handoff {handoff_id}")
+
+    # Get supervisor's assigned assets for filtering
+    assigned_assets = _get_supervisor_assignments(user_id)
+    asset_ids = [str(a.asset_id) for a in assigned_assets] if assigned_assets else None
+
+    # Get synthesis service and generate
+    service = get_handoff_synthesis_service()
+    synthesis = await service.synthesize_shift_data(
+        user_id=user_id,
+        supervisor_assignments=asset_ids,
+        handoff_id=str(handoff_id),
+    )
+
+    # Store summary in handoff
+    summary_text = _format_synthesis_for_storage(synthesis)
+    now = datetime.now(timezone.utc)
+    handoff["summary"] = summary_text
+    handoff["updated_at"] = now.isoformat()
+    _save_handoff(handoff)
+
+    return synthesis
+
+
+def _format_synthesis_for_storage(synthesis: HandoffSynthesisResponse) -> str:
+    """Format synthesis sections into a text summary for storage."""
+    parts = []
+    for section in synthesis.sections:
+        if section.content:
+            parts.append(f"## {section.title}\n{section.content}")
+    return "\n\n".join(parts)

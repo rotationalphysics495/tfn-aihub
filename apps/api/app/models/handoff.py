@@ -180,3 +180,250 @@ class NoAssetsError(BaseModel):
         description="Error message"
     )
     code: str = Field(default="NO_ASSETS_ASSIGNED", description="Error code")
+
+
+# =============================================================================
+# Handoff Synthesis Models (Story 9.2)
+# =============================================================================
+
+
+class HandoffSynthesisCitation(BaseModel):
+    """
+    Citation for handoff synthesis data (AC#6).
+
+    Each data point includes a citation with source table and timestamp.
+    Follows the established Citation model pattern.
+    """
+    source: str = Field(..., description="Data source name (e.g., 'supabase')")
+    table: Optional[str] = Field(None, description="Database table name")
+    timestamp: datetime = Field(
+        default_factory=_utcnow,
+        description="When data was retrieved"
+    )
+
+
+class HandoffSectionStatus(str, Enum):
+    """
+    Status of a handoff section (AC#3, AC#4).
+
+    Used to track completion state during synthesis.
+    """
+    PENDING = "pending"
+    COMPLETE = "complete"
+    PARTIAL = "partial"
+    FAILED = "failed"
+    LOADING = "loading"
+
+
+class HandoffSection(BaseModel):
+    """
+    A section of the handoff summary (AC#2).
+
+    Represents a logical segment of the handoff narrative.
+    """
+    section_type: str = Field(
+        ...,
+        description="Section type: overview/issues/concerns/focus"
+    )
+    title: str = Field(..., description="Section title")
+    content: str = Field(..., description="Narrative content for this section")
+    citations: List[HandoffSynthesisCitation] = Field(
+        default_factory=list,
+        description="Citations for data in this section"
+    )
+    status: HandoffSectionStatus = Field(
+        default=HandoffSectionStatus.PENDING,
+        description="Section completion status"
+    )
+    error_message: Optional[str] = Field(
+        None,
+        description="Error message if section failed to load"
+    )
+
+
+class HandoffSynthesisRequest(BaseModel):
+    """
+    Request for handoff synthesis (Task 2.1).
+
+    Used to initiate shift data synthesis for a handoff.
+    """
+    user_id: str = Field(..., description="User requesting synthesis")
+    handoff_id: Optional[str] = Field(
+        None,
+        description="Optional handoff ID to associate synthesis with"
+    )
+    supervisor_assignments: Optional[List[UUID]] = Field(
+        None,
+        description="Asset IDs to filter by (defaults to user's assignments)"
+    )
+
+
+class HandoffSynthesisMetadata(BaseModel):
+    """
+    Metadata for handoff synthesis response.
+
+    Tracks synthesis performance and completion status.
+    """
+    generated_at: datetime = Field(
+        default_factory=_utcnow,
+        description="When synthesis was generated"
+    )
+    generation_duration_ms: Optional[int] = Field(
+        None,
+        description="Total generation time in milliseconds"
+    )
+    completion_percentage: float = Field(
+        100.0,
+        description="Percentage of sections completed"
+    )
+    timed_out: bool = Field(
+        False,
+        description="Whether synthesis timed out (AC#4)"
+    )
+    tool_failures: List[str] = Field(
+        default_factory=list,
+        description="Names of tools that failed (AC#3)"
+    )
+    partial_result: bool = Field(
+        False,
+        description="True if showing partial results due to timeout"
+    )
+    background_loading: bool = Field(
+        False,
+        description="True if background still loading remaining sections"
+    )
+
+
+class HandoffSynthesisResponse(BaseModel):
+    """
+    Complete handoff synthesis response (Task 2.2).
+
+    Contains all sections of the handoff summary with citations.
+
+    AC#1: Tool Composition for Synthesis
+    AC#2: Narrative Summary Structure
+    AC#3: Graceful Degradation on Tool Failure
+    AC#4: Progressive Loading
+    AC#6: Citation Compliance
+    """
+    id: str = Field(..., description="Unique synthesis ID")
+    handoff_id: Optional[str] = Field(
+        None,
+        description="Associated handoff ID if created from handoff"
+    )
+    user_id: str = Field(..., description="User who requested synthesis")
+    shift_info: ShiftTimeRange = Field(
+        ...,
+        description="Shift time range for this synthesis"
+    )
+
+    # Narrative sections (AC#2)
+    sections: List[HandoffSection] = Field(
+        default_factory=list,
+        description="Narrative summary sections"
+    )
+
+    # All citations (AC#6)
+    citations: List[HandoffSynthesisCitation] = Field(
+        default_factory=list,
+        description="All citations from all sections"
+    )
+
+    # Summary fields for quick access
+    total_sections: int = Field(
+        default=4,
+        description="Expected number of sections"
+    )
+    completed_sections: int = Field(
+        default=0,
+        description="Number of completed sections"
+    )
+
+    # Metadata
+    metadata: HandoffSynthesisMetadata = Field(
+        default_factory=HandoffSynthesisMetadata,
+        description="Synthesis metadata"
+    )
+
+    @property
+    def is_complete(self) -> bool:
+        """Check if synthesis is fully complete."""
+        return self.completed_sections == self.total_sections
+
+    @property
+    def has_partial_data(self) -> bool:
+        """Check if synthesis has at least some data."""
+        return self.completed_sections > 0
+
+
+class HandoffToolResultData(BaseModel):
+    """
+    Aggregated data from a single tool execution (Task 2.4).
+
+    Used internally to track tool outputs during synthesis.
+    """
+    tool_name: str = Field(..., description="Name of the tool")
+    success: bool = Field(True, description="Whether tool execution succeeded")
+    data: Optional[dict] = Field(None, description="Tool output data")
+    citations: List[HandoffSynthesisCitation] = Field(
+        default_factory=list,
+        description="Citations from this tool"
+    )
+    error_message: Optional[str] = Field(
+        None,
+        description="Error message if failed"
+    )
+    execution_time_ms: Optional[int] = Field(
+        None,
+        description="Execution time in milliseconds"
+    )
+
+
+class HandoffSynthesisData(BaseModel):
+    """
+    Aggregated data from all tool executions (AC#1).
+
+    Internal structure used during handoff synthesis.
+    """
+    production_status: Optional[HandoffToolResultData] = None
+    downtime_analysis: Optional[HandoffToolResultData] = None
+    safety_events: Optional[HandoffToolResultData] = None
+    alert_check: Optional[HandoffToolResultData] = None
+
+    @property
+    def all_citations(self) -> List[HandoffSynthesisCitation]:
+        """Get all citations from all tools."""
+        citations = []
+        for field in [self.production_status, self.downtime_analysis,
+                      self.safety_events, self.alert_check]:
+            if field and field.citations:
+                citations.extend(field.citations)
+        return citations
+
+    @property
+    def successful_tools(self) -> List[str]:
+        """Get names of tools that succeeded."""
+        tools = []
+        for name, field in [
+            ("production_status", self.production_status),
+            ("downtime_analysis", self.downtime_analysis),
+            ("safety_events", self.safety_events),
+            ("alert_check", self.alert_check),
+        ]:
+            if field and field.success:
+                tools.append(name)
+        return tools
+
+    @property
+    def failed_tools(self) -> List[str]:
+        """Get names of tools that failed."""
+        tools = []
+        for name, field in [
+            ("production_status", self.production_status),
+            ("downtime_analysis", self.downtime_analysis),
+            ("safety_events", self.safety_events),
+            ("alert_check", self.alert_check),
+        ]:
+            if field and not field.success:
+                tools.append(name)
+        return tools

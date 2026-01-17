@@ -228,7 +228,7 @@ development_status:
   # Story 9.2: Shift Data Synthesis
   # - Auto-synthesize shift data into handoff summary
   # - Reuse LangChain tools for production/downtime/safety data
-  9-2-shift-data-synthesis: ready-for-dev
+  9-2-shift-data-synthesis: done
 
   # Story 9.3: Voice Note Attachment
   # - Add voice notes to handoff
