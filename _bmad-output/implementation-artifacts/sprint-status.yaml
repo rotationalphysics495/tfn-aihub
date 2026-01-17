@@ -238,12 +238,12 @@ development_status:
   # Story 9.4: Persistent Handoff Records
   # - Store handoffs securely in shift_handoffs table
   # - Immutable records, RLS policies
-  9-4-persistent-handoff-records: ready-for-dev
+  9-4-persistent-handoff-records: done
 
   # Story 9.5: Handoff Review UI
   # - Incoming supervisor views handoff
   # - Play voice notes, view summary
-  9-5-handoff-review-ui: ready-for-dev
+  9-5-handoff-review-ui: done
 
   # Story 9.6: Handoff Q&A
   # - Ask follow-up questions about handoff content

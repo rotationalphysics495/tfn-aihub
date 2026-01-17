@@ -235,7 +235,7 @@ export function VoiceNotePlayer({
             onClick={togglePlay}
             disabled={isLoading}
             className={cn(
-              'w-10 h-10 rounded-full flex items-center justify-center transition-colors',
+              'w-11 h-11 rounded-full flex items-center justify-center transition-colors', // AC#4: 44x44px touch target
               isLoading
                 ? 'bg-muted cursor-wait'
                 : 'bg-primary hover:bg-primary/90 text-white'
