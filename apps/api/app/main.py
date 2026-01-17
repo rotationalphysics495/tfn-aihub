@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import health, assets, summaries, actions, auth, pipelines, production, oee, downtime, safety, financial, live_pulse, memory, chat, asset_history, citations, agent, cache, voice, briefing, preferences
+from app.api import health, assets, summaries, actions, auth, pipelines, production, oee, downtime, safety, financial, live_pulse, memory, chat, asset_history, citations, agent, cache, voice, briefing, preferences, handoff
 from app.core.database import initialize_database, shutdown_database
 from app.services.scheduler import get_scheduler
 from app.services.pipelines.live_pulse import run_live_pulse_poll
@@ -89,6 +89,8 @@ app.include_router(voice.router, prefix="/api/v1/voice", tags=["Voice"])
 app.include_router(briefing.router, prefix="/api/v1/briefing", tags=["Briefing"])
 # Story 8.8: User Preferences API for onboarding and settings
 app.include_router(preferences.router, prefix="/api/v1/preferences", tags=["Preferences"])
+# Story 9.1: Shift Handoff API for handoff creation and management
+app.include_router(handoff.router, prefix="/api/v1/handoff", tags=["Handoff"])
 
 
 @app.get("/")

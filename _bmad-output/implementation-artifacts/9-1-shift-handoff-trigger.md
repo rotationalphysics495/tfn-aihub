@@ -1,6 +1,6 @@
 # Story 9.1: Shift Handoff Trigger
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -24,65 +24,65 @@ so that **I can transfer knowledge to the incoming shift**.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: Create ShiftHandoff Pydantic Schema** (AC: 1, 2)
-  - [ ] Create `apps/api/app/models/handoff.py` with ShiftHandoff schema
-  - [ ] Define fields: id, user_id, shift_date, shift_type, assets_covered, summary, text_notes, status, created_at
-  - [ ] Add ShiftType enum (morning, afternoon, night)
-  - [ ] Add HandoffStatus enum (draft, pending_acknowledgment, acknowledged)
-  - [ ] Export from `apps/api/app/models/__init__.py`
+- [x] **Task 1: Create ShiftHandoff Pydantic Schema** (AC: 1, 2)
+  - [x] Create `apps/api/app/models/handoff.py` with ShiftHandoff schema
+  - [x] Define fields: id, user_id, shift_date, shift_type, assets_covered, summary, text_notes, status, created_at
+  - [x] Add ShiftType enum (morning, afternoon, night)
+  - [x] Add HandoffStatus enum (draft, pending_acknowledgment, acknowledged)
+  - [x] Export from `apps/api/app/models/__init__.py`
 
-- [ ] **Task 2: Create Handoff API Endpoints** (AC: 1, 3, 4)
-  - [ ] Create `apps/api/app/api/handoff.py` with FastAPI router
-  - [ ] Implement `POST /api/v1/handoff/` - Create new handoff
-  - [ ] Implement `GET /api/v1/handoff/` - List user's handoffs
-  - [ ] Implement `GET /api/v1/handoff/{id}` - Get handoff details
-  - [ ] Implement `PATCH /api/v1/handoff/{id}` - Update draft handoff
-  - [ ] Add shift detection logic (based on current time vs standard shift windows)
-  - [ ] Add duplicate handoff check for same user + shift
+- [x] **Task 2: Create Handoff API Endpoints** (AC: 1, 3, 4)
+  - [x] Create `apps/api/app/api/handoff.py` with FastAPI router
+  - [x] Implement `POST /api/v1/handoff/` - Create new handoff
+  - [x] Implement `GET /api/v1/handoff/` - List user's handoffs
+  - [x] Implement `GET /api/v1/handoff/{id}` - Get handoff details
+  - [x] Implement `PATCH /api/v1/handoff/{id}` - Update draft handoff
+  - [x] Add shift detection logic (based on current time vs standard shift windows)
+  - [x] Add duplicate handoff check for same user + shift
 
-- [ ] **Task 3: Implement Supervisor Assignment Check** (AC: 3)
-  - [ ] Query `supervisor_assignments` table to check user's assigned assets
-  - [ ] Return 400 error with "No assets assigned" message if empty
-  - [ ] Pre-populate handoff with assigned asset IDs
+- [x] **Task 3: Implement Supervisor Assignment Check** (AC: 3)
+  - [x] Query `supervisor_assignments` table to check user's assigned assets
+  - [x] Return 400 error with "No assets assigned" message if empty
+  - [x] Pre-populate handoff with assigned asset IDs
 
-- [ ] **Task 4: Create Handoff Creator Component** (AC: 1, 2)
-  - [ ] Create `apps/web/src/components/handoff/HandoffCreator.tsx`
-  - [ ] Implement wizard-style flow with steps:
+- [x] **Task 4: Create Handoff Creator Component** (AC: 1, 2)
+  - [x] Create `apps/web/src/components/handoff/HandoffCreator.tsx`
+  - [x] Implement wizard-style flow with steps:
     - Step 1: Shift confirmation (auto-detected shift, assets list)
     - Step 2: Summary display (auto-generated + editable text notes)
     - Step 3: Voice notes (placeholder for Story 9.3)
     - Step 4: Confirmation
-  - [ ] Add loading states and error handling
+  - [x] Add loading states and error handling
 
-- [ ] **Task 5: Create Handoff Page** (AC: 1, 2)
-  - [ ] Create `apps/web/src/app/(main)/handoff/new/page.tsx`
-  - [ ] Integrate HandoffCreator component
-  - [ ] Add route protection (Supervisor role only)
-  - [ ] Handle redirect after successful creation
+- [x] **Task 5: Create Handoff Page** (AC: 1, 2)
+  - [x] Create `apps/web/src/app/(main)/handoff/new/page.tsx`
+  - [x] Integrate HandoffCreator component
+  - [x] Add route protection (Supervisor role only)
+  - [x] Handle redirect after successful creation
 
-- [ ] **Task 6: Add Shift Detection Utilities** (AC: 1)
-  - [ ] Create `apps/api/app/services/handoff/__init__.py`
-  - [ ] Create `apps/api/app/services/handoff/shift_detection.py`
-  - [ ] Implement shift window detection:
+- [x] **Task 6: Add Shift Detection Utilities** (AC: 1)
+  - [x] Create `apps/api/app/services/handoff/__init__.py`
+  - [x] Create `apps/api/app/services/handoff/shift_detection.py`
+  - [x] Implement shift window detection:
     - Morning: 6:00 AM - 2:00 PM
     - Afternoon: 2:00 PM - 10:00 PM
     - Night: 10:00 PM - 6:00 AM
-  - [ ] Calculate shift time range (last 8 hours from current time)
+  - [x] Calculate shift time range (last 8 hours from current time)
 
-- [ ] **Task 7: Handle Existing Handoff Scenario** (AC: 4)
-  - [ ] Check for existing handoff with same user_id + shift_date + shift_type
-  - [ ] If exists with status 'draft': redirect to edit
-  - [ ] If exists with status 'pending_acknowledgment': offer supplemental note option
-  - [ ] Return appropriate response/redirect
+- [x] **Task 7: Handle Existing Handoff Scenario** (AC: 4)
+  - [x] Check for existing handoff with same user_id + shift_date + shift_type
+  - [x] If exists with status 'draft': redirect to edit
+  - [x] If exists with status 'pending_acknowledgment': offer supplemental note option
+  - [x] Return appropriate response/redirect
 
-- [ ] **Task 8: Write Unit Tests** (AC: 1, 2, 3, 4)
-  - [ ] Create `apps/api/app/tests/api/test_handoff_endpoints.py`
-  - [ ] Test create handoff endpoint
-  - [ ] Test no assets assigned scenario
-  - [ ] Test duplicate handoff scenario
-  - [ ] Create `apps/web/src/components/handoff/__tests__/HandoffCreator.test.tsx`
-  - [ ] Test wizard step navigation
-  - [ ] Test form validation
+- [x] **Task 8: Write Unit Tests** (AC: 1, 2, 3, 4)
+  - [x] Create `apps/api/app/tests/api/test_handoff_endpoints.py`
+  - [x] Test create handoff endpoint
+  - [x] Test no assets assigned scenario
+  - [x] Test duplicate handoff scenario
+  - [x] Create `apps/web/src/components/handoff/__tests__/HandoffCreator.test.tsx`
+  - [x] Test wizard step navigation
+  - [x] Test form validation
 
 ## Dev Notes
 
@@ -238,16 +238,96 @@ Step 4: Confirmation
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Debug Log References
 
+- All 20 backend API tests passing
+- All 17 frontend component tests passing
+
 ### Completion Notes List
+
+1. **Backend Implementation:**
+   - Created `apps/api/app/models/handoff.py` with ShiftHandoff, ShiftType, HandoffStatus schemas
+   - Created `apps/api/app/api/handoff.py` with full CRUD endpoints for handoff management
+   - Created `apps/api/app/services/handoff/` module with shift detection utilities
+   - Integrated handoff router in `apps/api/app/main.py`
+   - In-memory handoff storage for MVP (Story 9.4 will add database persistence)
+
+2. **Frontend Implementation:**
+   - Created `apps/web/src/components/handoff/HandoffCreator.tsx` - wizard-style handoff creation flow
+   - Created `apps/web/src/app/(main)/handoff/new/page.tsx` - handoff creation page
+   - Voice notes step shows placeholder (Story 9.3 will implement)
+   - Summary auto-generation shows placeholder (Story 9.2 will implement)
+
+3. **Testing:**
+   - Created `apps/api/app/tests/api/test_handoff_endpoints.py` with 20 tests
+   - Created `apps/web/src/components/handoff/__tests__/HandoffCreator.test.tsx` with 17 tests
+
+4. **Acceptance Criteria Coverage:**
+   - AC#1: Handoff creation with pre-populated assets and auto-detected shift - COMPLETE
+   - AC#2: Handoff screen with summary, notes, confirmation - COMPLETE (placeholders for 9.2, 9.3)
+   - AC#3: No assets assigned error handling - COMPLETE
+   - AC#4: Duplicate handoff detection and handling - COMPLETE
 
 ### Change Log
 
 | Date | Change | Author |
 |------|--------|--------|
 | 2026-01-16 | Story created via create-story workflow | Claude Opus 4.5 |
+| 2026-01-17 | Implementation complete, all tests passing | Claude Opus 4.5 |
+| 2026-01-17 | Code review passed with fixes (7 issues fixed) | Claude Opus 4.5 |
+
+### Code Review Record
+
+**Review Date:** 2026-01-17
+**Reviewer:** Claude Opus 4.5 (code-review workflow)
+**Result:** PASSED WITH FIXES
+
+**Issues Found and Fixed:**
+
+1. **[HIGH] Security: Missing JWT Authentication on API Endpoints**
+   - All endpoints accepted `user_id` as query param, allowing impersonation
+   - Fixed: Added `get_current_user` dependency to all endpoints
+   - User ID now extracted from JWT token server-side
+
+2. **[HIGH] Security: Frontend Passed user_id in URL**
+   - Frontend was sending `user_id` in query string (visible in logs/history)
+   - Fixed: Removed user_id from frontend fetch URLs
+   - Backend now uses JWT token for user identification
+
+3. **[MEDIUM] Missing input validation on text_notes**
+   - Frontend enforced 2000 char limit, backend had none
+   - Fixed: Added `max_length=2000` to CreateHandoffRequest.text_notes
+
+4. **[MEDIUM] Test isolation - global state pollution**
+   - Tests shared global `_handoffs` dict without cleanup
+   - Fixed: Added `@pytest.fixture(autouse=True)` to reset state between tests
+
+5. **[MEDIUM] Improved mock data logging**
+   - Mock data was returned silently in production
+   - Fixed: Added logging when mock data is returned for transparency
+
+6. **[MEDIUM] Missing export in handoff service**
+   - `get_shift_for_handoff` not exported from `__init__.py`
+   - Fixed: Added to exports
+
+7. **[LOW] Updated tests to use authentication fixtures**
+   - All tests now use `authenticated_client` fixture
+   - Tests properly mock JWT authentication
 
 ### File List
+
+**New Files Created:**
+- `apps/api/app/models/handoff.py` - Pydantic schemas for handoff
+- `apps/api/app/api/handoff.py` - FastAPI router with CRUD endpoints
+- `apps/api/app/services/handoff/__init__.py` - Handoff services module init
+- `apps/api/app/services/handoff/shift_detection.py` - Shift detection utilities
+- `apps/api/app/tests/api/test_handoff_endpoints.py` - Backend API tests
+- `apps/web/src/components/handoff/HandoffCreator.tsx` - Handoff creation wizard
+- `apps/web/src/components/handoff/__tests__/HandoffCreator.test.tsx` - Frontend tests
+- `apps/web/src/app/(main)/handoff/new/page.tsx` - Handoff creation page
+
+**Modified Files:**
+- `apps/api/app/models/__init__.py` - Added handoff model exports
+- `apps/api/app/main.py` - Registered handoff router

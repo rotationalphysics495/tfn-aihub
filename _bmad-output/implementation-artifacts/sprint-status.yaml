@@ -223,7 +223,7 @@ development_status:
   # Story 9.1: Shift Handoff Trigger
   # - Initiate shift handoff process
   # - Pre-populate with assigned assets, auto-detect shift time
-  9-1-shift-handoff-trigger: ready-for-dev
+  9-1-shift-handoff-trigger: done
 
   # Story 9.2: Shift Data Synthesis
   # - Auto-synthesize shift data into handoff summary
