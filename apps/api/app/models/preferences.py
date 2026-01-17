@@ -67,6 +67,11 @@ class UserPreferencesBase(BaseModel):
         default=True,
         description="Whether voice briefings are enabled"
     )
+    # Story 9.8: Handoff notification preference (AC#4)
+    handoff_notifications_enabled: bool = Field(
+        default=True,
+        description="Whether push notifications are enabled for handoff acknowledgments"
+    )
 
     @field_validator('area_order')
     @classmethod
@@ -122,6 +127,11 @@ class UpdateUserPreferencesRequest(BaseModel):
     voice_enabled: Optional[bool] = Field(
         None,
         description="Whether voice briefings are enabled"
+    )
+    # Story 9.8: Handoff notification preference (AC#4)
+    handoff_notifications_enabled: Optional[bool] = Field(
+        None,
+        description="Whether push notifications are enabled for handoff acknowledgments"
     )
 
     @field_validator('area_order')

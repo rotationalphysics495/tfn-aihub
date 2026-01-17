@@ -1694,6 +1694,7 @@ from app.models.handoff import (
     HandoffAcknowledgment,
     AuditLogEntry,
 )
+from app.services.handoff.notifications import get_handoff_notification_service
 
 
 # In-memory acknowledgments store (for MVP - persistent storage via Supabase)
@@ -1925,6 +1926,24 @@ async def acknowledge_handoff(
     logger.info(
         f"Handoff {handoff_id} acknowledged by user {user_id}"
     )
+
+    # Story 9.8: Trigger notification to outgoing supervisor (Task 3.2)
+    # Notification is best-effort - don't fail the acknowledgment if it fails
+    try:
+        notification_service = get_handoff_notification_service()
+        outgoing_user_id = handoff.get("user_id")
+        if outgoing_user_id and outgoing_user_id != user_id:
+            await notification_service.notify_handoff_acknowledged(
+                handoff_id=str(handoff_id),
+                acknowledgment_id=str(ack_id),
+                outgoing_user_id=outgoing_user_id,
+                acknowledging_user_id=user_id,
+                acknowledging_user_name=getattr(current_user, "name", None),
+                acknowledged_at=now,
+                notes=notes,
+            )
+    except Exception as e:
+        logger.warning(f"Failed to send notification for handoff {handoff_id}: {e}")
 
     return AcknowledgeHandoffResponse(
         success=True,

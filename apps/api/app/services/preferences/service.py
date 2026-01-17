@@ -37,6 +37,7 @@ DEFAULT_PREFERENCES = {
     "detail_level": "summary",
     "voice_enabled": True,
     "onboarding_complete": False,
+    "handoff_notifications_enabled": True,  # Story 9.8: AC#4
 }
 
 
@@ -92,6 +93,7 @@ class PreferenceService:
             detail_level=data.get("detail_level", DEFAULT_PREFERENCES["detail_level"]),
             voice_enabled=data.get("voice_enabled", DEFAULT_PREFERENCES["voice_enabled"]),
             onboarding_complete=data.get("onboarding_complete", DEFAULT_PREFERENCES["onboarding_complete"]),
+            handoff_notifications_enabled=data.get("handoff_notifications_enabled", DEFAULT_PREFERENCES["handoff_notifications_enabled"]),
             updated_at=data.get("updated_at", datetime.now(timezone.utc).isoformat()),
         )
 
@@ -124,6 +126,7 @@ class PreferenceService:
                     detail_level=DEFAULT_PREFERENCES["detail_level"],
                     voice_enabled=DEFAULT_PREFERENCES["voice_enabled"],
                     onboarding_complete=DEFAULT_PREFERENCES["onboarding_complete"],
+                    handoff_notifications_enabled=DEFAULT_PREFERENCES["handoff_notifications_enabled"],
                     updated_at=datetime.now(timezone.utc).isoformat(),
                 )
 
@@ -169,6 +172,7 @@ class PreferenceService:
                 "detail_level": preferences.detail_level.value,
                 "voice_enabled": preferences.voice_enabled,
                 "onboarding_complete": preferences.onboarding_complete,
+                "handoff_notifications_enabled": preferences.handoff_notifications_enabled,
                 "updated_at": now,
             }
 
@@ -240,6 +244,9 @@ class PreferenceService:
                 update_data["detail_level"] = updates.detail_level.value
             if updates.voice_enabled is not None:
                 update_data["voice_enabled"] = updates.voice_enabled
+            # Story 9.8: Handle handoff notifications preference update
+            if updates.handoff_notifications_enabled is not None:
+                update_data["handoff_notifications_enabled"] = updates.handoff_notifications_enabled
 
             result = client.table("user_preferences").update(update_data).eq(
                 "user_id", user_id
