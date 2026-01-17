@@ -61,8 +61,8 @@ export interface QueueStatus {
 // ============================================================================
 
 const DB_NAME = 'tfn-aihub-offline';
-const DB_VERSION = 1;
-const STORE_NAME = 'sync_queue';
+const DB_VERSION = 2; // Must match handoff-cache.ts version for shared DB
+const STORE_NAME = 'pending_actions'; // Aligned with handoff-cache.ts schema
 const MAX_RETRY_ATTEMPTS = 3;
 
 // ============================================================================
@@ -190,11 +190,13 @@ export async function getPendingActions(): Promise<QueuedAction[]> {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([STORE_NAME], 'readonly');
     const store = transaction.objectStore(STORE_NAME);
-    const index = store.index('synced');
-    const request = index.getAll(IDBKeyRange.only(false));
+    const request = store.getAll();
 
     request.onsuccess = () => {
-      resolve(request.result || []);
+      // Filter for unsynced actions (boolean false check can't use index)
+      const allActions = request.result || [];
+      const pendingActions = allActions.filter((action) => action.synced === false);
+      resolve(pendingActions);
     };
 
     request.onerror = () => {
@@ -290,15 +292,17 @@ export async function removeSyncedActions(): Promise<number> {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([STORE_NAME], 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
-    const index = store.index('synced');
-    const request = index.openCursor(IDBKeyRange.only(true));
+    const request = store.openCursor();
     let deletedCount = 0;
 
     request.onsuccess = (event) => {
       const cursor = (event.target as IDBRequest).result;
       if (cursor) {
-        cursor.delete();
-        deletedCount++;
+        // Check if synced is true
+        if (cursor.value.synced === true) {
+          cursor.delete();
+          deletedCount++;
+        }
         cursor.continue();
       }
     };
@@ -508,4 +512,65 @@ export async function hasPendingAcknowledgment(
       action.action_type === 'acknowledge_handoff' &&
       action.payload.handoff_id === handoffId
   );
+}
+
+// ============================================================================
+// Background Sync API (Story 9.9, Task 4.6, 4.7)
+// ============================================================================
+
+/**
+ * Register for background sync (Task 4.6)
+ *
+ * This allows pending actions to be synced even if the user closes the tab.
+ */
+export async function registerBackgroundSync(): Promise<boolean> {
+  if (!('serviceWorker' in navigator)) {
+    console.warn('Service Workers not supported');
+    return false;
+  }
+
+  try {
+    const registration = await navigator.serviceWorker.ready;
+
+    // Check if sync is supported
+    if (!('sync' in registration)) {
+      console.warn('Background Sync API not supported');
+      return false;
+    }
+
+    await (registration as ServiceWorkerRegistration & { sync: SyncManager }).sync.register('sync-acknowledgments');
+    return true;
+  } catch (error) {
+    console.error('Failed to register background sync:', error);
+    return false;
+  }
+}
+
+/**
+ * Queue an acknowledgment and register background sync (Task 4.7)
+ *
+ * Includes retry logic via sync_attempts tracking in IndexedDB.
+ *
+ * @param handoffId - Handoff ID to acknowledge
+ * @param notes - Optional acknowledgment notes
+ */
+export async function queueAcknowledgmentWithSync(
+  handoffId: string,
+  notes?: string
+): Promise<QueuedAction> {
+  const action = await queueAcknowledgment(handoffId, notes);
+
+  // Register background sync for when connectivity returns
+  await registerBackgroundSync();
+
+  return action;
+}
+
+// ============================================================================
+// Type Augmentation for Background Sync API
+// ============================================================================
+
+interface SyncManager {
+  register(tag: string): Promise<void>;
+  getTags(): Promise<string[]>;
 }

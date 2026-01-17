@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { VoiceNotePlayer } from './VoiceNotePlayer';
 import { HandoffQA } from './HandoffQA';
 import { HandoffAcknowledge } from './HandoffAcknowledge';
+import { StaleCacheWarning } from '@/components/offline/StaleCacheWarning';
 import { cn } from '@/lib/utils';
 import type { Handoff, HandoffVoiceNote, HandoffStatus } from '@/types/handoff';
 
@@ -55,6 +56,14 @@ export interface HandoffViewerProps {
   voiceTranscript?: string;
   /** Whether voice input is active for Q&A */
   isVoiceActive?: boolean;
+  /** Whether cache is stale (Story 9.9 AC#4) */
+  isCacheStale?: boolean;
+  /** Cache age in milliseconds (Story 9.9 AC#4) */
+  cacheAgeMs?: number;
+  /** Called when user requests fresh data (Story 9.9 AC#4) */
+  onRefreshCache?: () => void;
+  /** Whether refreshing cache (Story 9.9 AC#4) */
+  isRefreshingCache?: boolean;
   /** Optional CSS class name */
   className?: string;
 }
@@ -254,6 +263,10 @@ export function HandoffViewer({
   onPushToTalk,
   voiceTranscript,
   isVoiceActive = false,
+  isCacheStale = false,
+  cacheAgeMs,
+  onRefreshCache,
+  isRefreshingCache = false,
   className,
 }: HandoffViewerProps) {
   // State for acknowledgment dialog (Story 9.7 AC#1)
@@ -281,6 +294,16 @@ export function HandoffViewer({
         className
       )}
     >
+      {/* Stale cache warning (Story 9.9 AC#4) */}
+      {isCacheStale && (
+        <StaleCacheWarning
+          isStale={isCacheStale}
+          cacheAgeMs={cacheAgeMs}
+          onRefresh={onRefreshCache}
+          isRefreshing={isRefreshingCache}
+        />
+      )}
+
       {/* Header section */}
       <Card>
         <CardContent className="pt-6">

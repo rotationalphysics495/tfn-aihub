@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { ThemeProvider } from '@/components/theme-provider'
 import { ChatSidebar } from '@/components/chat'
+import { ServiceWorkerProvider } from '@/components/offline/ServiceWorkerProvider'
 import './globals.css'
 
 /**
@@ -37,10 +38,12 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
-          {/* AI Chat Sidebar - accessible from anywhere in the application */}
-          {/* @see Story 4.3 - Chat Sidebar UI, AC #1 */}
-          <ChatSidebar />
+          <ServiceWorkerProvider>
+            {children}
+            {/* AI Chat Sidebar - accessible from anywhere in the application */}
+            {/* @see Story 4.3 - Chat Sidebar UI, AC #1 */}
+            <ChatSidebar />
+          </ServiceWorkerProvider>
         </ThemeProvider>
       </body>
     </html>
