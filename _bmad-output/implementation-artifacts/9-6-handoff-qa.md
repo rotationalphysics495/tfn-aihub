@@ -1,6 +1,6 @@
 # Story 9.6: Handoff Q&A
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -35,49 +35,49 @@ So that **I can clarify anything unclear before taking over**.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create HandoffQA Component (AC: #1, #4)
-  - [ ] 1.1 Create `apps/web/src/components/handoff/HandoffQA.tsx` component
-  - [ ] 1.2 Implement text input field with send button
-  - [ ] 1.3 Integrate push-to-talk button from Story 8.2 infrastructure
-  - [ ] 1.4 Display Q&A thread with proper scrolling and timestamps
-  - [ ] 1.5 Add loading states during AI processing
-  - [ ] 1.6 Show question attribution (who asked)
-  - [ ] 1.7 Create `apps/web/src/components/handoff/__tests__/HandoffQA.test.tsx`
+- [x] Task 1: Create HandoffQA Component (AC: #1, #4)
+  - [x] 1.1 Create `apps/web/src/components/handoff/HandoffQA.tsx` component
+  - [x] 1.2 Implement text input field with send button
+  - [x] 1.3 Integrate push-to-talk button from Story 8.2 infrastructure
+  - [x] 1.4 Display Q&A thread with proper scrolling and timestamps
+  - [x] 1.5 Add loading states during AI processing
+  - [x] 1.6 Show question attribution (who asked)
+  - [x] 1.7 Create `apps/web/src/components/handoff/__tests__/HandoffQA.test.tsx`
 
-- [ ] Task 2: Create Q&A Backend Service (AC: #1, #2)
-  - [ ] 2.1 Create `apps/api/app/services/handoff/qa.py` service module
-  - [ ] 2.2 Implement context injection pattern - inject handoff summary into LangChain prompt
-  - [ ] 2.3 Implement `process_qa_question()` method that routes through ManufacturingAgent
-  - [ ] 2.4 Add shift time range and assets scope to agent context for accurate data retrieval
-  - [ ] 2.5 Ensure citations are generated from underlying tool responses (FR52)
-  - [ ] 2.6 Handle partial failures gracefully (continue with available data)
-  - [ ] 2.7 Create `apps/api/app/tests/services/test_handoff_qa.py`
+- [x] Task 2: Create Q&A Backend Service (AC: #1, #2)
+  - [x] 2.1 Create `apps/api/app/services/handoff/qa.py` service module
+  - [x] 2.2 Implement context injection pattern - inject handoff summary into LangChain prompt
+  - [x] 2.3 Implement `process_qa_question()` method that routes through ManufacturingAgent
+  - [x] 2.4 Add shift time range and assets scope to agent context for accurate data retrieval
+  - [x] 2.5 Ensure citations are generated from underlying tool responses (FR52)
+  - [x] 2.6 Handle partial failures gracefully (continue with available data)
+  - [x] 2.7 Create `apps/api/app/tests/services/test_handoff_qa.py`
 
-- [ ] Task 3: Create Q&A API Endpoint (AC: #1, #2, #4)
-  - [ ] 3.1 Add Q&A endpoint to `apps/api/app/api/handoff.py`: `POST /api/v1/handoff/{id}/qa`
-  - [ ] 3.2 Accept request body: `{ "question": string, "voice_transcript"?: string }`
-  - [ ] 3.3 Validate handoff exists and user has access (RLS check)
-  - [ ] 3.4 Store Q&A entries in handoff record (append-only for immutability)
-  - [ ] 3.5 Return response with citations and thread update
-  - [ ] 3.6 Create `apps/api/app/tests/api/test_handoff_qa.py`
+- [x] Task 3: Create Q&A API Endpoint (AC: #1, #2, #4)
+  - [x] 3.1 Add Q&A endpoint to `apps/api/app/api/handoff.py`: `POST /api/v1/handoff/{id}/qa`
+  - [x] 3.2 Accept request body: `{ "question": string, "voice_transcript"?: string }`
+  - [x] 3.3 Validate handoff exists and user has access (RLS check)
+  - [x] 3.4 Store Q&A entries in handoff record (append-only for immutability)
+  - [x] 3.5 Return response with citations and thread update
+  - [x] 3.6 Create `apps/api/app/tests/api/test_handoff_qa.py`
 
-- [ ] Task 4: Database Schema for Q&A Thread (AC: #4)
-  - [ ] 4.1 Create migration `supabase/migrations/20260116_001_handoff_qa_thread.sql`
-  - [ ] 4.2 Create `handoff_qa_entries` table with columns: id, handoff_id (FK), user_id, role (questioner/responder), content_type (question/answer/human_response), content, citations (JSONB), created_at
-  - [ ] 4.3 Add RLS policies: users can read/write Q&A for handoffs they have access to
-  - [ ] 4.4 Add index on handoff_id for efficient thread retrieval
+- [x] Task 4: Database Schema for Q&A Thread (AC: #4)
+  - [x] 4.1 Create migration `supabase/migrations/20260116_001_handoff_qa_thread.sql`
+  - [x] 4.2 Create `handoff_qa_entries` table with columns: id, handoff_id (FK), user_id, user_name, content_type (question/ai_answer/human_response), content, citations (JSONB), voice_transcript, created_at
+  - [x] 4.3 Add RLS policies: users can read/write Q&A for handoffs they have access to
+  - [x] 4.4 Add index on handoff_id for efficient thread retrieval
 
-- [ ] Task 5: Real-time Q&A Updates (AC: #3)
-  - [ ] 5.1 Configure Supabase Realtime for `handoff_qa_entries` table
-  - [ ] 5.2 Create `apps/web/src/lib/hooks/useHandoffQA.ts` hook with Realtime subscription
-  - [ ] 5.3 Display incoming question notification to outgoing supervisor (if online)
-  - [ ] 5.4 Enable outgoing supervisor to respond directly via same Q&A interface
-  - [ ] 5.5 Differentiate AI responses vs human responses in UI (icon/badge)
+- [x] Task 5: Real-time Q&A Updates (AC: #3)
+  - [x] 5.1 Configure Supabase Realtime for `handoff_qa_entries` table
+  - [x] 5.2 Create `apps/web/src/lib/hooks/useHandoffQA.ts` hook with Realtime subscription
+  - [x] 5.3 Display incoming question notification to outgoing supervisor (if online)
+  - [x] 5.4 Enable outgoing supervisor to respond directly via same Q&A interface
+  - [x] 5.5 Differentiate AI responses vs human responses in UI (icon/badge)
 
-- [ ] Task 6: Handoff Model Updates (AC: #2, #4)
-  - [ ] 6.1 Add Pydantic models: `HandoffQAEntry`, `HandoffQARequest`, `HandoffQAResponse` to `apps/api/app/models/handoff.py`
-  - [ ] 6.2 Update `ShiftHandoff` model to include optional `qa_thread: List[HandoffQAEntry]`
-  - [ ] 6.3 Add citation model for Q&A responses extending existing Citation pattern
+- [x] Task 6: Handoff Model Updates (AC: #2, #4)
+  - [x] 6.1 Add Pydantic models: `HandoffQAEntry`, `HandoffQARequest`, `HandoffQAResponse` to `apps/api/app/models/handoff.py`
+  - [x] 6.2 Update `ShiftHandoff` model to include optional `qa_thread: List[HandoffQAEntry]`
+  - [x] 6.3 Add citation model for Q&A responses extending existing Citation pattern
 
 ## Dev Notes
 
@@ -189,11 +189,34 @@ const channel = supabase
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Debug Log References
 
+- Code review performed 2026-01-17 with 12 issues found and fixed
+
 ### Completion Notes List
+
+- All 6 tasks with 30 subtasks implemented
+- Frontend Q&A component with real-time updates
+- Backend Q&A service with context injection pattern
+- Database migration with RLS policies
+- Integration tests for API and service layer
+- HandoffViewer integration completed
 
 ### File List
 
+**New Files:**
+- `apps/api/app/services/handoff/qa.py` - Q&A processing service (HandoffQAService)
+- `apps/api/app/tests/services/test_handoff_qa.py` - Q&A service unit tests
+- `apps/api/app/tests/api/test_handoff_qa.py` - Q&A API endpoint tests
+- `apps/web/src/components/handoff/HandoffQA.tsx` - Q&A UI component
+- `apps/web/src/components/handoff/__tests__/HandoffQA.test.tsx` - Q&A component tests
+- `apps/web/src/lib/hooks/useHandoffQA.ts` - Real-time Q&A hook with Supabase subscription
+- `supabase/migrations/20260116_001_handoff_qa_thread.sql` - handoff_qa_entries table with RLS
+
+**Modified Files:**
+- `apps/api/app/api/handoff.py` - Added Q&A endpoints (POST/GET /qa, POST /qa/respond)
+- `apps/api/app/models/handoff.py` - Added HandoffQA* models (Entry, Request, Response, Thread, Citation, Context)
+- `apps/api/app/services/handoff/__init__.py` - Exported Q&A service
+- `apps/web/src/components/handoff/HandoffViewer.tsx` - Integrated HandoffQA component

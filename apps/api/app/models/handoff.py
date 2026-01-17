@@ -561,3 +561,179 @@ class VoiceNoteErrorCode(str, Enum):
     HANDOFF_NOT_FOUND = "handoff_not_found"
     NOT_AUTHORIZED = "not_authorized"
     INVALID_AUDIO = "invalid_audio"
+
+
+# =============================================================================
+# Handoff Q&A Models (Story 9.6)
+# =============================================================================
+
+
+class HandoffQAContentType(str, Enum):
+    """
+    Content type for Q&A entries (Story 9.6 AC#2).
+
+    Types:
+    - question: User's question about the handoff
+    - ai_answer: AI-generated response with citations
+    - human_response: Direct response from outgoing supervisor
+    """
+    QUESTION = "question"
+    AI_ANSWER = "ai_answer"
+    HUMAN_RESPONSE = "human_response"
+
+
+class HandoffQACitation(BaseModel):
+    """
+    Citation for Q&A response data (Story 9.6 AC#2, FR52).
+
+    Follows the established Citation model pattern from chat.py.
+    Each citation references specific data from the handoff or tool output.
+    """
+    value: str = Field(..., description="The cited value (e.g., '87%')")
+    field: str = Field(..., description="The data field or source type")
+    table: str = Field(..., description="The source table or 'handoff_summary'")
+    context: str = Field(..., description="Business context (e.g., 'Production overview')")
+    timestamp: Optional[datetime] = Field(
+        default_factory=_utcnow,
+        description="When data was retrieved"
+    )
+
+    model_config = {"from_attributes": True}
+
+
+class HandoffQAEntry(BaseModel):
+    """
+    A single Q&A entry in the handoff thread (Story 9.6 AC#4).
+
+    Represents a question, AI answer, or human response in the Q&A thread.
+    Entries are append-only (immutable) per NFR24.
+    """
+    id: UUID = Field(..., description="Unique entry identifier")
+    handoff_id: UUID = Field(..., description="Parent handoff ID")
+    user_id: UUID = Field(..., description="User who created the entry")
+    user_name: Optional[str] = Field(None, description="Display name of user")
+    content_type: HandoffQAContentType = Field(
+        ...,
+        description="Type of content (question/ai_answer/human_response)"
+    )
+    content: str = Field(..., description="Question or response text")
+    citations: List[HandoffQACitation] = Field(
+        default_factory=list,
+        description="Citations for AI responses (FR52)"
+    )
+    voice_transcript: Optional[str] = Field(
+        None,
+        description="Original voice transcript if question was spoken"
+    )
+    created_at: datetime = Field(
+        default_factory=_utcnow,
+        description="When the entry was created"
+    )
+
+    model_config = {"from_attributes": True}
+
+
+class HandoffQARequest(BaseModel):
+    """
+    Request schema for submitting a Q&A question (Story 9.6 AC#1).
+
+    Used when a supervisor asks a question about the handoff content.
+    Supports both text input and voice transcript.
+    """
+    question: str = Field(
+        ...,
+        description="The question text",
+        min_length=1,
+        max_length=2000
+    )
+    voice_transcript: Optional[str] = Field(
+        None,
+        description="Original voice transcript if question was spoken"
+    )
+
+    model_config = {"from_attributes": True}
+
+
+class HandoffQAResponse(BaseModel):
+    """
+    Response schema for Q&A processing (Story 9.6 AC#2).
+
+    Returns the AI-generated answer with citations and updated thread.
+    """
+    entry: HandoffQAEntry = Field(
+        ...,
+        description="The created Q&A entry (the answer)"
+    )
+    question_entry: HandoffQAEntry = Field(
+        ...,
+        description="The question entry that was created"
+    )
+    thread_count: int = Field(
+        ...,
+        description="Total entries in the Q&A thread"
+    )
+    message: str = Field(
+        default="Question processed successfully",
+        description="Status message"
+    )
+
+
+class HandoffQAThread(BaseModel):
+    """
+    Complete Q&A thread for a handoff (Story 9.6 AC#4).
+
+    Returns all Q&A entries for a handoff, ordered by creation time.
+    """
+    handoff_id: UUID = Field(..., description="Parent handoff ID")
+    entries: List[HandoffQAEntry] = Field(
+        default_factory=list,
+        description="Q&A entries ordered by created_at"
+    )
+    count: int = Field(0, description="Number of entries in thread")
+
+    @classmethod
+    def from_entries(cls, handoff_id: UUID, entries: List[HandoffQAEntry]) -> "HandoffQAThread":
+        """Create a thread from a list of entries."""
+        return cls(
+            handoff_id=handoff_id,
+            entries=sorted(entries, key=lambda e: e.created_at),
+            count=len(entries),
+        )
+
+
+class HandoffQAHumanResponseRequest(BaseModel):
+    """
+    Request for outgoing supervisor to respond directly (Story 9.6 AC#3).
+
+    Allows the outgoing supervisor to provide a human response to a question.
+    """
+    response: str = Field(
+        ...,
+        description="Human response text",
+        min_length=1,
+        max_length=2000
+    )
+    question_entry_id: Optional[UUID] = Field(
+        None,
+        description="ID of the question being responded to"
+    )
+
+
+class HandoffQAContext(BaseModel):
+    """
+    Context passed to the agent for Q&A processing (Story 9.6 Dev Notes).
+
+    Contains handoff summary and metadata for accurate AI responses.
+    """
+    handoff_summary: str = Field(..., description="Full handoff summary text")
+    shift_time_range: ShiftTimeRange = Field(..., description="Shift time range")
+    assets_covered: List[UUID] = Field(
+        default_factory=list,
+        description="Asset IDs covered in the handoff"
+    )
+    outgoing_supervisor: str = Field(..., description="Name of outgoing supervisor")
+    text_notes: Optional[str] = Field(None, description="User text notes")
+    voice_note_transcripts: Optional[List[str]] = Field(
+        None,
+        description="Transcripts from voice notes"
+    )

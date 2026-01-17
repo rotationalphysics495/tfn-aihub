@@ -1467,3 +1467,217 @@ async def get_supplemental_notes(
         "notes": notes,
         "count": len(notes),
     }
+
+
+# ============================================================================
+# Story 9.6: Handoff Q&A Endpoints
+# ============================================================================
+
+
+from app.models.handoff import (
+    HandoffQARequest,
+    HandoffQAResponse,
+    HandoffQAThread,
+    HandoffQAEntry,
+    HandoffQAContext,
+    HandoffQAHumanResponseRequest,
+    HandoffQAContentType,
+)
+from app.services.handoff import get_handoff_qa_service
+
+
+@router.post("/{handoff_id}/qa", response_model=HandoffQAResponse)
+async def submit_qa_question(
+    handoff_id: UUID,
+    request: HandoffQARequest,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Submit a Q&A question about a handoff (Story 9.6 AC#1, AC#2).
+
+    Process:
+    1. Validate handoff exists and user has access (RLS check)
+    2. Load handoff context for agent injection
+    3. Process question through ManufacturingAgent
+    4. Store Q&A entries (append-only for immutability)
+    5. Return response with citations
+
+    Args:
+        handoff_id: UUID of the handoff
+        request: Question request body
+
+    Returns:
+        HandoffQAResponse with AI answer and citations
+
+    Raises:
+        404: Handoff not found
+        403: User doesn't have access to handoff
+    """
+    user_id = current_user.id
+    logger.info(f"Q&A question for handoff {handoff_id} from user {user_id}")
+
+    # Validate handoff exists and user has access
+    handoff = _get_handoff_by_id(str(handoff_id))
+    if not handoff:
+        raise HTTPException(
+            status_code=404,
+            detail="Handoff not found"
+        )
+
+    # Check authorization
+    # Users can access if they created the handoff OR are assigned to its assets
+    if handoff.get("user_id") != user_id:
+        assigned_assets = _get_supervisor_assignments(user_id)
+        assigned_asset_ids = {str(a.asset_id) for a in assigned_assets}
+        handoff_assets = set(handoff.get("assets_covered", []))
+
+        if not handoff_assets.intersection(assigned_asset_ids):
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied"
+            )
+
+    # Build handoff context for agent injection
+    shift_info = get_shift_time_range()
+    handoff_context = HandoffQAContext(
+        handoff_summary=handoff.get("summary", "") or "",
+        shift_time_range=shift_info,
+        assets_covered=[UUID(a) for a in handoff.get("assets_covered", [])],
+        outgoing_supervisor=handoff.get("user_id", "Unknown"),
+        text_notes=handoff.get("text_notes"),
+        voice_note_transcripts=None,  # Could load from voice notes
+    )
+
+    # Get voice note transcripts if available
+    voice_notes = _get_voice_notes_for_handoff(str(handoff_id))
+    if voice_notes:
+        transcripts = [
+            n.get("transcript")
+            for n in voice_notes
+            if n.get("transcript")
+        ]
+        if transcripts:
+            handoff_context.voice_note_transcripts = transcripts
+
+    # Process through Q&A service
+    qa_service = get_handoff_qa_service()
+    response = await qa_service.process_question(
+        handoff_id=str(handoff_id),
+        question=request.question,
+        user_id=user_id,
+        user_name=getattr(current_user, "name", None),
+        handoff_context=handoff_context,
+        voice_transcript=request.voice_transcript,
+    )
+
+    return response
+
+
+@router.get("/{handoff_id}/qa", response_model=HandoffQAThread)
+async def get_qa_thread(
+    handoff_id: UUID,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Get the Q&A thread for a handoff (Story 9.6 AC#4).
+
+    Returns all questions and answers for the handoff, ordered by creation time.
+    Thread is visible to both outgoing and incoming supervisors.
+
+    Args:
+        handoff_id: UUID of the handoff
+
+    Returns:
+        HandoffQAThread with all Q&A entries
+
+    Raises:
+        404: Handoff not found
+        403: User doesn't have access to handoff
+    """
+    user_id = current_user.id
+
+    # Validate handoff exists and user has access
+    handoff = _get_handoff_by_id(str(handoff_id))
+    if not handoff:
+        raise HTTPException(
+            status_code=404,
+            detail="Handoff not found"
+        )
+
+    # Check authorization
+    if handoff.get("user_id") != user_id:
+        assigned_assets = _get_supervisor_assignments(user_id)
+        assigned_asset_ids = {str(a.asset_id) for a in assigned_assets}
+        handoff_assets = set(handoff.get("assets_covered", []))
+
+        if not handoff_assets.intersection(assigned_asset_ids):
+            raise HTTPException(
+                status_code=403,
+                detail="Access denied"
+            )
+
+    # Get thread from Q&A service
+    qa_service = get_handoff_qa_service()
+    thread = qa_service.get_thread(str(handoff_id))
+
+    return thread
+
+
+@router.post("/{handoff_id}/qa/respond", response_model=HandoffQAEntry)
+async def submit_human_response(
+    handoff_id: UUID,
+    request: HandoffQAHumanResponseRequest,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Submit a human response to a Q&A question (Story 9.6 AC#3).
+
+    Allows the outgoing supervisor to respond directly to questions
+    instead of relying on AI responses.
+
+    Args:
+        handoff_id: UUID of the handoff
+        request: Human response request body
+
+    Returns:
+        Created HandoffQAEntry
+
+    Raises:
+        404: Handoff not found
+        403: Only the handoff creator can submit human responses
+    """
+    user_id = current_user.id
+    logger.info(
+        f"Human response for handoff {handoff_id} from user {user_id}"
+    )
+
+    # Validate handoff exists
+    handoff = _get_handoff_by_id(str(handoff_id))
+    if not handoff:
+        raise HTTPException(
+            status_code=404,
+            detail="Handoff not found"
+        )
+
+    # Only the handoff creator can submit human responses
+    if handoff.get("user_id") != user_id:
+        raise HTTPException(
+            status_code=403,
+            detail="Only the handoff creator can submit responses"
+        )
+
+    # Add human response
+    qa_service = get_handoff_qa_service()
+    entry = await qa_service.add_human_response(
+        handoff_id=str(handoff_id),
+        response=request.response,
+        user_id=user_id,
+        user_name=getattr(current_user, "name", None),
+        question_entry_id=(
+            str(request.question_entry_id)
+            if request.question_entry_id
+            else None
+        ),
+    )
+
+    return entry

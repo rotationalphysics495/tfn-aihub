@@ -1,11 +1,12 @@
 'use client';
 
 /**
- * HandoffViewer Component (Story 9.5, Task 5)
+ * HandoffViewer Component (Story 9.5, 9.6)
  *
- * Displays full handoff details including summary, notes, and voice notes.
+ * Displays full handoff details including summary, notes, voice notes, and Q&A.
  *
  * @see Story 9.5 - Handoff Review UI
+ * @see Story 9.6 - Handoff Q&A
  * @see AC#2 - Handoff Detail View
  * @see AC#3 - Voice Note Playback
  * @see AC#4 - Tablet-Optimized Layout
@@ -17,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { VoiceNotePlayer } from './VoiceNotePlayer';
+import { HandoffQA } from './HandoffQA';
 import { cn } from '@/lib/utils';
 import type { Handoff, HandoffVoiceNote, HandoffStatus } from '@/types/handoff';
 
@@ -27,12 +29,20 @@ import type { Handoff, HandoffVoiceNote, HandoffStatus } from '@/types/handoff';
 export interface HandoffViewerProps {
   /** Handoff data */
   handoff: Handoff;
+  /** Whether current user is the handoff creator (outgoing supervisor) */
+  isCreator?: boolean;
   /** Whether user can acknowledge this handoff */
   canAcknowledge?: boolean;
   /** Called when acknowledge button clicked */
   onAcknowledge?: () => void;
   /** Whether acknowledge is in progress */
   isAcknowledging?: boolean;
+  /** Callback when push-to-talk is pressed for Q&A */
+  onPushToTalk?: () => void;
+  /** Voice transcript from STT for Q&A */
+  voiceTranscript?: string;
+  /** Whether voice input is active for Q&A */
+  isVoiceActive?: boolean;
   /** Optional CSS class name */
   className?: string;
 }
@@ -204,6 +214,7 @@ function VoiceNoteSection({ notes }: VoiceNoteSectionProps) {
  * - Shift summary section with citations
  * - Text notes section
  * - Voice note player integration
+ * - Q&A section for follow-up questions (Story 9.6)
  * - Acknowledge button (placeholder for Story 9.7)
  * - Tablet-first responsive layout
  *
@@ -218,9 +229,13 @@ function VoiceNoteSection({ notes }: VoiceNoteSectionProps) {
  */
 export function HandoffViewer({
   handoff,
+  isCreator = false,
   canAcknowledge = false,
   onAcknowledge,
   isAcknowledging = false,
+  onPushToTalk,
+  voiceTranscript,
+  isVoiceActive = false,
   className,
 }: HandoffViewerProps) {
   return (
@@ -337,6 +352,18 @@ export function HandoffViewer({
 
       {/* Voice Notes section */}
       <VoiceNoteSection notes={handoff.voice_notes} />
+
+      {/* Q&A Section (Story 9.6) */}
+      {handoff.status !== 'draft' && (
+        <HandoffQA
+          handoffId={handoff.id}
+          isCreator={isCreator}
+          canRespond={isCreator}
+          onPushToTalk={onPushToTalk}
+          voiceTranscript={voiceTranscript}
+          isVoiceActive={isVoiceActive}
+        />
+      )}
 
       {/* Assets covered section */}
       {handoff.assets_covered.length > 0 && (
