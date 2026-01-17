@@ -128,3 +128,28 @@ export interface HandoffState<T> {
   isLoading: boolean;
   error: string | null;
 }
+
+// ============================================================================
+// Acknowledgment Types (Story 9.7)
+// ============================================================================
+
+/**
+ * Acknowledgment record
+ */
+export interface HandoffAcknowledgment {
+  id: string;
+  handoff_id: string;
+  acknowledged_by: string;
+  acknowledged_at: string;
+  notes: string | null;
+  created_at: string;
+}
+
+/**
+ * Response from acknowledge endpoint
+ */
+export interface AcknowledgeHandoffResponse {
+  success: boolean;
+  acknowledgment: HandoffAcknowledgment;
+  message: string;
+}

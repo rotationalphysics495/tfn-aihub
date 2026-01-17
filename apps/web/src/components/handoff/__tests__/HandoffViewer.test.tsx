@@ -160,7 +160,7 @@ describe('HandoffViewer', () => {
     expect(screen.queryByRole('button', { name: /acknowledge/i })).not.toBeInTheDocument();
   });
 
-  it('calls onAcknowledge when acknowledge button is clicked', () => {
+  it('opens acknowledge dialog when acknowledge button is clicked (Story 9.7)', () => {
     const handoff = createMockHandoff();
     const onAcknowledge = vi.fn();
 
@@ -174,7 +174,8 @@ describe('HandoffViewer', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /acknowledge/i }));
 
-    expect(onAcknowledge).toHaveBeenCalledTimes(1);
+    // Dialog should open (Story 9.7: AC#1) - check for dialog-specific content
+    expect(screen.getByText(/confirm receipt of the shift handoff/i)).toBeInTheDocument();
   });
 
   it('disables acknowledge button when isAcknowledging is true', () => {
@@ -194,7 +195,7 @@ describe('HandoffViewer', () => {
     expect(button).toBeDisabled();
   });
 
-  it('shows acknowledged indicator for acknowledged handoffs', () => {
+  it('shows acknowledged indicator for acknowledged handoffs (Story 9.7)', () => {
     const handoff = createMockHandoff({
       status: 'acknowledged',
       acknowledged_at: '2026-01-15T15:30:00Z',
@@ -202,8 +203,9 @@ describe('HandoffViewer', () => {
 
     render(<HandoffViewer handoff={handoff} />);
 
-    // Should have status badge
-    expect(screen.getByText('Acknowledged')).toBeInTheDocument();
+    // Should have status badge and indicator (multiple "Acknowledged" elements)
+    const acknowledgedElements = screen.getAllByText('Acknowledged');
+    expect(acknowledgedElements.length).toBeGreaterThanOrEqual(1);
   });
 
   it('displays assets covered section', () => {

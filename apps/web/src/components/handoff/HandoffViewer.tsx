@@ -1,24 +1,26 @@
 'use client';
 
 /**
- * HandoffViewer Component (Story 9.5, 9.6)
+ * HandoffViewer Component (Story 9.5, 9.6, 9.7)
  *
  * Displays full handoff details including summary, notes, voice notes, and Q&A.
  *
  * @see Story 9.5 - Handoff Review UI
  * @see Story 9.6 - Handoff Q&A
+ * @see Story 9.7 - Acknowledgment Flow
  * @see AC#2 - Handoff Detail View
  * @see AC#3 - Voice Note Playback
  * @see AC#4 - Tablet-Optimized Layout
  */
 
 import { useState } from 'react';
-import { Clock, User, FileText, Mic, CheckCircle } from 'lucide-react';
+import { Clock, User, FileText, Mic, CheckCircle, MessageSquare, WifiOff } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { VoiceNotePlayer } from './VoiceNotePlayer';
 import { HandoffQA } from './HandoffQA';
+import { HandoffAcknowledge } from './HandoffAcknowledge';
 import { cn } from '@/lib/utils';
 import type { Handoff, HandoffVoiceNote, HandoffStatus } from '@/types/handoff';
 
@@ -33,10 +35,20 @@ export interface HandoffViewerProps {
   isCreator?: boolean;
   /** Whether user can acknowledge this handoff */
   canAcknowledge?: boolean;
-  /** Called when acknowledge button clicked */
-  onAcknowledge?: () => void;
+  /** Called when acknowledge is confirmed (Story 9.7) */
+  onAcknowledge?: (notes?: string) => Promise<void>;
   /** Whether acknowledge is in progress */
   isAcknowledging?: boolean;
+  /** Error message from acknowledgment attempt */
+  acknowledgeError?: string | null;
+  /** Whether offline mode is active (AC#4) */
+  isOffline?: boolean;
+  /** Whether there's a pending acknowledgment queued (AC#4) */
+  hasPendingAcknowledgment?: boolean;
+  /** Acknowledgment notes if acknowledged (AC#3) */
+  acknowledgmentNotes?: string | null;
+  /** Name of the user who acknowledged */
+  acknowledgedByName?: string | null;
   /** Callback when push-to-talk is pressed for Q&A */
   onPushToTalk?: () => void;
   /** Voice transcript from STT for Q&A */
@@ -215,7 +227,8 @@ function VoiceNoteSection({ notes }: VoiceNoteSectionProps) {
  * - Text notes section
  * - Voice note player integration
  * - Q&A section for follow-up questions (Story 9.6)
- * - Acknowledge button (placeholder for Story 9.7)
+ * - Acknowledgment flow with dialog (Story 9.7)
+ * - Offline acknowledgment queuing (Story 9.7 AC#4)
  * - Tablet-first responsive layout
  *
  * @example
@@ -223,7 +236,7 @@ function VoiceNoteSection({ notes }: VoiceNoteSectionProps) {
  * <HandoffViewer
  *   handoff={handoff}
  *   canAcknowledge={true}
- *   onAcknowledge={() => handleAcknowledge()}
+ *   onAcknowledge={async (notes) => handleAcknowledge(notes)}
  * />
  * ```
  */
@@ -233,11 +246,32 @@ export function HandoffViewer({
   canAcknowledge = false,
   onAcknowledge,
   isAcknowledging = false,
+  acknowledgeError = null,
+  isOffline = false,
+  hasPendingAcknowledgment = false,
+  acknowledgmentNotes = null,
+  acknowledgedByName = null,
   onPushToTalk,
   voiceTranscript,
   isVoiceActive = false,
   className,
 }: HandoffViewerProps) {
+  // State for acknowledgment dialog (Story 9.7 AC#1)
+  const [showAckDialog, setShowAckDialog] = useState(false);
+
+  // Handle opening the acknowledgment dialog
+  const handleAcknowledgeClick = () => {
+    setShowAckDialog(true);
+  };
+
+  // Handle acknowledgment confirmation
+  const handleAcknowledgeConfirm = async (notes?: string) => {
+    if (onAcknowledge) {
+      await onAcknowledge(notes);
+      setShowAckDialog(false);
+    }
+  };
+
   return (
     <div
       className={cn(
@@ -279,34 +313,58 @@ export function HandoffViewer({
               </div>
             </div>
 
-            {/* Right: Acknowledge button (Story 9.7 placeholder) */}
-            {canAcknowledge && onAcknowledge && (
-              <Button
-                onClick={onAcknowledge}
-                disabled={isAcknowledging}
-                size="lg"
-                className="min-w-[44px] min-h-[44px]" // AC#4: Touch target
-              >
-                {isAcknowledging ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                    Acknowledging...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="w-5 h-5 mr-2" />
-                    Acknowledge
-                  </>
+            {/* Right: Acknowledge button (Story 9.7) */}
+            {canAcknowledge && onAcknowledge && !hasPendingAcknowledgment && (
+              <div className="flex flex-col items-end gap-2">
+                {isOffline && (
+                  <div className="flex items-center gap-1 text-xs text-warning-amber">
+                    <WifiOff className="w-3 h-3" />
+                    <span>Offline</span>
+                  </div>
                 )}
-              </Button>
+                <Button
+                  onClick={handleAcknowledgeClick}
+                  disabled={isAcknowledging}
+                  size="lg"
+                  className="min-w-[44px] min-h-[44px]" // AC#4: Touch target
+                >
+                  {isAcknowledging ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                      Acknowledging...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-5 h-5 mr-2" />
+                      Acknowledge Handoff
+                    </>
+                  )}
+                </Button>
+              </div>
             )}
 
-            {/* Already acknowledged indicator */}
+            {/* Pending sync indicator (Story 9.7 AC#4) */}
+            {hasPendingAcknowledgment && (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-warning-amber/10 border border-warning-amber/30">
+                <WifiOff className="w-4 h-4 text-warning-amber" />
+                <span className="text-sm text-warning-amber-dark">
+                  Acknowledgment pending sync
+                </span>
+              </div>
+            )}
+
+            {/* Already acknowledged indicator (Story 9.7 AC#2) */}
             {handoff.status === 'acknowledged' && handoff.acknowledged_at && (
-              <div className="flex items-center gap-2 text-success-green">
-                <CheckCircle className="w-5 h-5" />
-                <span className="text-sm">
-                  Acknowledged {formatTime(handoff.acknowledged_at)}
+              <div className="flex flex-col items-end gap-1">
+                <div className="flex items-center gap-2 text-success-green">
+                  <CheckCircle className="w-5 h-5" />
+                  <span className="text-sm font-medium">
+                    Acknowledged
+                  </span>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {formatTime(handoff.acknowledged_at)}
+                  {acknowledgedByName && ` by ${acknowledgedByName}`}
                 </span>
               </div>
             )}
@@ -365,6 +423,28 @@ export function HandoffViewer({
         />
       )}
 
+      {/* Acknowledgment notes section (Story 9.7 AC#3) */}
+      {handoff.status === 'acknowledged' && acknowledgmentNotes && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg flex items-center gap-2">
+              <MessageSquare className="w-5 h-5" />
+              Acknowledgment Notes
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-base text-muted-foreground whitespace-pre-wrap">
+              {acknowledgmentNotes}
+            </p>
+            {acknowledgedByName && (
+              <p className="text-sm text-muted-foreground mt-2 italic">
+                - {acknowledgedByName}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Assets covered section */}
       {handoff.assets_covered.length > 0 && (
         <Card>
@@ -384,6 +464,20 @@ export function HandoffViewer({
           </CardContent>
         </Card>
       )}
+
+      {/* Acknowledgment Dialog (Story 9.7 AC#1) */}
+      <HandoffAcknowledge
+        isOpen={showAckDialog}
+        onClose={() => setShowAckDialog(false)}
+        onConfirm={handleAcknowledgeConfirm}
+        handoffId={handoff.id}
+        creatorName={handoff.creator_name}
+        shiftDate={handoff.shift_date}
+        shiftType={handoff.shift_type}
+        isLoading={isAcknowledging}
+        error={acknowledgeError}
+        isOffline={isOffline}
+      />
     </div>
   );
 }

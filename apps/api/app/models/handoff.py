@@ -737,3 +737,112 @@ class HandoffQAContext(BaseModel):
         None,
         description="Transcripts from voice notes"
     )
+
+
+# =============================================================================
+# Handoff Acknowledgment Models (Story 9.7)
+# =============================================================================
+
+
+class AcknowledgeHandoffRequest(BaseModel):
+    """
+    Request schema for acknowledging a handoff (Story 9.7 AC#1, AC#3).
+
+    Used when an incoming supervisor acknowledges receipt of a handoff.
+    Notes are optional and allow the acknowledging user to add comments.
+    """
+    notes: Optional[str] = Field(
+        None,
+        description="Optional acknowledgment notes (FR29)",
+        max_length=500
+    )
+
+
+class HandoffAcknowledgment(BaseModel):
+    """
+    Acknowledgment record schema (Story 9.7 AC#2).
+
+    Represents a completed acknowledgment of a shift handoff.
+    """
+    id: UUID = Field(..., description="Unique acknowledgment identifier")
+    handoff_id: UUID = Field(..., description="ID of the acknowledged handoff")
+    acknowledged_by: UUID = Field(
+        ...,
+        description="User ID of incoming supervisor who acknowledged"
+    )
+    acknowledged_at: datetime = Field(
+        default_factory=_utcnow,
+        description="When the handoff was acknowledged"
+    )
+    notes: Optional[str] = Field(None, description="Optional acknowledgment notes")
+    created_at: datetime = Field(
+        default_factory=_utcnow,
+        description="When the record was created"
+    )
+
+    model_config = {"from_attributes": True}
+
+
+class AcknowledgeHandoffResponse(BaseModel):
+    """
+    Response schema for acknowledgment endpoint (Story 9.7 AC#2).
+
+    Returns success status and the created acknowledgment record.
+    """
+    success: bool = Field(True, description="Whether acknowledgment succeeded")
+    acknowledgment: HandoffAcknowledgment = Field(
+        ...,
+        description="The created acknowledgment record"
+    )
+    message: str = Field(
+        default="Handoff acknowledged successfully",
+        description="Status message"
+    )
+
+
+class AcknowledgmentPendingSync(BaseModel):
+    """
+    Response for offline acknowledgment queuing (Story 9.7 AC#4).
+
+    Indicates acknowledgment was queued locally for later sync.
+    """
+    queued: bool = Field(True, description="Whether acknowledgment was queued")
+    local_id: str = Field(..., description="Local queue ID for deduplication")
+    message: str = Field(
+        default="Acknowledgment pending sync",
+        description="Status message for offline state"
+    )
+
+
+class AuditLogEntry(BaseModel):
+    """
+    Audit log entry schema (Story 9.7 AC#2, FR55).
+
+    Represents a single audit trail entry for handoff operations.
+    """
+    id: UUID = Field(..., description="Unique log identifier")
+    action_type: str = Field(
+        ...,
+        description="Action performed (e.g., handoff_acknowledged)"
+    )
+    entity_type: str = Field(
+        ...,
+        description="Type of entity (e.g., shift_handoff)"
+    )
+    entity_id: UUID = Field(..., description="ID of the affected entity")
+    user_id: UUID = Field(..., description="User who performed the action")
+    state_before: Optional[dict] = Field(
+        None,
+        description="Entity state before the action"
+    )
+    state_after: Optional[dict] = Field(
+        None,
+        description="Entity state after the action"
+    )
+    metadata: Optional[dict] = Field(None, description="Additional metadata")
+    created_at: datetime = Field(
+        default_factory=_utcnow,
+        description="When the action occurred"
+    )
+
+    model_config = {"from_attributes": True}

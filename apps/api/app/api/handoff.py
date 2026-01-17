@@ -1681,3 +1681,315 @@ async def submit_human_response(
     )
 
     return entry
+
+
+# ============================================================================
+# Story 9.7: Handoff Acknowledgment Endpoints
+# ============================================================================
+
+
+from app.models.handoff import (
+    AcknowledgeHandoffRequest,
+    AcknowledgeHandoffResponse,
+    HandoffAcknowledgment,
+    AuditLogEntry,
+)
+
+
+# In-memory acknowledgments store (for MVP - persistent storage via Supabase)
+_acknowledgments: dict[str, dict] = {}
+_audit_logs: list[dict] = []
+
+
+def _get_acknowledgment_by_handoff(handoff_id: str) -> Optional[dict]:
+    """Get an acknowledgment by handoff ID."""
+    for ack in _acknowledgments.values():
+        if ack.get("handoff_id") == handoff_id:
+            return ack
+    return None
+
+
+def _save_acknowledgment(ack: dict) -> dict:
+    """Save an acknowledgment to the store."""
+    _acknowledgments[str(ack["id"])] = ack
+    return ack
+
+
+def _create_audit_log(
+    action_type: str,
+    entity_type: str,
+    entity_id: str,
+    user_id: str,
+    state_before: Optional[dict] = None,
+    state_after: Optional[dict] = None,
+    metadata: Optional[dict] = None,
+) -> dict:
+    """
+    Create an audit log entry (Task 4, AC#2, FR55).
+
+    Audit logs are append-only for immutability.
+    """
+    now = datetime.now(timezone.utc)
+    log_entry = {
+        "id": str(uuid4()),
+        "action_type": action_type,
+        "entity_type": entity_type,
+        "entity_id": entity_id,
+        "user_id": user_id,
+        "state_before": state_before,
+        "state_after": state_after,
+        "metadata": metadata,
+        "created_at": now.isoformat(),
+    }
+    _audit_logs.append(log_entry)
+    logger.info(
+        f"Audit log created: {action_type} on {entity_type}/{entity_id} by {user_id}"
+    )
+    return log_entry
+
+
+def _can_acknowledge_handoff(user_id: str, handoff: dict) -> bool:
+    """
+    Check if user can acknowledge a handoff (Task 3.2).
+
+    User must be:
+    - Assigned to at least one asset covered by the handoff
+    - NOT the creator of the handoff
+    """
+    # Cannot acknowledge own handoff
+    if handoff.get("user_id") == user_id:
+        return False
+
+    # Must be assigned to at least one asset covered by the handoff
+    assigned_assets = _get_supervisor_assignments(user_id)
+    if not assigned_assets:
+        return False
+
+    assigned_asset_ids = {str(a.asset_id) for a in assigned_assets}
+    handoff_assets = set(handoff.get("assets_covered", []))
+
+    return bool(handoff_assets.intersection(assigned_asset_ids))
+
+
+@router.post("/{handoff_id}/acknowledge", response_model=AcknowledgeHandoffResponse)
+async def acknowledge_handoff(
+    handoff_id: UUID,
+    request: AcknowledgeHandoffRequest = None,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Acknowledge receipt of a shift handoff (Story 9.7).
+
+    This endpoint allows an incoming supervisor to acknowledge that they
+    have received and reviewed a handoff from an outgoing supervisor.
+
+    AC#1: Acknowledgment UI Trigger - endpoint receives acknowledgment request
+    AC#2: Acknowledgment Record Creation - creates record, updates status, creates audit log
+    AC#3: Optional Notes Attachment - notes attached to acknowledgment record
+    AC#4: Handled on frontend (offline queuing)
+
+    Process:
+    1. Validate user authorization (must be assigned to receive this handoff)
+    2. Validate handoff is in pending_acknowledgment status
+    3. Create acknowledgment record in handoff_acknowledgments
+    4. Update handoff status to "acknowledged"
+    5. Create audit log entry (FR55)
+    6. Return acknowledgment confirmation
+
+    Args:
+        handoff_id: UUID of the handoff to acknowledge
+        request: Optional acknowledgment request with notes
+
+    Returns:
+        AcknowledgeHandoffResponse with acknowledgment details
+
+    Raises:
+        400: Handoff not in pending_acknowledgment status
+        403: User not authorized to acknowledge this handoff
+        404: Handoff not found
+        409: Handoff already acknowledged
+    """
+    user_id = current_user.id
+    logger.info(f"Acknowledging handoff {handoff_id} by user {user_id}")
+
+    # Handle optional body
+    if request is None:
+        request = AcknowledgeHandoffRequest()
+
+    # Validate handoff exists
+    handoff = _get_handoff_by_id(str(handoff_id))
+    if not handoff:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "Handoff not found",
+                "code": "NOT_FOUND",
+            }
+        )
+
+    # Validate handoff is in pending_acknowledgment status (Task 3.2)
+    current_status = handoff.get("status")
+    if current_status == HandoffStatus.ACKNOWLEDGED.value:
+        # Already acknowledged
+        existing_ack = _get_acknowledgment_by_handoff(str(handoff_id))
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": "Handoff has already been acknowledged",
+                "code": "ALREADY_ACKNOWLEDGED",
+                "acknowledged_at": existing_ack.get("acknowledged_at") if existing_ack else None,
+            }
+        )
+
+    if current_status != HandoffStatus.PENDING_ACKNOWLEDGMENT.value:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": f"Cannot acknowledge handoff with status: {current_status}",
+                "code": "INVALID_STATUS",
+                "expected_status": "pending_acknowledgment",
+            }
+        )
+
+    # Validate user authorization (Task 3.2)
+    if not _can_acknowledge_handoff(user_id, handoff):
+        # Check if it's their own handoff
+        if handoff.get("user_id") == user_id:
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "error": "Cannot acknowledge your own handoff",
+                    "code": "CANNOT_ACK_OWN",
+                }
+            )
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "You are not authorized to acknowledge this handoff",
+                "code": "NOT_AUTHORIZED",
+            }
+        )
+
+    # Create acknowledgment record (Task 3.3)
+    now = datetime.now(timezone.utc)
+    ack_id = uuid4()
+    # Trim whitespace from notes (validation)
+    notes = request.notes.strip() if request.notes else None
+    notes = notes if notes else None  # Convert empty string to None
+    acknowledgment_data = {
+        "id": str(ack_id),
+        "handoff_id": str(handoff_id),
+        "acknowledged_by": user_id,
+        "acknowledged_at": now.isoformat(),
+        "notes": notes,
+        "created_at": now.isoformat(),
+        "updated_at": now.isoformat(),
+    }
+    _save_acknowledgment(acknowledgment_data)
+
+    # Capture state before for audit log
+    state_before = {
+        "status": current_status,
+        "acknowledged_by": handoff.get("acknowledged_by"),
+        "acknowledged_at": handoff.get("acknowledged_at"),
+    }
+
+    # Update handoff status to "acknowledged" (Task 3.4)
+    handoff["status"] = HandoffStatus.ACKNOWLEDGED.value
+    handoff["acknowledged_by"] = user_id
+    handoff["acknowledged_at"] = now.isoformat()
+    handoff["updated_at"] = now.isoformat()
+    _save_handoff(handoff)
+
+    # State after for audit log
+    state_after = {
+        "status": HandoffStatus.ACKNOWLEDGED.value,
+        "acknowledged_by": user_id,
+        "acknowledged_at": now.isoformat(),
+    }
+
+    # Create audit log entry (Task 3.5, Task 4, FR55)
+    _create_audit_log(
+        action_type="handoff_acknowledged",
+        entity_type="shift_handoff",
+        entity_id=str(handoff_id),
+        user_id=user_id,
+        state_before=state_before,
+        state_after=state_after,
+        metadata={
+            "acknowledgment_id": str(ack_id),
+            "has_notes": bool(request.notes),
+        },
+    )
+
+    logger.info(
+        f"Handoff {handoff_id} acknowledged by user {user_id}"
+    )
+
+    return AcknowledgeHandoffResponse(
+        success=True,
+        acknowledgment=HandoffAcknowledgment(
+            id=ack_id,
+            handoff_id=handoff_id,
+            acknowledged_by=UUID(user_id),
+            acknowledged_at=now,
+            notes=notes,
+            created_at=now,
+        ),
+        message="Handoff acknowledged successfully",
+    )
+
+
+@router.get("/{handoff_id}/acknowledgment")
+async def get_handoff_acknowledgment(
+    handoff_id: UUID,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Get acknowledgment details for a handoff (Story 9.7 AC#3).
+
+    Returns the acknowledgment record if the handoff has been acknowledged,
+    including any notes added by the acknowledging supervisor.
+
+    Args:
+        handoff_id: UUID of the handoff
+
+    Returns:
+        Acknowledgment details or 404 if not acknowledged
+
+    Raises:
+        403: User doesn't have access to this handoff
+        404: Handoff or acknowledgment not found
+    """
+    user_id = current_user.id
+
+    # Validate handoff exists
+    handoff = _get_handoff_by_id(str(handoff_id))
+    if not handoff:
+        raise HTTPException(status_code=404, detail="Handoff not found")
+
+    # Check authorization - creator or assigned supervisor
+    if handoff.get("user_id") != user_id:
+        assigned_assets = _get_supervisor_assignments(user_id)
+        assigned_asset_ids = {str(a.asset_id) for a in assigned_assets}
+        handoff_assets = set(handoff.get("assets_covered", []))
+
+        if not handoff_assets.intersection(assigned_asset_ids):
+            raise HTTPException(status_code=403, detail="Access denied")
+
+    # Get acknowledgment
+    acknowledgment = _get_acknowledgment_by_handoff(str(handoff_id))
+    if not acknowledgment:
+        raise HTTPException(
+            status_code=404,
+            detail="Handoff has not been acknowledged yet"
+        )
+
+    return {
+        "id": acknowledgment["id"],
+        "handoff_id": acknowledgment["handoff_id"],
+        "acknowledged_by": acknowledgment["acknowledged_by"],
+        "acknowledged_at": acknowledgment["acknowledged_at"],
+        "notes": acknowledgment.get("notes"),
+        "created_at": acknowledgment["created_at"],
+    }
