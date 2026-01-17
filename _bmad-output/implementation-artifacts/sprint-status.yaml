@@ -233,7 +233,7 @@ development_status:
   # Story 9.3: Voice Note Attachment
   # - Add voice notes to handoff
   # - Push-to-talk recording, transcription
-  9-3-voice-note-attachment: ready-for-dev
+  9-3-voice-note-attachment: done
 
   # Story 9.4: Persistent Handoff Records
   # - Store handoffs securely in shift_handoffs table

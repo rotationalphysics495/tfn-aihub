@@ -10,7 +10,24 @@
 
 import { describe, it, expect, vi, beforeEach, Mock } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { HandoffCreator } from '@/components/handoff/HandoffCreator'
+import { HandoffCreator } from '../HandoffCreator'
+
+// Mock voice note components
+vi.mock('../VoiceNoteRecorder', () => ({
+  VoiceNoteRecorder: ({ onNoteAdded, noteCount, maxNotes }: any) => (
+    <div data-testid="voice-note-recorder">
+      <div>{noteCount}/{maxNotes} voice notes</div>
+    </div>
+  ),
+}))
+
+vi.mock('../VoiceNoteList', () => ({
+  VoiceNoteList: ({ notes }: any) => (
+    <div data-testid="voice-note-list">
+      {notes.length === 0 ? 'No voice notes' : `${notes.length} notes`}
+    </div>
+  ),
+}))
 
 // Mock the Supabase client
 vi.mock('@/lib/supabase/client', () => ({
@@ -280,7 +297,7 @@ describe('HandoffCreator', () => {
     expect(textarea).toHaveValue('Test handoff notes')
   })
 
-  it('shows voice notes placeholder (Story 9.3)', async () => {
+  it('shows voice notes step with recorder (Story 9.3)', async () => {
     render(<HandoffCreator {...defaultProps} />)
 
     await waitFor(() => {
@@ -299,11 +316,10 @@ describe('HandoffCreator', () => {
       expect(screen.getByText('Voice Notes')).toBeInTheDocument()
     })
 
-    // Should show placeholder
-    expect(screen.getByText(/voice note recording will be available/i)).toBeInTheDocument()
-
-    // Button should be disabled
-    expect(screen.getByRole('button', { name: /add voice note/i })).toBeDisabled()
+    // Should show voice note count indicator (from component text)
+    await waitFor(() => {
+      expect(screen.getByText('0/5 voice notes')).toBeInTheDocument()
+    })
   })
 
   it('shows confirmation summary before submission', async () => {

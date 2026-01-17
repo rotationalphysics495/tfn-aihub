@@ -24,6 +24,8 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/client'
+import { VoiceNoteRecorder, type VoiceNote } from './VoiceNoteRecorder'
+import { VoiceNoteList } from './VoiceNoteList'
 
 // ============================================================================
 // Types
@@ -121,6 +123,9 @@ export function HandoffCreator({
   const [summary, setSummary] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [voiceNotes, setVoiceNotes] = useState<VoiceNote[]>([])
+  const [deletingNoteId, setDeletingNoteId] = useState<string | null>(null)
+  const [handoffId, setHandoffId] = useState<string | null>(null)
 
   // Computed values
   const canCreate = assignedAssets.length > 0 && !existingHandoff?.exists
@@ -193,6 +198,25 @@ export function HandoffCreator({
         throw new Error('Not authenticated')
       }
 
+      // If we already have a handoff (created for voice notes), submit it
+      if (handoffId) {
+        const response = await fetch(`/api/v1/handoff/${handoffId}/submit`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.detail || 'Failed to submit handoff')
+        }
+
+        onComplete(handoffId)
+        return
+      }
+
+      // Otherwise create and submit in one step
       const response = await fetch('/api/v1/handoff/', {
         method: 'POST',
         headers: {
@@ -226,7 +250,7 @@ export function HandoffCreator({
     } finally {
       setIsSubmitting(false)
     }
-  }, [userId, textNotes, selectedAssets, onComplete, onEditExisting])
+  }, [handoffId, textNotes, selectedAssets, onComplete, onEditExisting])
 
   // ============================================================================
   // Effects
@@ -237,15 +261,8 @@ export function HandoffCreator({
   }, [initiateHandoff])
 
   // ============================================================================
-  // Handlers
+  // Basic Handlers
   // ============================================================================
-
-  const handleNext = useCallback(() => {
-    const nextIndex = currentStepIndex + 1
-    if (nextIndex < stepSequence.length) {
-      setCurrentStep(stepSequence[nextIndex])
-    }
-  }, [currentStepIndex, stepSequence])
 
   const handleBack = useCallback(() => {
     const prevIndex = currentStepIndex - 1
@@ -273,6 +290,120 @@ export function HandoffCreator({
   const handleDeselectAll = useCallback(() => {
     setSelectedAssets(new Set())
   }, [])
+
+  // ============================================================================
+  // Voice Note Handlers (Story 9.3)
+  // ============================================================================
+
+  const handleVoiceNoteAdded = useCallback((note: VoiceNote) => {
+    setVoiceNotes(prev => [...prev, note])
+  }, [])
+
+  const handleVoiceNoteError = useCallback((errorMsg: string) => {
+    console.error('Voice note error:', errorMsg)
+    // Could show a toast notification here
+  }, [])
+
+  const handleVoiceNoteDelete = useCallback(async (noteId: string) => {
+    if (!handoffId) return
+
+    setDeletingNoteId(noteId)
+
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
+      }
+
+      const response = await fetch(`/api/v1/handoff/${handoffId}/voice-notes/${noteId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to delete voice note')
+      }
+
+      setVoiceNotes(prev => prev.filter(n => n.id !== noteId))
+    } catch (err) {
+      console.error('Error deleting voice note:', err)
+    } finally {
+      setDeletingNoteId(null)
+    }
+  }, [handoffId])
+
+  // Create handoff before voice notes step to enable voice note uploads
+  const createDraftHandoff = useCallback(async () => {
+    if (handoffId) return handoffId // Already created
+
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
+      }
+
+      const response = await fetch('/api/v1/handoff/', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text_notes: textNotes || null,
+          assets_covered: Array.from(selectedAssets),
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        if (response.status === 409) {
+          const detail = errorData.detail || {}
+          if (detail.action === 'edit' && detail.existing_handoff_id) {
+            setHandoffId(detail.existing_handoff_id)
+            return detail.existing_handoff_id
+          }
+        }
+        throw new Error(errorData.detail?.message || errorData.detail || 'Failed to create handoff')
+      }
+
+      const data = await response.json()
+      setHandoffId(data.id)
+      return data.id
+    } catch (err) {
+      console.error('Error creating draft handoff:', err)
+      throw err
+    }
+  }, [handoffId, textNotes, selectedAssets])
+
+  // ============================================================================
+  // Navigation Handler (depends on createDraftHandoff)
+  // ============================================================================
+
+  const handleNext = useCallback(async () => {
+    const nextIndex = currentStepIndex + 1
+    if (nextIndex >= stepSequence.length) return
+
+    const nextStep = stepSequence[nextIndex]
+
+    // Create draft handoff when moving to voice notes step
+    // This is needed so we have a handoff_id for voice note uploads
+    if (nextStep === 'voice_notes' && !handoffId) {
+      try {
+        await createDraftHandoff()
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to create handoff')
+        return
+      }
+    }
+
+    setCurrentStep(nextStep)
+  }, [currentStepIndex, stepSequence, handoffId, createDraftHandoff])
 
   // ============================================================================
   // Render Helpers
@@ -526,66 +657,77 @@ export function HandoffCreator({
     </Card>
   )
 
-  const renderVoiceNotesStep = () => (
-    <Card className="w-full max-w-lg mx-auto">
-      <CardHeader className="text-center">
-        <CardTitle className="text-2xl">Voice Notes</CardTitle>
-        <CardDescription className="text-base mt-2">
-          Record voice notes to include in your handoff
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Placeholder for voice recording */}
-        <div className="bg-muted/30 rounded-lg p-8 flex flex-col items-center justify-center min-h-[200px] border-2 border-dashed border-muted">
-          <svg
-            className="w-16 h-16 text-muted-foreground mb-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1.5}
-              d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"
+  const renderVoiceNotesStep = () => {
+    const maxNotes = 5
+    const noteCount = voiceNotes.length
+
+    return (
+      <Card className="w-full max-w-lg mx-auto">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl">Voice Notes</CardTitle>
+          <CardDescription className="text-base mt-2">
+            Record voice notes to include in your handoff (optional)
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Voice note count indicator */}
+          <div className="flex items-center justify-center">
+            <span className={cn(
+              'text-sm font-medium px-3 py-1 rounded-full',
+              noteCount >= maxNotes
+                ? 'bg-destructive/10 text-destructive'
+                : 'bg-muted text-muted-foreground'
+            )}>
+              {noteCount}/{maxNotes} voice notes
+            </span>
+          </div>
+
+          {/* Voice note recorder (Story 9.3 AC#1, AC#2, AC#4) */}
+          {handoffId && (
+            <VoiceNoteRecorder
+              handoffId={handoffId}
+              onNoteAdded={handleVoiceNoteAdded}
+              onError={handleVoiceNoteError}
+              noteCount={noteCount}
+              maxNotes={maxNotes}
+              disabled={noteCount >= maxNotes}
             />
-          </svg>
-          <p className="text-muted-foreground text-center">
-            Voice note recording will be available in Story 9.3
-          </p>
-          <Button
-            variant="outline"
-            className="mt-4"
-            disabled
-          >
-            Add Voice Note
-          </Button>
-        </div>
+          )}
 
-        {/* Voice notes list placeholder */}
-        <div className="text-sm text-muted-foreground text-center">
-          No voice notes attached
-        </div>
+          {/* Voice notes list (Story 9.3 AC#3) */}
+          {voiceNotes.length > 0 ? (
+            <VoiceNoteList
+              notes={voiceNotes}
+              onDelete={handleVoiceNoteDelete}
+              deletingId={deletingNoteId}
+              editable={true}
+            />
+          ) : (
+            <div className="text-sm text-muted-foreground text-center py-4">
+              No voice notes attached yet
+            </div>
+          )}
 
-        {/* Navigation */}
-        <div className="flex gap-3 pt-4">
-          <Button
-            variant="outline"
-            onClick={handleBack}
-            className="flex-1 touch-target"
-          >
-            Back
-          </Button>
-          <Button
-            onClick={handleNext}
-            className="flex-1 touch-target"
-          >
-            Next
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  )
+          {/* Navigation */}
+          <div className="flex gap-3 pt-4">
+            <Button
+              variant="outline"
+              onClick={handleBack}
+              className="flex-1 touch-target"
+            >
+              Back
+            </Button>
+            <Button
+              onClick={handleNext}
+              className="flex-1 touch-target"
+            >
+              Next
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
 
   const renderConfirmationStep = () => (
     <Card className="w-full max-w-lg mx-auto">
@@ -628,6 +770,16 @@ export function HandoffCreator({
               </div>
             </div>
           )}
+
+          {/* Voice notes (Story 9.3) */}
+          <div className="space-y-1 pt-2 border-t">
+            <h4 className="font-medium text-sm">Voice Notes</h4>
+            <div className="text-sm text-muted-foreground">
+              {voiceNotes.length > 0
+                ? `${voiceNotes.length} voice note${voiceNotes.length !== 1 ? 's' : ''} attached`
+                : 'No voice notes attached'}
+            </div>
+          </div>
         </div>
 
         {/* Error display */}

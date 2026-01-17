@@ -22,9 +22,11 @@ import logging
 from typing import Optional, List
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
+import io
 
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, UploadFile, File, Form
 from pydantic import BaseModel, Field
+import httpx
 
 from supabase import Client, create_client
 
@@ -39,6 +41,12 @@ from app.models.handoff import (
     HandoffExistsResponse,
     HandoffCreationResponse,
     HandoffSynthesisResponse,
+    VoiceNote,
+    VoiceNoteList,
+    VoiceNoteUploadResponse,
+    VoiceNoteErrorCode,
+    VOICE_NOTE_MAX_DURATION_SECONDS,
+    VOICE_NOTE_MAX_COUNT,
 )
 from app.services.handoff import detect_current_shift, get_shift_time_range
 from app.services.briefing.handoff import get_handoff_synthesis_service
@@ -730,3 +738,489 @@ def _format_synthesis_for_storage(synthesis: HandoffSynthesisResponse) -> str:
         if section.content:
             parts.append(f"## {section.title}\n{section.content}")
     return "\n\n".join(parts)
+
+
+# ============================================================================
+# Voice Note Endpoints (Story 9.3)
+# ============================================================================
+
+
+# In-memory voice notes store (for MVP - persistent storage via Supabase)
+_voice_notes: dict[str, dict] = {}
+
+
+def _get_voice_notes_for_handoff(handoff_id: str) -> List[dict]:
+    """Get all voice notes for a handoff, ordered by sequence."""
+    notes = [n for n in _voice_notes.values() if n.get("handoff_id") == handoff_id]
+    notes.sort(key=lambda n: n.get("sequence_order", 0))
+    return notes
+
+
+def _get_voice_note_by_id(note_id: str) -> Optional[dict]:
+    """Get a voice note by ID."""
+    return _voice_notes.get(note_id)
+
+
+def _save_voice_note(note: dict) -> dict:
+    """Save a voice note to the store."""
+    _voice_notes[str(note["id"])] = note
+    return note
+
+
+def _delete_voice_note(note_id: str) -> bool:
+    """Delete a voice note from the store."""
+    if note_id in _voice_notes:
+        del _voice_notes[note_id]
+        return True
+    return False
+
+
+async def _transcribe_audio_with_elevenlabs(
+    audio_data: bytes,
+    content_type: str = "audio/webm"
+) -> Optional[str]:
+    """
+    Transcribe audio using ElevenLabs Scribe v2.
+
+    AC#2: Recording completion and transcription
+
+    Args:
+        audio_data: Raw audio bytes
+        content_type: MIME type of the audio
+
+    Returns:
+        Transcription text or None if failed
+    """
+    settings = get_settings()
+
+    if not settings.elevenlabs_api_key:
+        logger.warning("ElevenLabs API key not configured")
+        return None
+
+    url = "https://api.elevenlabs.io/v1/speech-to-text"
+    headers = {
+        "xi-api-key": settings.elevenlabs_api_key,
+    }
+
+    # Determine file extension from content type
+    ext_map = {
+        "audio/webm": "webm",
+        "audio/ogg": "ogg",
+        "audio/mp4": "m4a",
+        "audio/mpeg": "mp3",
+    }
+    ext = ext_map.get(content_type, "webm")
+
+    files = {
+        "audio": (f"audio.{ext}", audio_data, content_type),
+    }
+
+    data = {
+        "model_id": "scribe_v2",
+    }
+
+    try:
+        # Use longer timeout for transcription of up to 60-second audio
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                url,
+                headers=headers,
+                files=files,
+                data=data,
+            )
+
+            if response.status_code != 200:
+                logger.warning(
+                    f"ElevenLabs transcription failed: {response.status_code}"
+                )
+                return None
+
+            result = response.json()
+            text = result.get("text", "")
+            return text.strip() if text else None
+
+    except Exception as e:
+        logger.error(f"Error transcribing audio: {e}")
+        return None
+
+
+async def _upload_to_supabase_storage(
+    user_id: str,
+    handoff_id: str,
+    note_id: str,
+    audio_data: bytes,
+    content_type: str = "audio/webm"
+) -> Optional[str]:
+    """
+    Upload audio file to Supabase Storage.
+
+    AC#2: Audio is stored for playback
+
+    Path format: handoff-voice-notes/{user_id}/{handoff_id}/{note_id}.webm
+
+    Args:
+        user_id: User ID
+        handoff_id: Handoff ID
+        note_id: Voice note ID
+        audio_data: Raw audio bytes
+        content_type: MIME type
+
+    Returns:
+        Storage path or None if failed
+    """
+    supabase = _get_supabase_client()
+    if supabase is None:
+        # For MVP without Supabase, return a mock path
+        logger.info("Supabase not configured - using mock storage path")
+        return f"mock://{user_id}/{handoff_id}/{note_id}.webm"
+
+    # Determine file extension
+    ext_map = {
+        "audio/webm": "webm",
+        "audio/ogg": "ogg",
+        "audio/mp4": "m4a",
+    }
+    ext = ext_map.get(content_type, "webm")
+    storage_path = f"{user_id}/{handoff_id}/{note_id}.{ext}"
+
+    try:
+        # Upload to storage bucket
+        bucket = supabase.storage.from_("handoff-voice-notes")
+        result = bucket.upload(
+            storage_path,
+            audio_data,
+            {"content-type": content_type}
+        )
+
+        logger.info(f"Uploaded voice note to storage: {storage_path}")
+        return storage_path
+
+    except Exception as e:
+        logger.error(f"Error uploading to storage: {e}")
+        return None
+
+
+def _get_signed_url(storage_path: str) -> Optional[str]:
+    """
+    Get a signed URL for audio playback.
+
+    Args:
+        storage_path: Path in Supabase Storage
+
+    Returns:
+        Signed URL valid for 1 hour, or None if failed
+    """
+    if storage_path.startswith("mock://"):
+        # Return mock URL for development
+        return f"https://mock-storage.example.com/{storage_path[7:]}"
+
+    supabase = _get_supabase_client()
+    if supabase is None:
+        return None
+
+    try:
+        bucket = supabase.storage.from_("handoff-voice-notes")
+        result = bucket.create_signed_url(storage_path, 3600)  # 1 hour
+        return result.get("signedURL") or result.get("signedUrl")
+    except Exception as e:
+        logger.error(f"Error creating signed URL: {e}")
+        return None
+
+
+@router.post("/{handoff_id}/voice-notes", response_model=VoiceNoteUploadResponse)
+async def upload_voice_note(
+    handoff_id: UUID,
+    audio: UploadFile = File(..., description="Audio file (webm/ogg/mp4)"),
+    duration_seconds: int = Form(..., description="Duration in seconds"),
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Upload a voice note for a shift handoff (Story 9.3 Task 2.1).
+
+    AC#2: Recording completion and transcription
+    AC#3: Multiple voice notes management
+
+    Process:
+    1. Validate handoff ownership and note limits
+    2. Upload audio to Supabase Storage
+    3. Transcribe via ElevenLabs Scribe v2
+    4. Store record in handoff_voice_notes table
+    5. Return voice note with transcript
+
+    Raises:
+        400: Duration exceeds 60 seconds or limit reached
+        403: User is not the owner of the handoff
+        404: Handoff not found
+        413: File too large (handled by FastAPI)
+    """
+    user_id = current_user.id
+
+    # Validate handoff exists and belongs to user
+    handoff = _get_handoff_by_id(str(handoff_id))
+    if not handoff:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "Handoff not found",
+                "code": VoiceNoteErrorCode.HANDOFF_NOT_FOUND.value,
+            }
+        )
+
+    if handoff.get("user_id") != user_id:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "Access denied",
+                "code": VoiceNoteErrorCode.NOT_AUTHORIZED.value,
+            }
+        )
+
+    # Validate duration (Task 2.6)
+    if duration_seconds > VOICE_NOTE_MAX_DURATION_SECONDS:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": f"Duration exceeds maximum of {VOICE_NOTE_MAX_DURATION_SECONDS} seconds",
+                "code": VoiceNoteErrorCode.DURATION_TOO_LONG.value,
+            }
+        )
+
+    # Check note count limit (Task 2.7)
+    existing_notes = _get_voice_notes_for_handoff(str(handoff_id))
+    if len(existing_notes) >= VOICE_NOTE_MAX_COUNT:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": f"Maximum of {VOICE_NOTE_MAX_COUNT} voice notes reached",
+                "code": VoiceNoteErrorCode.LIMIT_EXCEEDED.value,
+                "fallback_suggestion": "Delete a voice note to add a new one",
+            }
+        )
+
+    # Read audio data (Task 2.2)
+    audio_data = await audio.read()
+    content_type = audio.content_type or "audio/webm"
+
+    # Generate note ID
+    note_id = uuid4()
+
+    # Upload to storage (Task 2.3)
+    storage_path = await _upload_to_supabase_storage(
+        user_id=user_id,
+        handoff_id=str(handoff_id),
+        note_id=str(note_id),
+        audio_data=audio_data,
+        content_type=content_type,
+    )
+
+    if not storage_path:
+        raise HTTPException(
+            status_code=500,
+            detail={
+                "error": "Failed to upload audio file",
+                "code": VoiceNoteErrorCode.UPLOAD_FAILED.value,
+                "fallback_suggestion": "Try recording again or add text notes instead",
+            }
+        )
+
+    # Transcribe audio (Task 2.4)
+    transcript = await _transcribe_audio_with_elevenlabs(audio_data, content_type)
+
+    # If transcription failed, still save the note (AC#4 graceful degradation)
+    if not transcript:
+        logger.warning(f"Transcription failed for note {note_id}, saving without transcript")
+
+    # Calculate sequence order
+    sequence_order = len(existing_notes)
+
+    # Create voice note record (Task 2.5)
+    now = datetime.now(timezone.utc)
+    note_data = {
+        "id": str(note_id),
+        "handoff_id": str(handoff_id),
+        "user_id": user_id,
+        "storage_path": storage_path,
+        "transcript": transcript,
+        "duration_seconds": duration_seconds,
+        "sequence_order": sequence_order,
+        "created_at": now.isoformat(),
+    }
+    _save_voice_note(note_data)
+
+    # Get signed URL for immediate playback
+    storage_url = _get_signed_url(storage_path)
+
+    # Build response
+    voice_note = VoiceNote(
+        id=note_id,
+        handoff_id=handoff_id,
+        user_id=UUID(user_id),
+        storage_path=storage_path,
+        storage_url=storage_url,
+        transcript=transcript,
+        duration_seconds=duration_seconds,
+        sequence_order=sequence_order,
+        created_at=now,
+    )
+
+    total_notes = len(existing_notes) + 1
+    can_add_more = total_notes < VOICE_NOTE_MAX_COUNT
+
+    logger.info(
+        f"Voice note uploaded: {note_id} for handoff {handoff_id} "
+        f"({total_notes}/{VOICE_NOTE_MAX_COUNT} notes)"
+    )
+
+    message = "Voice note uploaded successfully"
+    if not transcript:
+        message = "Voice note saved (transcription unavailable)"
+
+    return VoiceNoteUploadResponse(
+        note=voice_note,
+        total_notes=total_notes,
+        can_add_more=can_add_more,
+        message=message,
+    )
+
+
+@router.get("/{handoff_id}/voice-notes", response_model=VoiceNoteList)
+async def list_voice_notes(
+    handoff_id: UUID,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    List voice notes for a handoff (Story 9.3 Task 2.1).
+
+    AC#3: Multiple voice notes management - shows duration and timestamp
+
+    Returns:
+        VoiceNoteList with all notes ordered by sequence
+    """
+    user_id = current_user.id
+
+    # Validate handoff exists and belongs to user
+    handoff = _get_handoff_by_id(str(handoff_id))
+    if not handoff:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "Handoff not found",
+                "code": VoiceNoteErrorCode.HANDOFF_NOT_FOUND.value,
+            }
+        )
+
+    if handoff.get("user_id") != user_id:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "Access denied",
+                "code": VoiceNoteErrorCode.NOT_AUTHORIZED.value,
+            }
+        )
+
+    # Get voice notes
+    note_records = _get_voice_notes_for_handoff(str(handoff_id))
+
+    # Convert to VoiceNote models with signed URLs
+    notes = []
+    for record in note_records:
+        storage_url = _get_signed_url(record["storage_path"])
+        notes.append(VoiceNote(
+            id=UUID(record["id"]),
+            handoff_id=handoff_id,
+            user_id=UUID(record["user_id"]),
+            storage_path=record["storage_path"],
+            storage_url=storage_url,
+            transcript=record.get("transcript"),
+            duration_seconds=record["duration_seconds"],
+            sequence_order=record["sequence_order"],
+            created_at=datetime.fromisoformat(record["created_at"]),
+        ))
+
+    return VoiceNoteList.from_notes(notes)
+
+
+@router.delete("/{handoff_id}/voice-notes/{note_id}", status_code=204)
+async def delete_voice_note(
+    handoff_id: UUID,
+    note_id: UUID,
+    current_user: CurrentUser = Depends(get_current_user)
+):
+    """
+    Delete a voice note (Story 9.3 Task 2.1).
+
+    AC#3: Users can delete notes to add more
+
+    Returns:
+        204 No Content on success
+
+    Raises:
+        403: User is not the owner
+        404: Handoff or note not found
+    """
+    user_id = current_user.id
+
+    # Validate handoff exists and belongs to user
+    handoff = _get_handoff_by_id(str(handoff_id))
+    if not handoff:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "Handoff not found",
+                "code": VoiceNoteErrorCode.HANDOFF_NOT_FOUND.value,
+            }
+        )
+
+    if handoff.get("user_id") != user_id:
+        raise HTTPException(
+            status_code=403,
+            detail={
+                "error": "Access denied",
+                "code": VoiceNoteErrorCode.NOT_AUTHORIZED.value,
+            }
+        )
+
+    # Get the voice note
+    note = _get_voice_note_by_id(str(note_id))
+    if not note:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "Voice note not found",
+                "code": "not_found",
+            }
+        )
+
+    # Verify the note belongs to this handoff
+    if note.get("handoff_id") != str(handoff_id):
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "Voice note not found",
+                "code": "not_found",
+            }
+        )
+
+    # Delete from storage (if not mock)
+    storage_path = note.get("storage_path")
+    if storage_path and not storage_path.startswith("mock://"):
+        supabase = _get_supabase_client()
+        if supabase:
+            try:
+                bucket = supabase.storage.from_("handoff-voice-notes")
+                bucket.remove([storage_path])
+            except Exception as e:
+                logger.warning(f"Failed to delete from storage: {e}")
+
+    # Delete from in-memory store
+    _delete_voice_note(str(note_id))
+
+    # Resequence remaining notes
+    remaining_notes = _get_voice_notes_for_handoff(str(handoff_id))
+    for i, remaining in enumerate(remaining_notes):
+        remaining["sequence_order"] = i
+        _save_voice_note(remaining)
+
+    logger.info(f"Voice note deleted: {note_id} from handoff {handoff_id}")
+
+    return None

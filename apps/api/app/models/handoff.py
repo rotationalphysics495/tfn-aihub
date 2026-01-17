@@ -427,3 +427,137 @@ class HandoffSynthesisData(BaseModel):
             if field and not field.success:
                 tools.append(name)
         return tools
+
+
+# =============================================================================
+# Voice Note Models (Story 9.3)
+# =============================================================================
+
+
+# Constraints
+VOICE_NOTE_MAX_DURATION_SECONDS = 60
+VOICE_NOTE_MAX_COUNT = 5
+
+
+class VoiceNoteCreate(BaseModel):
+    """
+    Input schema for uploading a voice note (Story 9.3 Task 3.1).
+
+    Used when a supervisor records a voice note to attach to their handoff.
+    The actual audio file is uploaded via multipart/form-data.
+
+    AC#2: Recording completion and transcription
+    """
+    handoff_id: UUID = Field(..., description="Handoff ID to attach the note to")
+    duration_seconds: int = Field(
+        ...,
+        description="Duration of the recording in seconds",
+        ge=1,
+        le=VOICE_NOTE_MAX_DURATION_SECONDS
+    )
+
+    model_config = {"from_attributes": True}
+
+
+class VoiceNote(BaseModel):
+    """
+    Response schema for a voice note (Story 9.3 Task 3.1).
+
+    Contains all voice note data including transcript and storage URL.
+
+    AC#2: Recording completion and transcription
+    AC#3: Multiple voice notes management
+    """
+    id: UUID = Field(..., description="Unique voice note identifier")
+    handoff_id: UUID = Field(..., description="Parent handoff ID")
+    user_id: UUID = Field(..., description="User who created the note")
+    storage_path: str = Field(..., description="Path in Supabase Storage")
+    storage_url: Optional[str] = Field(
+        None,
+        description="Signed URL for audio playback"
+    )
+    transcript: Optional[str] = Field(
+        None,
+        description="ElevenLabs Scribe transcription"
+    )
+    duration_seconds: int = Field(..., description="Duration in seconds")
+    sequence_order: int = Field(..., description="Order within the handoff")
+    created_at: datetime = Field(..., description="When the note was created")
+
+    model_config = {"from_attributes": True}
+
+
+class VoiceNoteList(BaseModel):
+    """
+    Response schema for listing voice notes (Story 9.3 Task 3.1).
+
+    Returns all voice notes for a handoff with metadata.
+
+    AC#3: Multiple voice notes management
+    """
+    notes: List[VoiceNote] = Field(
+        default_factory=list,
+        description="List of voice notes ordered by sequence"
+    )
+    count: int = Field(0, description="Number of voice notes")
+    max_count: int = Field(
+        VOICE_NOTE_MAX_COUNT,
+        description="Maximum notes allowed per handoff"
+    )
+    can_add_more: bool = Field(
+        True,
+        description="Whether more notes can be added"
+    )
+
+    @classmethod
+    def from_notes(cls, notes: List[VoiceNote]) -> "VoiceNoteList":
+        """Create a VoiceNoteList from a list of notes."""
+        count = len(notes)
+        return cls(
+            notes=notes,
+            count=count,
+            max_count=VOICE_NOTE_MAX_COUNT,
+            can_add_more=count < VOICE_NOTE_MAX_COUNT,
+        )
+
+
+class VoiceNoteUploadResponse(BaseModel):
+    """
+    Response after successfully uploading a voice note.
+
+    Includes the created note and updated counts.
+    """
+    note: VoiceNote = Field(..., description="The created voice note")
+    total_notes: int = Field(..., description="Total notes in handoff")
+    can_add_more: bool = Field(..., description="Whether more can be added")
+    message: str = Field(
+        "Voice note uploaded successfully",
+        description="Status message"
+    )
+
+
+class VoiceNoteError(BaseModel):
+    """
+    Error response for voice note operations.
+
+    AC#4: Recording error handling
+    """
+    error: str = Field(..., description="Error message")
+    code: str = Field(..., description="Error code")
+    fallback_suggestion: Optional[str] = Field(
+        None,
+        description="Suggested fallback action"
+    )
+
+
+class VoiceNoteErrorCode(str, Enum):
+    """
+    Error codes for voice note operations (AC#4).
+    """
+    LIMIT_EXCEEDED = "limit_exceeded"
+    DURATION_TOO_LONG = "duration_too_long"
+    UPLOAD_FAILED = "upload_failed"
+    TRANSCRIPTION_FAILED = "transcription_failed"
+    HANDOFF_NOT_FOUND = "handoff_not_found"
+    NOT_AUTHORIZED = "not_authorized"
+    INVALID_AUDIO = "invalid_audio"
