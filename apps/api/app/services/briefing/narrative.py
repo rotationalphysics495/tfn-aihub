@@ -1,5 +1,5 @@
 """
-Narrative Generator (Story 8.3)
+Narrative Generator (Story 8.3, 8.6)
 
 LLM-powered narrative formatting for briefings.
 Transforms tool data into natural language sections.
@@ -10,6 +10,10 @@ AC#2: Narrative Generation
 - Top concerns (gaps, issues)
 - Recommended actions
 - All metrics include citations
+
+Story 8.6: Voice Number Formatting Integration
+- All numeric metrics formatted for natural speech before TTS
+- Uses formatters module for consistent number formatting
 
 References:
 - [Source: architecture/voice-briefing.md#BriefingService Architecture]
@@ -26,12 +30,18 @@ from app.models.briefing import (
     BriefingCitation,
     BriefingData,
 )
+from app.services.briefing.formatters import (
+    format_number_for_voice,
+    format_percentage_for_voice,
+    format_currency_for_voice,
+    format_duration_for_voice,
+)
 
 logger = logging.getLogger(__name__)
 
 
 # Narrative generation prompt template
-NARRATIVE_PROMPT = """You are a manufacturing briefing narrator. Transform the following data into natural, conversational briefing sections.
+NARRATIVE_PROMPT = """You are a manufacturing briefing narrator. Transform the following data into natural, conversational briefing sections optimized for voice delivery.
 
 DATA:
 {data}
@@ -58,7 +68,8 @@ Generate briefing sections in this JSON format:
 
 Guidelines:
 - Be conversational, not robotic ("We're tracking slightly behind" not "Variance: -3.2%")
-- Round large numbers naturally ("about 145,000 units" not "145,230 units")
+- Numbers are already formatted for voice - use them as provided (e.g., "about 2.1 million units")
+- Use percentages as provided (e.g., "87 percent")
 - Include [Source: table_name] citations after key metrics
 - Start safety section with status (all clear vs issues)
 - Keep each section under 50 words
@@ -130,18 +141,27 @@ class NarrativeGenerator:
         return self._generate_with_template(briefing_data)
 
     def _prepare_data_summary(self, briefing_data: BriefingData) -> str:
-        """Prepare data summary for LLM prompt."""
+        """Prepare data summary for LLM prompt with voice-formatted numbers (Story 8.6)."""
         summary_parts = []
 
         # Production status
         if briefing_data.production_status and briefing_data.production_status.success:
             data = briefing_data.production_status.data or {}
             summary = data.get("summary", {})
+            total_output = summary.get('total_output')
+            total_target = summary.get('total_target')
+            variance_pct = summary.get('total_variance_percent')
+
+            # Format numbers for voice (Story 8.6)
+            output_formatted = format_number_for_voice(total_output, "units") if total_output is not None else "N/A"
+            target_formatted = format_number_for_voice(total_target, "units") if total_target is not None else "N/A"
+            variance_formatted = format_percentage_for_voice(variance_pct) if variance_pct is not None else "N/A"
+
             summary_parts.append(f"""
 PRODUCTION STATUS:
-- Total Output: {summary.get('total_output', 'N/A')} units
-- Target: {summary.get('total_target', 'N/A')} units
-- Variance: {summary.get('total_variance_percent', 'N/A')}%
+- Total Output: {output_formatted}
+- Target: {target_formatted}
+- Variance: {variance_formatted}
 - Assets Ahead: {summary.get('ahead_count', 0)}
 - Assets Behind: {summary.get('behind_count', 0)}
 - Needing Attention: {', '.join(summary.get('assets_needing_attention', [])[:3])}
@@ -160,22 +180,37 @@ SAFETY:
         # OEE
         if briefing_data.oee_data and briefing_data.oee_data.success:
             data = briefing_data.oee_data.data or {}
+            # Format percentages for voice (Story 8.6)
+            oee_val = data.get('oee_percentage', data.get('oee'))
+            availability_val = data.get('availability')
+            performance_val = data.get('performance')
+            quality_val = data.get('quality')
+
+            oee_formatted = format_percentage_for_voice(oee_val) if oee_val is not None else "N/A"
+            availability_formatted = format_percentage_for_voice(availability_val) if availability_val is not None else "N/A"
+            performance_formatted = format_percentage_for_voice(performance_val) if performance_val is not None else "N/A"
+            quality_formatted = format_percentage_for_voice(quality_val) if quality_val is not None else "N/A"
+
             summary_parts.append(f"""
 OEE:
-- Plant OEE: {data.get('oee_percentage', data.get('oee', 'N/A'))}%
-- Availability: {data.get('availability', 'N/A')}%
-- Performance: {data.get('performance', 'N/A')}%
-- Quality: {data.get('quality', 'N/A')}%
+- Plant OEE: {oee_formatted}
+- Availability: {availability_formatted}
+- Performance: {performance_formatted}
+- Quality: {quality_formatted}
 [Source: daily_summaries]""")
 
         # Downtime
         if briefing_data.downtime_analysis and briefing_data.downtime_analysis.success:
             data = briefing_data.downtime_analysis.data or {}
             reasons = data.get("top_reasons", [])[:3]
-            reason_text = "; ".join([
-                f"{r.get('reason', 'Unknown')}: {r.get('duration_minutes', 0)}min"
-                for r in reasons
-            ]) if reasons else "No significant downtime"
+            # Format durations for voice (Story 8.6)
+            reason_parts = []
+            for r in reasons:
+                reason_name = r.get('reason', 'Unknown')
+                duration_min = r.get('duration_minutes', 0)
+                duration_formatted = format_duration_for_voice(duration_min)
+                reason_parts.append(f"{reason_name}: {duration_formatted}")
+            reason_text = "; ".join(reason_parts) if reason_parts else "No significant downtime"
             summary_parts.append(f"""
 DOWNTIME:
 - Top Reasons: {reason_text}
@@ -315,7 +350,7 @@ RECOMMENDED ACTIONS:
         return sections
 
     def _generate_headline_template(self, briefing_data: BriefingData) -> str:
-        """Generate headline using template."""
+        """Generate headline using template with voice formatting (Story 8.6)."""
         parts = []
 
         # Safety first
@@ -331,16 +366,20 @@ RECOMMENDED ACTIONS:
             data = briefing_data.production_status.data or {}
             summary = data.get("summary", {})
             variance = summary.get("total_variance_percent", 0)
+            # Format percentage for voice (Story 8.6)
+            variance_formatted = format_percentage_for_voice(abs(variance))
             if variance >= 0:
-                parts.append(f"Production is tracking {abs(variance):.1f}% ahead of target.")
+                parts.append(f"Production is tracking {variance_formatted} ahead of target.")
             else:
-                parts.append(f"Production is {abs(variance):.1f}% behind target.")
+                parts.append(f"Production is {variance_formatted} behind target.")
 
         # OEE
         if briefing_data.oee_data and briefing_data.oee_data.success:
             data = briefing_data.oee_data.data or {}
             oee = data.get("oee_percentage", data.get("oee", 0))
-            parts.append(f"Plant OEE stands at {oee}%. [Source: daily_summaries]")
+            # Format percentage for voice (Story 8.6)
+            oee_formatted = format_percentage_for_voice(oee)
+            parts.append(f"Plant OEE stands at {oee_formatted}. [Source: daily_summaries]")
 
         return " ".join(parts) if parts else "Here's your morning briefing summary."
 
@@ -367,7 +406,7 @@ RECOMMENDED ACTIONS:
             return f"{ahead_count} assets are currently exceeding their production targets. [Source: live_snapshots]"
 
     def _generate_concerns_template(self, briefing_data: BriefingData) -> str:
-        """Generate concerns section using template."""
+        """Generate concerns section using template with voice formatting (Story 8.6)."""
         concerns = []
 
         # Safety concerns
@@ -390,9 +429,12 @@ RECOMMENDED ACTIONS:
             reasons = data.get("top_reasons", [])
             if reasons:
                 top_reason = reasons[0]
+                # Format duration for voice (Story 8.6)
+                duration_min = top_reason.get('duration_minutes', 0)
+                duration_formatted = format_duration_for_voice(duration_min)
                 concerns.append(
                     f"Downtime: {top_reason.get('reason', 'Unknown')} caused "
-                    f"{top_reason.get('duration_minutes', 0)} minutes of lost time. [Source: downtime_events]"
+                    f"{duration_formatted} of lost time. [Source: downtime_events]"
                 )
 
         if not concerns:

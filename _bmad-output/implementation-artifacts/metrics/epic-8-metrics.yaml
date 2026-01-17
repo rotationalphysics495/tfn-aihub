@@ -1,13 +1,13 @@
 epic_id: "8"
 execution:
-  start_time: "2026-01-16T17:12:35Z"
+  start_time: "2026-01-17T02:49:12Z"
   end_time: ""
   duration_seconds: 0
 stories:
   total: 0
-  completed: 1
+  completed: 0
   failed: 0
-  skipped: 3
+  skipped: 5
 validation:
   gate_executed: false
   gate_status: "PENDING"

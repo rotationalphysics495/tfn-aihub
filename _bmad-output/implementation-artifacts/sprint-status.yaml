@@ -191,7 +191,7 @@ development_status:
   # Story 8.5: Supervisor Scoped Briefings
   # - Briefings filtered to assigned assets only
   # - supervisor_assignments table for role-based scoping
-  8-5-supervisor-scoped-briefings: ready-for-dev
+  8-5-supervisor-scoped-briefings: done
 
   # Story 8.6: Voice Number Formatting
   # - Format numbers for natural speech ("2.1 million" not "2,130,500")
