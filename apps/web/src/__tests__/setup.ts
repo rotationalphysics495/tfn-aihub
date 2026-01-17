@@ -1,6 +1,9 @@
 import '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
 
+// Mock scrollIntoView since jsdom doesn't support it
+window.HTMLElement.prototype.scrollIntoView = vi.fn()
+
 // Mock Next.js router
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -12,6 +15,7 @@ vi.mock('next/navigation', () => ({
     get: vi.fn().mockReturnValue(null),
   }),
   usePathname: () => '/',
+  useParams: () => ({}),
 }))
 
 // Mock environment variables

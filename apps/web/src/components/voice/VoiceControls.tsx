@@ -1,20 +1,27 @@
 'use client';
 
 /**
- * VoiceControls Component (Story 8.4)
+ * VoiceControls Component (Story 8.4, 8.7)
  *
  * Playback controls for voice briefings with Play/Pause/Next/End buttons.
- * Includes section navigation and visual feedback for current state.
+ * Includes section navigation, visual feedback, and keyboard shortcuts.
  *
+ * Story 8.4:
  * AC#2: Play/Pause/Next/End Briefing controls
  * AC#3: Area section navigation
  * AC#4: Visual countdown for silence detection
  *
+ * Story 8.7:
+ * AC#3: Skip to Next functionality
+ * AC#4: End Briefing with confirmation
+ * Task 4.4: Keyboard shortcuts (Space for pause, Right arrow for skip)
+ *
  * References:
  * - [Source: architecture/voice-briefing.md#Voice Integration Architecture]
+ * - [Source: epic-8.md#Story 8.7]
  */
 
-import React from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import { type BriefingStatus, type BriefingSection } from '@/lib/hooks/useBriefing';
 
 /**
@@ -47,6 +54,10 @@ export interface VoiceControlsProps {
   className?: string;
   /** Compact mode */
   compact?: boolean;
+  /** Enable keyboard shortcuts (default: true) */
+  enableKeyboardShortcuts?: boolean;
+  /** Show keyboard shortcut hints */
+  showShortcutHints?: boolean;
 }
 
 /**
@@ -56,6 +67,11 @@ export interface VoiceControlsProps {
  * - AC#2: Play/Pause/Next/End controls
  * - AC#3: Section navigation (skip forward/back)
  * - AC#4: Silence countdown display
+ *
+ * Story 8.7 Implementation:
+ * - AC#3: Skip to Next immediately ends current section
+ * - AC#4: End Briefing with confirmation dialog
+ * - Task 4.4: Keyboard shortcuts
  */
 export function VoiceControls({
   status,
@@ -71,6 +87,8 @@ export function VoiceControls({
   onContinue,
   className = '',
   compact = false,
+  enableKeyboardShortcuts = true,
+  showShortcutHints = false,
 }: VoiceControlsProps) {
   const isPlaying = status === 'playing';
   const isPaused = status === 'paused';
@@ -81,6 +99,106 @@ export function VoiceControls({
 
   const canGoBack = currentSectionIndex > 0;
   const canGoForward = currentSectionIndex < totalSections - 1;
+
+  // State for end briefing confirmation dialog
+  const [showEndConfirmation, setShowEndConfirmation] = useState(false);
+
+  /**
+   * Handle keyboard shortcuts (Story 8.7 Task 4.4)
+   * - Space: Pause/Resume or Continue
+   * - Right Arrow: Skip to next section
+   * - Left Arrow: Go to previous section
+   * - Escape: Close confirmation dialog
+   */
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent) => {
+      // Don't handle if user is typing in an input
+      if (
+        event.target instanceof HTMLInputElement ||
+        event.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      switch (event.key) {
+        case ' ':
+        case 'Spacebar':
+          event.preventDefault();
+          if (isAwaitingResponse) {
+            onContinue?.();
+          } else if (isPlaying) {
+            onPause?.();
+          } else if (isPaused || status === 'idle') {
+            onPlay?.();
+          }
+          break;
+
+        case 'ArrowRight':
+          event.preventDefault();
+          if (canGoForward && !isLoading) {
+            onNext?.();
+          } else if (isAwaitingResponse) {
+            onContinue?.();
+          }
+          break;
+
+        case 'ArrowLeft':
+          event.preventDefault();
+          if (canGoBack && !isLoading) {
+            onPrevious?.();
+          }
+          break;
+
+        case 'Escape':
+          if (showEndConfirmation) {
+            event.preventDefault();
+            setShowEndConfirmation(false);
+          }
+          break;
+      }
+    },
+    [
+      status,
+      isPlaying,
+      isPaused,
+      isAwaitingResponse,
+      isLoading,
+      canGoBack,
+      canGoForward,
+      showEndConfirmation,
+      onPlay,
+      onPause,
+      onNext,
+      onPrevious,
+      onContinue,
+    ]
+  );
+
+  // Register keyboard event listener
+  useEffect(() => {
+    if (!enableKeyboardShortcuts) return;
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [enableKeyboardShortcuts, handleKeyDown]);
+
+  /**
+   * Handle end briefing with confirmation (Story 8.7 AC#4)
+   */
+  const handleEndClick = useCallback(() => {
+    setShowEndConfirmation(true);
+  }, []);
+
+  const handleConfirmEnd = useCallback(() => {
+    setShowEndConfirmation(false);
+    onEnd?.();
+  }, [onEnd]);
+
+  const handleCancelEnd = useCallback(() => {
+    setShowEndConfirmation(false);
+  }, []);
 
   // Status text
   const getStatusText = () => {
@@ -119,32 +237,34 @@ export function VoiceControls({
       </div>
 
       {/* Progress bar */}
-      <div className="voice-controls__progress mb-4">
-        <div className="h-1 bg-gray-200 rounded-full overflow-hidden">
-          <div
-            className="h-full bg-blue-600 transition-all duration-300"
-            style={{
-              width: `${((currentSectionIndex + 1) / totalSections) * 100}%`,
-            }}
-          />
-        </div>
-        {/* Section markers */}
-        <div className="flex justify-between mt-1">
-          {Array.from({ length: totalSections }).map((_, idx) => (
+      {totalSections > 0 && (
+        <div className="voice-controls__progress mb-4">
+          <div className="h-1 bg-gray-200 rounded-full overflow-hidden">
             <div
-              key={idx}
-              className={`w-2 h-2 rounded-full ${
-                idx < currentSectionIndex
-                  ? 'bg-blue-600'
-                  : idx === currentSectionIndex
-                  ? 'bg-blue-600 ring-2 ring-blue-200'
-                  : 'bg-gray-300'
-              }`}
-              title={`Section ${idx + 1}`}
+              className="h-full bg-blue-600 transition-all duration-300"
+              style={{
+                width: `${((currentSectionIndex + 1) / totalSections) * 100}%`,
+              }}
             />
-          ))}
+          </div>
+          {/* Section markers */}
+          <div className="flex justify-between mt-1">
+            {Array.from({ length: totalSections }).map((_, idx) => (
+              <div
+                key={idx}
+                className={`w-2 h-2 rounded-full ${
+                  idx < currentSectionIndex
+                    ? 'bg-blue-600'
+                    : idx === currentSectionIndex
+                    ? 'bg-blue-600 ring-2 ring-blue-200'
+                    : 'bg-gray-300'
+                }`}
+                title={`Section ${idx + 1}`}
+              />
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Silence countdown indicator */}
       {silenceCountdown !== null && isAwaitingResponse && (
@@ -295,13 +415,74 @@ export function VoiceControls({
               text-sm text-gray-500 hover:text-gray-700
               flex items-center gap-1 transition-colors
             "
-            onClick={onEnd}
+            onClick={handleEndClick}
+            aria-label="End briefing"
           >
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
               <path d="M6 6h12v12H6z" />
             </svg>
             End briefing
           </button>
+        </div>
+      )}
+
+      {/* End Briefing Confirmation Dialog (Story 8.7 AC#4) */}
+      {showEndConfirmation && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="end-confirmation-title"
+        >
+          <div className="bg-white rounded-xl shadow-xl p-6 max-w-sm mx-4">
+            <h3
+              id="end-confirmation-title"
+              className="text-lg font-semibold text-gray-900 mb-2"
+            >
+              End Briefing?
+            </h3>
+            <p className="text-sm text-gray-600 mb-6">
+              You&apos;ve completed {currentSectionIndex + 1} of {totalSections} sections.
+              Your progress will be saved.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                onClick={handleCancelEnd}
+                autoFocus
+              >
+                Continue Briefing
+              </button>
+              <button
+                type="button"
+                className="px-4 py-2 text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 rounded-lg transition-colors"
+                onClick={handleConfirmEnd}
+              >
+                End Briefing
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Keyboard Shortcut Hints */}
+      {showShortcutHints && !isComplete && (
+        <div className="voice-controls__shortcuts mt-4 text-center">
+          <div className="inline-flex items-center gap-4 text-xs text-gray-400">
+            <span>
+              <kbd className="px-1.5 py-0.5 bg-gray-100 rounded border border-gray-200 font-mono">Space</kbd>
+              {' '}Pause/Play
+            </span>
+            <span>
+              <kbd className="px-1.5 py-0.5 bg-gray-100 rounded border border-gray-200 font-mono">→</kbd>
+              {' '}Skip
+            </span>
+            <span>
+              <kbd className="px-1.5 py-0.5 bg-gray-100 rounded border border-gray-200 font-mono">←</kbd>
+              {' '}Previous
+            </span>
+          </div>
         </div>
       )}
 

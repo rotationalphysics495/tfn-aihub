@@ -196,12 +196,12 @@ development_status:
   # Story 8.6: Voice Number Formatting
   # - Format numbers for natural speech ("2.1 million" not "2,130,500")
   # - Percentages, durations, currency conversions
-  8-6-voice-number-formatting: ready-for-dev
+  8-6-voice-number-formatting: done
 
   # Story 8.7: Area-by-Area Delivery UI
   # - Visual progress indicator, transcript panel
   # - Play/pause/skip controls, section stepper
-  8-7-area-by-area-delivery-ui: ready-for-dev
+  8-7-area-by-area-delivery-ui: done
 
   # Story 8.8: User Preference Onboarding
   # - First-time onboarding flow for briefing preferences

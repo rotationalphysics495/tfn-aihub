@@ -17,6 +17,24 @@
 set -e
 
 # =============================================================================
+# Pipeline Protection
+# =============================================================================
+# CRITICAL: This script must NOT be piped to head/tail/etc as it will cause
+# premature termination when the pipe closes. Detect and warn.
+
+if [ ! -t 1 ] && [ -z "$EPIC_EXECUTE_ALLOW_PIPE" ]; then
+    # stdout is not a terminal (being piped)
+    echo "WARNING: epic-execute.sh output is being piped." >&2
+    echo "This can cause premature script termination if piped to head/tail/etc." >&2
+    echo "To suppress this warning, set EPIC_EXECUTE_ALLOW_PIPE=1" >&2
+    echo "" >&2
+    # Don't exit - just warn, in case it's being piped to tee or a log file
+fi
+
+# Ignore SIGPIPE to prevent script death when pipe closes
+trap '' PIPE 2>/dev/null || true
+
+# =============================================================================
 # Configuration
 # =============================================================================
 
@@ -409,6 +427,11 @@ if [ -z "$EPIC_ID" ]; then
     echo "  --verbose       Detailed output"
     echo "  --start-from ID Start from a specific story (e.g., 31-2)"
     echo "  --skip-done     Skip stories with Status: Done"
+    echo ""
+    echo "WARNING: Do NOT pipe output to head/tail/etc - this kills the script!"
+    echo "  BAD:  ./epic-execute.sh 8 | head -100"
+    echo "  GOOD: ./epic-execute.sh 8"
+    echo "  GOOD: ./epic-execute.sh 8 2>&1 | tee epic.log"
     exit 1
 fi
 
@@ -521,63 +544,44 @@ fi
 execute_dev_phase() {
     local story_file="$1"
     local story_id=$(basename "$story_file" .md)
-    
-    log ">>> DEV PHASE: $story_id"
-    
-    local story_contents=$(cat "$story_file")
-    
-    # Build the dev prompt
-    local dev_prompt="You are the Dev agent executing a BMAD story implementation.
 
-## Your Task
+    log ">>> DEV PHASE: $story_id (using BMAD dev-story workflow)"
 
-Implement story: $story_id
+    # Build BMAD workflow invocation prompt
+    # This invokes the actual dev-story workflow which:
+    # - Loads project-context.md for coding standards
+    # - Uses red-green-refactor TDD cycle
+    # - Tracks sprint-status.yaml
+    # - Validates definition-of-done
+    local dev_prompt="Execute the BMAD dev-story workflow for story: $story_file
 
-## Story Specification
+CRITICAL INSTRUCTIONS:
+1. Load the workflow configuration from: _bmad/bmm/workflows/4-implementation/dev-story/workflow.yaml
+2. Load the workflow instructions from: _bmad/bmm/workflows/4-implementation/dev-story/instructions.xml
+3. Execute the workflow steps exactly as specified in instructions.xml
+4. The story file path is: $story_file
+5. Run in YOLO mode - do NOT ask for user confirmation, proceed autonomously
+6. Complete ALL tasks and subtasks in the story
+7. Run tests and ensure they pass
+8. Update the story file Status to 'review' when complete
+9. Stage all changes with: git add -A
 
-<story>
-$story_contents
-</story>
-
-## Implementation Requirements
-
-1. Read the story file completely before writing any code
-2. Follow existing patterns in the codebase
-3. Implement ALL acceptance criteria
-4. Write tests for each criterion
-5. Run tests and fix any failures
-6. Update documentation as needed
-
-## When Complete
-
-1. Update the story file:
-   - Change Status to: In Review
-   - Fill in the Dev Agent Record section with:
-     - Implementation Summary
-     - Files Created/Modified
-     - Key Decisions
-     - Tests Added
-     - Test Results (summary of test run)
-     - Notes for Reviewer
-     - Acceptance Criteria Status (checklist with file references)
-
-2. Stage changes: git add -A
-
-3. Output exactly: IMPLEMENTATION COMPLETE: $story_id
-
-If blocked, output: IMPLEMENTATION BLOCKED: $story_id - [reason]"
+When the workflow completes successfully, output exactly: IMPLEMENTATION COMPLETE: $story_id
+If blocked or failed, output: IMPLEMENTATION BLOCKED: $story_id - [reason]"
 
     if [ "$DRY_RUN" = true ]; then
-        echo "[DRY RUN] Would execute dev phase for $story_id"
+        echo "[DRY RUN] Would execute BMAD dev-story workflow for $story_id"
         return 0
     fi
-    
+
     # Execute in isolated context
+    # Note: timeout command not available on macOS by default, so we run without hard timeout
+    # The BMAD workflow has its own completion logic
     local result
     result=$(claude --dangerously-skip-permissions -p "$dev_prompt" 2>&1) || true
-    
+
     echo "$result" >> "$LOG_FILE"
-    
+
     if echo "$result" | grep -q "IMPLEMENTATION COMPLETE"; then
         log_success "Dev phase complete: $story_id"
         return 0
@@ -594,122 +598,48 @@ If blocked, output: IMPLEMENTATION BLOCKED: $story_id - [reason]"
 execute_review_phase() {
     local story_file="$1"
     local story_id=$(basename "$story_file" .md)
-    
-    log ">>> REVIEW PHASE: $story_id (fresh context)"
-    
-    local story_contents=$(cat "$story_file")
-    
-    # Build the review prompt with severity-based fix logic
-    local review_prompt="You are a Senior Code Reviewer performing a BMAD code review.
 
-## Your Task
+    log ">>> REVIEW PHASE: $story_id (using BMAD code-review workflow, fresh context)"
 
-Review the implementation of story: $story_id
+    # Build BMAD code-review workflow invocation prompt
+    # This invokes the adversarial code-review workflow which:
+    # - Validates git diff vs story file claims
+    # - Verifies each AC is actually implemented
+    # - Audits task completion (marked [x] but not done = CRITICAL)
+    # - Finds 3-10 issues minimum
+    # - Auto-fixes HIGH and MEDIUM issues
+    local review_prompt="Execute the BMAD code-review workflow for story: $story_file
 
-You are seeing this code for the first time. You have no knowledge of the implementation process.
+CRITICAL INSTRUCTIONS:
+1. Load the workflow configuration from: _bmad/bmm/workflows/4-implementation/code-review/workflow.yaml
+2. Load the workflow instructions from: _bmad/bmm/workflows/4-implementation/code-review/instructions.xml
+3. Execute the workflow steps exactly as specified in instructions.xml
+4. The story file path is: $story_file
+5. Run in YOLO mode - automatically fix issues (choose option 1 when prompted)
+6. Be ADVERSARIAL - find 3-10 specific issues minimum
+7. Verify git diff matches story File List claims
+8. Check that tasks marked [x] are actually implemented
+9. Fix all HIGH severity issues and MEDIUM if total > 5
+10. Update story Status to 'done' if review passes
+11. Stage all changes with: git add -A
 
-## Story Specification and Dev Context
-
-<story>
-$story_contents
-</story>
-
-The story file contains:
-- Acceptance criteria (what must be verified)
-- Dev Agent Record (implementation notes from the developer)
-- Notes for Reviewer (areas of concern flagged by dev)
-
-## Review Process
-
-1. Run: git diff --staged
-2. Verify each acceptance criterion is implemented and tested
-3. Check code quality, security, and patterns
-4. Collect and categorize all issues by severity
-
-## Issue Severity Definitions
-
-- **HIGH**: Security vulnerabilities, missing error handling, no tests for new code, N+1 queries, exposed credentials
-- **MEDIUM**: Pattern violations, missing edge cases, hardcoded config values, code duplication  
-- **LOW**: Naming inconsistencies, minor style issues, missing comments
-
-## Issue Fix Policy (IMPORTANT)
-
-Apply this logic after collecting all issues:
-
-\`\`\`
-1. Always fix ALL HIGH severity issues
-2. If TOTAL issues > 5, also fix ALL MEDIUM severity issues
-3. LOW severity issues: document only, do NOT fix
-\`\`\`
-
-## Review Checklist
-
-### Acceptance Criteria
-For each criterion: implemented? tested? matches requirement?
-
-### Code Quality  
-- Follows existing patterns (MEDIUM)
-- No security issues (HIGH)
-- Error handling appropriate (HIGH)
-- Tests exist and meaningful (HIGH)
-- No hardcoded secrets (HIGH)
-
-## After Review
-
-1. Compile issues found with severity
-2. Count: HIGH=?, MEDIUM=?, LOW=?, TOTAL=?
-3. Apply fix policy: fix HIGH always, fix MEDIUM if total > 5
-4. For each fix: make change, run tests, verify
-5. Stage any fixes: git add -A
-
-## Update Story File
-
-Add Code Review Record section:
-
-\`\`\`markdown
-## Code Review Record
-
-**Reviewer**: Code Review Agent  
-**Date**: $(date '+%Y-%m-%d %H:%M')
-
-### Issues Found
-| # | Description | Severity | Status |
-|---|-------------|----------|--------|
-
-**Totals**: X HIGH, Y MEDIUM, Z LOW
-
-### Fixes Applied
-[List what was fixed]
-
-### Remaining Issues
-[Low severity items for future cleanup]
-
-### Final Status
-Approved / Approved with fixes / Rejected
-\`\`\`
-
-## Completion
-
-If PASSED (no unfixed HIGH/MEDIUM issues):
-1. Update story Status to: Done
-2. Output: REVIEW PASSED: $story_id
-   or: REVIEW PASSED WITH FIXES: $story_id - Fixed N issues
-
-If FAILED (unfixable issues or missing acceptance criteria):
-1. Update story Status to: Blocked  
-2. Output: REVIEW FAILED: $story_id - [reason]"
+When the review passes, output exactly: REVIEW PASSED: $story_id
+If fixes were applied, output: REVIEW PASSED WITH FIXES: $story_id - Fixed N issues
+If review fails (unfixable issues), output: REVIEW FAILED: $story_id - [reason]"
 
     if [ "$DRY_RUN" = true ]; then
-        echo "[DRY RUN] Would execute review phase for $story_id"
+        echo "[DRY RUN] Would execute BMAD code-review workflow for $story_id"
         return 0
     fi
-    
+
     # Execute in isolated context
+    # Note: timeout command not available on macOS by default, so we run without hard timeout
+    # The BMAD workflow has its own completion logic
     local result
     result=$(claude --dangerously-skip-permissions -p "$review_prompt" 2>&1) || true
-    
+
     echo "$result" >> "$LOG_FILE"
-    
+
     if echo "$result" | grep -q "REVIEW PASSED"; then
         log_success "Review passed: $story_id"
         return 0
