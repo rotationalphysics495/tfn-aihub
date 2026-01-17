@@ -16,7 +16,7 @@ References:
 """
 
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from pydantic import BaseModel, Field, field_validator
 from enum import Enum
 
@@ -218,12 +218,22 @@ class Mem0PreferenceContext(BaseModel):
         # Area order description
         if preferences.area_order:
             first_area = preferences.area_order[0]
-            area_list = ", then ".join(preferences.area_order[:3])
-            if len(preferences.area_order) > 3:
-                area_list += ", and others"
-            descriptions.append(
-                f"User prefers to hear about {first_area} first, followed by {area_list} in their briefings"
-            )
+            if len(preferences.area_order) == 1:
+                descriptions.append(
+                    f"User prefers to hear about {first_area} in their briefings"
+                )
+            elif len(preferences.area_order) == 2:
+                descriptions.append(
+                    f"User prefers to hear about {first_area} first, then {preferences.area_order[1]} in their briefings"
+                )
+            else:
+                # Skip first area in the list since we already mention it
+                remaining_areas = ", then ".join(preferences.area_order[1:3])
+                if len(preferences.area_order) > 3:
+                    remaining_areas += ", and others"
+                descriptions.append(
+                    f"User prefers to hear about {first_area} first, then {remaining_areas} in their briefings"
+                )
 
         # Detail level description
         if preferences.detail_level == DetailLevelEnum.SUMMARY:
@@ -248,7 +258,7 @@ class Mem0PreferenceContext(BaseModel):
             preference_reason=reason,
             metadata={
                 "user_id": preferences.user_id,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "preference_version": preferences.updated_at,
             },
         )

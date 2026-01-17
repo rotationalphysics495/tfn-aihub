@@ -5,7 +5,7 @@ execution:
   duration_seconds: 0
 stories:
   total: 0
-  completed: 4
+  completed: 5
   failed: 0
   skipped: 6
 validation:

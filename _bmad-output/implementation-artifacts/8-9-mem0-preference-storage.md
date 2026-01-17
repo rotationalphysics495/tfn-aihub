@@ -299,26 +299,33 @@ Implemented dual storage for user preferences with Supabase as primary storage a
 
 ## Code Review Record
 
-**Reviewer**: Code Review Agent
+**Reviewer**: Code Review Agent (Adversarial)
 **Date**: 2026-01-17
 
-### Issues Found
+### Issues Found and Fixed
 | # | Description | Severity | Status |
 |---|-------------|----------|--------|
-| 1 | `datetime.utcnow()` is deprecated (Python 3.12+). Used in `sync.py:60` and `models/preferences.py:251` while codebase uses `datetime.now(timezone.utc)` elsewhere. | LOW | Document only |
-| 2 | API tests mock `sync_preferences_to_mem0` but don't explicitly verify it was called with correct arguments via BackgroundTasks | LOW | Document only |
-| 3 | PreferenceService class created but not used in API endpoints (intentional per dev notes for consistency) | LOW | Document only |
+| 1 | `datetime.utcnow()` deprecated in Python 3.12+ - Used in `sync.py:176` and `models/preferences.py:251` | HIGH | ✅ FIXED |
+| 2 | Missing `timezone` import in `sync.py` for proper datetime handling | MEDIUM | ✅ FIXED |
+| 3 | Area order semantic description grammatically awkward - mentions first area twice ("Grinding first, followed by Grinding, then Packing") | MEDIUM | ✅ FIXED |
+| 4 | API endpoints use direct Supabase client instead of PreferenceService | MEDIUM | Documented (intentional per dev notes) |
+| 5 | Test file location at `tests/test_preferences_api.py` vs documented `tests/api/` | MEDIUM | Documented |
+| 6 | Redundant `_format_preferences_response` helper duplicates PreferenceService method | LOW | Documented |
+| 7 | Magic string "user_preferences" repeated in sync.py | LOW | Documented |
 
-**Totals**: 0 HIGH, 0 MEDIUM, 3 LOW
+**Totals**: 1 HIGH, 4 MEDIUM, 2 LOW (3 fixed, 4 documented)
 
 ### Fixes Applied
-None required - all issues are LOW severity.
+1. **sync.py**: Added `timezone` import and replaced `datetime.utcnow()` with `datetime.now(timezone.utc)` at line 176
+2. **models/preferences.py**: Added `timezone` import and replaced `datetime.utcnow()` with `datetime.now(timezone.utc)` at line 251
+3. **models/preferences.py**: Fixed area order semantic description to avoid repetition - now correctly generates "User prefers to hear about Grinding first, then Packing, then Roasting in their briefings"
 
-### Remaining Issues
-- Consider migrating `datetime.utcnow()` to `datetime.now(timezone.utc)` for consistency in future cleanup
-- Consider more explicit BackgroundTasks testing in integration tests
-- PreferenceService provides useful abstraction for future use cases
+### Test Verification
+All 51 tests pass after fixes:
+- 14 service tests (test_service.py)
+- 24 sync tests (test_sync.py)
+- 13 API tests (test_preferences_api.py)
 
 ### Final Status
-**Approved** - All acceptance criteria verified and passing. 51 tests pass. No HIGH or MEDIUM severity issues found.
+**APPROVED** - All acceptance criteria verified and passing. 3 issues fixed, 4 documented for future consideration. All fixes verified with passing test suite.
 

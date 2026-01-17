@@ -211,7 +211,7 @@ development_status:
   # Story 8.9: Mem0 Preference Storage
   # - Dual storage: Supabase for queries, Mem0 for AI context
   # - Semantic preference descriptions for personalization
-  8-9-mem0-preference-storage: ready-for-dev
+  8-9-mem0-preference-storage: done
 
   epic-8-retrospective: optional
 
