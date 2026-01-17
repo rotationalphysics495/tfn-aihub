@@ -206,7 +206,7 @@ development_status:
   # Story 8.8: User Preference Onboarding
   # - First-time onboarding flow for briefing preferences
   # - Role, area order, detail level, voice settings
-  8-8-user-preference-onboarding: ready-for-dev
+  8-8-user-preference-onboarding: done
 
   # Story 8.9: Mem0 Preference Storage
   # - Dual storage: Supabase for queries, Mem0 for AI context
