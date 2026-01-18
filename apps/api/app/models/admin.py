@@ -33,6 +33,15 @@ class AuditActionType(str, Enum):
     ASSIGNMENT_DELETED = "assignment_deleted"
     ASSIGNMENT_UPDATED = "assignment_updated"
     BATCH_UPDATE = "batch_update"
+    # Story 9.14: Role management actions
+    ROLE_CHANGE = "role_change"
+
+
+class UserRole(str, Enum):
+    """User role types (Story 9.14 AC#1)."""
+    PLANT_MANAGER = "plant_manager"
+    SUPERVISOR = "supervisor"
+    ADMIN = "admin"
 
 
 class AuditEntityType(str, Enum):
@@ -342,3 +351,102 @@ class AuditLogListResponse(BaseModel):
     total_count: int
     page: int = 1
     page_size: int = 50
+
+
+# ============================================================================
+# Role Management Models (Story 9.14)
+# ============================================================================
+
+
+class UserWithRole(BaseModel):
+    """
+    User with their current role (Story 9.14 Task 4.2).
+
+    AC#1: List of users with current roles displayed.
+    """
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "user_id": "user-uuid-1",
+                "email": "manager@example.com",
+                "role": "plant_manager",
+                "created_at": "2026-01-15T08:00:00Z",
+                "updated_at": "2026-01-19T08:00:00Z",
+            }
+        }
+    )
+
+    user_id: UUID = Field(..., description="User ID from auth.users")
+    email: Optional[str] = Field(None, description="User email")
+    role: UserRole = Field(..., description="Current role: plant_manager, supervisor, admin")
+    created_at: Optional[datetime] = Field(None, description="When the role was created")
+    updated_at: Optional[datetime] = Field(None, description="When the role was last updated")
+
+
+class RoleUpdateRequest(BaseModel):
+    """
+    Request to update a user's role (Story 9.14 Task 4.2).
+
+    AC#2: Admin changes a user's role.
+    """
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "role": "plant_manager"
+            }
+        }
+    )
+
+    role: UserRole = Field(..., description="New role to assign")
+
+
+class RoleUpdateResponse(BaseModel):
+    """
+    Response after updating a user's role (Story 9.14).
+
+    AC#2: Role is updated and audit log entry created.
+    """
+    success: bool = True
+    user: UserWithRole = Field(..., description="Updated user with new role")
+    message: str = "Role updated successfully"
+
+
+class UserListResponse(BaseModel):
+    """
+    Response for listing all users with roles (Story 9.14 Task 3.2).
+
+    AC#1: Admins see list of users with current roles.
+    """
+    users: List[UserWithRole]
+    total_count: int
+
+
+class RoleAuditLogEntry(BaseModel):
+    """
+    Audit log entry for role changes (Story 9.14 AC#2).
+
+    Uses the audit_logs table defined in FR56.
+    """
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "id": "audit-uuid-1",
+                "timestamp": "2026-01-19T08:00:00Z",
+                "admin_user_id": "admin-uuid-1",
+                "action_type": "role_change",
+                "target_user_id": "user-uuid-1",
+                "before_value": {"role": "supervisor"},
+                "after_value": {"role": "plant_manager"},
+                "metadata": {"source": "admin_ui"},
+            }
+        }
+    )
+
+    id: UUID = Field(..., description="Unique audit log ID")
+    timestamp: datetime = Field(..., description="When the action occurred")
+    admin_user_id: UUID = Field(..., description="Admin who performed the action")
+    action_type: str = Field(default="role_change", description="Type of action")
+    target_user_id: UUID = Field(..., description="User whose role was changed")
+    before_value: Optional[Dict[str, Any]] = Field(None, description="Previous role state")
+    after_value: Optional[Dict[str, Any]] = Field(None, description="New role state")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional context")

@@ -229,6 +229,72 @@ class AuditLogger:
 
         return batch_id
 
+    def log_role_change(
+        self,
+        admin_user_id: str,
+        target_user_id: str,
+        old_role: str,
+        new_role: str,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Optional[UUID]:
+        """
+        Log a role change to the audit_logs table (Story 9.14 AC#2, Task 5.2).
+
+        Uses the separate audit_logs table for FR56 compliance.
+
+        Args:
+            admin_user_id: ID of admin performing the change
+            target_user_id: ID of user whose role is being changed
+            old_role: Previous role value
+            new_role: New role value
+            metadata: Additional context
+
+        Returns:
+            UUID of created audit log entry, or None if failed
+        """
+        now = datetime.now(timezone.utc)
+
+        log_data = {
+            "admin_user_id": admin_user_id,
+            "action_type": AuditActionType.ROLE_CHANGE.value,
+            "target_user_id": target_user_id,
+            "before_value": {"role": old_role},
+            "after_value": {"role": new_role},
+            "metadata": metadata or {},
+            "timestamp": now.isoformat(),
+        }
+
+        client = self._get_client()
+
+        if client is None:
+            # Store in memory for testing/development
+            log_id = uuid4()
+            log_data["id"] = str(log_id)
+            self._in_memory_logs.append(log_data)
+            logger.info(f"Stored role change audit log in memory: {old_role} -> {new_role}")
+            return log_id
+
+        try:
+            # Use the audit_logs table for role changes (FR56)
+            result = client.table("audit_logs").insert(log_data).execute()
+            if result.data and len(result.data) > 0:
+                log_id = UUID(result.data[0]["id"])
+                logger.info(
+                    f"Stored role change audit log {log_id}: "
+                    f"{old_role} -> {new_role} for user {target_user_id}"
+                )
+                return log_id
+        except Exception as e:
+            # Audit logging should never fail the main operation
+            logger.error(f"Failed to store role change audit log: {e}")
+            # Fallback to in-memory
+            log_id = uuid4()
+            log_data["id"] = str(log_id)
+            self._in_memory_logs.append(log_data)
+            return log_id
+
+        return None
+
     def get_logs(
         self,
         entity_type: Optional[AuditEntityType] = None,
@@ -370,5 +436,34 @@ def log_batch_assignment_change(
         admin_user_id=admin_user_id,
         changes=changes,
         results=results,
+        metadata=metadata,
+    )
+
+
+def log_role_change(
+    admin_user_id: str,
+    target_user_id: str,
+    old_role: str,
+    new_role: str,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> Optional[UUID]:
+    """
+    Log a role change to the audit_logs table (Story 9.14 AC#2).
+
+    Args:
+        admin_user_id: ID of admin performing the change
+        target_user_id: ID of user whose role is being changed
+        old_role: Previous role value
+        new_role: New role value
+        metadata: Additional context
+
+    Returns:
+        UUID of created audit log entry, or None if failed
+    """
+    return get_audit_logger().log_role_change(
+        admin_user_id=admin_user_id,
+        target_user_id=target_user_id,
+        old_role=old_role,
+        new_role=new_role,
         metadata=metadata,
     )

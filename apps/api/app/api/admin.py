@@ -1,9 +1,10 @@
 """
-Admin API Endpoints (Story 9.13)
+Admin API Endpoints (Story 9.13, 9.14)
 
-REST endpoints for admin operations including supervisor asset assignment.
+REST endpoints for admin operations including supervisor asset assignment
+and user role management.
 
-Task 2:
+Task 2 (Story 9.13 - Asset Assignment):
 AC#1: GET /api/v1/admin/assignments - Grid display data with supervisors, assets, assignments
 AC#2: GET /api/v1/admin/assignments/user/{user_id} - Get user's assignments
 AC#3: POST /api/v1/admin/assignments/preview - Preview impact of changes (FR48)
@@ -11,6 +12,11 @@ AC#4: POST /api/v1/admin/assignments/batch - Save batch changes atomically (FR46
 AC#5: DELETE /api/v1/admin/assignments/{id} - Remove single assignment
 AC#6: require_admin dependency on all endpoints
 AC#7: Audit logging for all write operations (FR50, FR56)
+
+Task 3 (Story 9.14 - Role Management):
+AC#1: GET /api/v1/admin/users - List users with current roles (FR47)
+AC#2: GET /api/v1/admin/users/{id} - Get single user details
+AC#3: PUT /api/v1/admin/users/{id}/role - Update user role with last-admin protection
 
 References:
 - [Source: architecture/voice-briefing.md#Admin UI Architecture]
@@ -43,8 +49,14 @@ from app.models.admin import (
     CreateAssignmentResponse,
     AssignmentAction,
     AuditActionType,
+    # Story 9.14: Role management models
+    UserRole,
+    UserWithRole,
+    UserListResponse,
+    RoleUpdateRequest,
+    RoleUpdateResponse,
 )
-from app.services.audit import log_assignment_change, log_batch_assignment_change
+from app.services.audit import log_assignment_change, log_batch_assignment_change, log_role_change
 
 logger = logging.getLogger(__name__)
 
@@ -868,3 +880,335 @@ async def delete_assignment(
     )
 
     return None
+
+
+# ============================================================================
+# Role Management Endpoints (Story 9.14)
+# ============================================================================
+
+# In-memory mock data for development
+_mock_user_roles: dict[str, dict] = {}
+
+
+def _init_mock_user_roles():
+    """Initialize mock user roles data if empty."""
+    if not _mock_user_roles:
+        now = datetime.now(timezone.utc).isoformat()
+        # Create mock users with roles
+        _mock_user_roles["aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"] = {
+            "user_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            "email": "supervisor1@example.com",
+            "role": "supervisor",
+            "created_at": now,
+            "updated_at": now,
+        }
+        _mock_user_roles["bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"] = {
+            "user_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            "email": "supervisor2@example.com",
+            "role": "supervisor",
+            "created_at": now,
+            "updated_at": now,
+        }
+        _mock_user_roles["cccccccc-cccc-cccc-cccc-cccccccccccc"] = {
+            "user_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+            "email": "manager@example.com",
+            "role": "plant_manager",
+            "created_at": now,
+            "updated_at": now,
+        }
+        _mock_user_roles["dddddddd-dddd-dddd-dddd-dddddddddddd"] = {
+            "user_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+            "email": "admin@example.com",
+            "role": "admin",
+            "created_at": now,
+            "updated_at": now,
+        }
+
+
+@router.get("/users", response_model=UserListResponse)
+async def list_users(
+    current_user: CurrentUser = Depends(require_admin),
+):
+    """
+    List all users with their current roles (Story 9.14 Task 3.2).
+
+    AC#1: Admins see a list of users with current roles.
+    Roles shown: Plant Manager, Supervisor, Admin
+
+    Returns:
+        UserListResponse with all users and their roles
+    """
+    logger.info(f"Admin {current_user.id} listing all users with roles")
+
+    supabase = _get_supabase_client()
+
+    if supabase is None:
+        # Return mock data for development
+        _init_mock_user_roles()
+
+        users = [
+            UserWithRole(
+                user_id=UUID(data["user_id"]),
+                email=data["email"],
+                role=UserRole(data["role"]),
+                created_at=datetime.fromisoformat(data["created_at"].replace("Z", "+00:00")),
+                updated_at=datetime.fromisoformat(data["updated_at"].replace("Z", "+00:00")),
+            )
+            for data in _mock_user_roles.values()
+        ]
+
+        return UserListResponse(
+            users=users,
+            total_count=len(users),
+        )
+
+    try:
+        # Query user_roles table joined with auth.users for email
+        # Note: Supabase join syntax - we query user_roles and get email from auth.users
+        result = supabase.table("user_roles").select("*").execute()
+
+        users = []
+        for row in result.data:
+            # Get user email from auth.users via admin API
+            try:
+                user_auth = supabase.auth.admin.get_user_by_id(row["user_id"])
+                email = user_auth.user.email if user_auth and user_auth.user else None
+            except Exception:
+                email = None
+
+            users.append(UserWithRole(
+                user_id=UUID(row["user_id"]),
+                email=email,
+                role=UserRole(row["role"]),
+                created_at=datetime.fromisoformat(row["created_at"].replace("Z", "+00:00")) if row.get("created_at") else None,
+                updated_at=datetime.fromisoformat(row["updated_at"].replace("Z", "+00:00")) if row.get("updated_at") else None,
+            ))
+
+        return UserListResponse(
+            users=users,
+            total_count=len(users),
+        )
+
+    except Exception as e:
+        logger.error(f"Error listing users: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to list users: {str(e)}"
+        )
+
+
+@router.get("/users/{user_id}", response_model=UserWithRole)
+async def get_user(
+    user_id: UUID,
+    current_user: CurrentUser = Depends(require_admin),
+):
+    """
+    Get a single user's details including role (Story 9.14 Task 3.3).
+
+    Args:
+        user_id: ID of the user to retrieve
+
+    Returns:
+        UserWithRole with user details and current role
+    """
+    logger.info(f"Admin {current_user.id} getting user {user_id}")
+
+    supabase = _get_supabase_client()
+
+    if supabase is None:
+        _init_mock_user_roles()
+
+        user_data = _mock_user_roles.get(str(user_id))
+        if not user_data:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        return UserWithRole(
+            user_id=UUID(user_data["user_id"]),
+            email=user_data["email"],
+            role=UserRole(user_data["role"]),
+            created_at=datetime.fromisoformat(user_data["created_at"].replace("Z", "+00:00")),
+            updated_at=datetime.fromisoformat(user_data["updated_at"].replace("Z", "+00:00")),
+        )
+
+    try:
+        # Query user_roles for the specific user
+        result = supabase.table("user_roles").select("*").eq("user_id", str(user_id)).execute()
+
+        if not result.data:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        row = result.data[0]
+
+        # Get user email from auth.users
+        try:
+            user_auth = supabase.auth.admin.get_user_by_id(str(user_id))
+            email = user_auth.user.email if user_auth and user_auth.user else None
+        except Exception:
+            email = None
+
+        return UserWithRole(
+            user_id=UUID(row["user_id"]),
+            email=email,
+            role=UserRole(row["role"]),
+            created_at=datetime.fromisoformat(row["created_at"].replace("Z", "+00:00")) if row.get("created_at") else None,
+            updated_at=datetime.fromisoformat(row["updated_at"].replace("Z", "+00:00")) if row.get("updated_at") else None,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting user: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get user: {str(e)}"
+        )
+
+
+@router.put("/users/{user_id}/role", response_model=RoleUpdateResponse)
+async def update_user_role(
+    user_id: UUID,
+    request: RoleUpdateRequest,
+    current_user: CurrentUser = Depends(require_admin),
+):
+    """
+    Update a user's role (Story 9.14 Task 3.4).
+
+    AC#2: Admin changes a user's role, user_roles table is updated,
+          audit log entry is created, user's access changes immediately.
+    AC#3: System prevents removing the last admin.
+
+    Args:
+        user_id: ID of the user to update
+        request: RoleUpdateRequest with new role
+
+    Returns:
+        RoleUpdateResponse with updated user
+
+    Raises:
+        HTTPException 400: Cannot remove last admin
+        HTTPException 404: User not found
+    """
+    admin_id = current_user.id
+    new_role = request.role.value
+    logger.info(f"Admin {admin_id} updating role for user {user_id} to {new_role}")
+
+    supabase = _get_supabase_client()
+
+    if supabase is None:
+        _init_mock_user_roles()
+
+        user_data = _mock_user_roles.get(str(user_id))
+        if not user_data:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        old_role = user_data["role"]
+
+        # AC#3: Prevent removing last admin
+        if old_role == "admin" and new_role != "admin":
+            admin_count = sum(1 for u in _mock_user_roles.values() if u["role"] == "admin")
+            if admin_count <= 1:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Cannot remove last admin"
+                )
+
+        # Update role
+        now = datetime.now(timezone.utc)
+        user_data["role"] = new_role
+        user_data["updated_at"] = now.isoformat()
+
+        # Log audit (AC#2)
+        log_role_change(
+            admin_user_id=admin_id,
+            target_user_id=str(user_id),
+            old_role=old_role,
+            new_role=new_role,
+            metadata={"source": "admin_ui"},
+        )
+
+        return RoleUpdateResponse(
+            success=True,
+            user=UserWithRole(
+                user_id=UUID(user_data["user_id"]),
+                email=user_data["email"],
+                role=UserRole(user_data["role"]),
+                created_at=datetime.fromisoformat(user_data["created_at"].replace("Z", "+00:00")),
+                updated_at=now,
+            ),
+            message=f"Role updated from {old_role} to {new_role}",
+        )
+
+    try:
+        # Get current role
+        existing = supabase.table("user_roles").select("*").eq("user_id", str(user_id)).execute()
+
+        if not existing.data:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        old_role = existing.data[0]["role"]
+
+        # AC#3: Prevent removing last admin
+        # The database trigger will also enforce this, but we check here for a better error message
+        if old_role == "admin" and new_role != "admin":
+            admin_count_result = supabase.table("user_roles").select("user_id", count="exact").eq("role", "admin").execute()
+            admin_count = admin_count_result.count if admin_count_result.count else len(admin_count_result.data)
+            if admin_count <= 1:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Cannot remove last admin"
+                )
+
+        # Update role
+        now = datetime.now(timezone.utc)
+        result = supabase.table("user_roles").update({
+            "role": new_role,
+            "updated_at": now.isoformat(),
+        }).eq("user_id", str(user_id)).execute()
+
+        if not result.data:
+            raise HTTPException(status_code=500, detail="Failed to update role")
+
+        row = result.data[0]
+
+        # Get user email
+        try:
+            user_auth = supabase.auth.admin.get_user_by_id(str(user_id))
+            email = user_auth.user.email if user_auth and user_auth.user else None
+        except Exception:
+            email = None
+
+        # Log audit (AC#2)
+        log_role_change(
+            admin_user_id=admin_id,
+            target_user_id=str(user_id),
+            old_role=old_role,
+            new_role=new_role,
+            metadata={"source": "admin_ui"},
+        )
+
+        return RoleUpdateResponse(
+            success=True,
+            user=UserWithRole(
+                user_id=UUID(row["user_id"]),
+                email=email,
+                role=UserRole(row["role"]),
+                created_at=datetime.fromisoformat(row["created_at"].replace("Z", "+00:00")) if row.get("created_at") else None,
+                updated_at=datetime.fromisoformat(row["updated_at"].replace("Z", "+00:00")) if row.get("updated_at") else None,
+            ),
+            message=f"Role updated from {old_role} to {new_role}",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating user role: {e}")
+        # Check if it's the last-admin trigger error
+        if "Cannot remove last admin" in str(e):
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot remove last admin"
+            )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to update role: {str(e)}"
+        )

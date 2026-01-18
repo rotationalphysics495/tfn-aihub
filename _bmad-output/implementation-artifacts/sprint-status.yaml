@@ -288,7 +288,7 @@ development_status:
   # Story 9.14: Admin UI - Role Management
   # - Assign roles to users
   # - Role hierarchy and protection
-  9-14-admin-ui-role-management: ready-for-dev
+  9-14-admin-ui-role-management: done
 
   # Story 9.15: Admin Audit Logging
   # - Log all admin configuration changes

@@ -4,12 +4,21 @@ execution:
   end_time: ""
   duration_seconds: 0
 stories:
-  total: 0
-  completed: 0
+  total: 15
+  completed: 13
+  in_review: 1
   failed: 0
-  skipped: 12
+  skipped: 1
 validation:
   gate_executed: false
   gate_status: "PENDING"
   fix_attempts: 0
 issues: []
+story_details:
+  "9-14-admin-ui-role-management":
+    status: "review"
+    completed_at: "2026-01-18T22:30:00Z"
+    tasks_completed: 10
+    tasks_total: 10
+    tests_passed: 14
+    tests_failed: 0

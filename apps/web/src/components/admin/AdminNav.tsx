@@ -27,7 +27,7 @@ const navItems: NavItem[] = [
     icon: <ClipboardList className="h-5 w-5" />,
   },
   {
-    href: '/admin/roles',
+    href: '/admin/users',
     label: 'Role Management',
     icon: <Users className="h-5 w-5" />,
   },
