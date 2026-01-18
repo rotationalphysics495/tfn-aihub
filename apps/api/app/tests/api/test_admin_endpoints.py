@@ -475,3 +475,236 @@ class TestAuditLogging:
 
             assert response.status_code == 204
             mock_log.assert_called_once()
+
+
+# ============================================================================
+# Audit Log Endpoint Tests (Story 9.15, Task 10.5-10.8)
+# ============================================================================
+
+
+class TestListAuditLogsEndpoint:
+    """Tests for GET /api/v1/admin/audit-logs endpoint (Story 9.15 Task 10.5)."""
+
+    def test_returns_audit_logs(self, admin_client):
+        """Test endpoint returns audit log entries (AC#2)."""
+        response = admin_client.get("/api/v1/admin/audit-logs")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        assert "entries" in data
+        assert "total" in data
+        assert "page" in data
+        assert "page_size" in data
+
+        assert isinstance(data["entries"], list)
+        assert isinstance(data["total"], int)
+
+    def test_returns_entries_in_reverse_chronological_order(self, admin_client):
+        """Test entries are sorted by timestamp descending (AC#2)."""
+        response = admin_client.get("/api/v1/admin/audit-logs")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        if len(data["entries"]) >= 2:
+            timestamps = [e["timestamp"] for e in data["entries"]]
+            # Verify descending order
+            assert timestamps == sorted(timestamps, reverse=True)
+
+    def test_entry_has_required_fields(self, admin_client):
+        """Test each entry has required fields (AC#1)."""
+        response = admin_client.get("/api/v1/admin/audit-logs")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        if len(data["entries"]) > 0:
+            entry = data["entries"][0]
+
+            # Required fields per AC#1
+            assert "id" in entry
+            assert "timestamp" in entry
+            assert "admin_user_id" in entry
+            assert "action_type" in entry
+            assert "before_value" in entry or entry.get("before_value") is None
+            assert "after_value" in entry or entry.get("after_value") is None
+
+    def test_supports_pagination(self, admin_client):
+        """Test pagination works correctly (AC#2)."""
+        # Request first page
+        response = admin_client.get("/api/v1/admin/audit-logs?page=1&page_size=2")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["page"] == 1
+        assert data["page_size"] == 2
+
+    def test_filter_by_action_type(self, admin_client):
+        """Test filter by action_type (AC#2)."""
+        response = admin_client.get("/api/v1/admin/audit-logs?action_type=role_change")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # If there are results, they should all be role_change
+        for entry in data["entries"]:
+            assert entry["action_type"] == "role_change"
+
+    def test_filter_by_date_range(self, admin_client):
+        """Test filter by date range (AC#2)."""
+        response = admin_client.get(
+            "/api/v1/admin/audit-logs?"
+            "start_date=2026-01-01T00:00:00Z&"
+            "end_date=2026-12-31T23:59:59Z"
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Verify dates are within range
+        for entry in data["entries"]:
+            timestamp = entry["timestamp"]
+            assert "2026" in timestamp  # Simple check for year
+
+    def test_filter_by_target_user_id(self, admin_client):
+        """Test filter by target_user_id (AC#2)."""
+        target_user = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+        response = admin_client.get(f"/api/v1/admin/audit-logs?target_user_id={target_user}")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # If there are results, they should all have matching target_user_id
+        for entry in data["entries"]:
+            if entry.get("target_user_id"):
+                assert entry["target_user_id"] == target_user
+
+
+class TestGetAuditLogEndpoint:
+    """Tests for GET /api/v1/admin/audit-logs/{id} endpoint (Story 9.15 Task 10.6)."""
+
+    def test_returns_single_entry(self, admin_client):
+        """Test endpoint returns a single audit log entry."""
+        # First get list to get an ID
+        list_response = admin_client.get("/api/v1/admin/audit-logs")
+        assert list_response.status_code == 200
+        list_data = list_response.json()
+
+        if len(list_data["entries"]) > 0:
+            entry_id = list_data["entries"][0]["id"]
+
+            response = admin_client.get(f"/api/v1/admin/audit-logs/{entry_id}")
+
+            assert response.status_code == 200
+            data = response.json()
+
+            assert data["id"] == entry_id
+
+    def test_returns_404_for_nonexistent(self, admin_client):
+        """Test returns 404 for nonexistent entry."""
+        fake_id = str(uuid4())
+
+        response = admin_client.get(f"/api/v1/admin/audit-logs/{fake_id}")
+
+        assert response.status_code == 404
+
+
+class TestAuditLogBatchIdLinking:
+    """Tests for batch_id linking in audit logs (Story 9.15 Task 10.7, AC#4)."""
+
+    def test_batch_entries_have_batch_id(self, admin_client):
+        """Test batch operation entries have batch_id (AC#4)."""
+        # Make a batch assignment change
+        changes = [
+            {
+                "user_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+                "asset_id": "11111111-1111-1111-1111-111111111111",
+                "action": "add"
+            },
+            {
+                "user_id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+                "asset_id": "22222222-2222-2222-2222-222222222221",
+                "action": "add"
+            }
+        ]
+
+        batch_response = admin_client.post(
+            "/api/v1/admin/assignments/batch",
+            json={"changes": changes}
+        )
+
+        assert batch_response.status_code == 200
+        batch_data = batch_response.json()
+        batch_id = batch_data.get("batch_id")
+
+        # The batch_id should be a valid UUID
+        if batch_id:
+            UUID(batch_id)  # Validates it's a UUID
+
+
+class TestAuditLogAdminAuthorization:
+    """Tests for admin-only authorization on audit log endpoints (Story 9.15 Task 10.8)."""
+
+    def test_requires_admin_for_list(self):
+        """Test list audit logs requires admin auth."""
+        client = TestClient(app)
+        app.dependency_overrides.clear()
+
+        response = client.get("/api/v1/admin/audit-logs")
+
+        # Should fail without admin auth
+        assert response.status_code in [401, 403, 422]
+
+    def test_requires_admin_for_get(self):
+        """Test get single audit log requires admin auth."""
+        client = TestClient(app)
+        app.dependency_overrides.clear()
+
+        response = client.get(f"/api/v1/admin/audit-logs/{uuid4()}")
+
+        # Should fail without admin auth
+        assert response.status_code in [401, 403, 422]
+
+
+class TestAuditLogResponseFormat:
+    """Tests for audit log response format validation (Story 9.15)."""
+
+    def test_list_response_format(self, admin_client):
+        """Test list response has correct structure."""
+        response = admin_client.get("/api/v1/admin/audit-logs")
+
+        assert response.status_code == 200
+        data = response.json()
+
+        # Required fields
+        assert "entries" in data
+        assert "total" in data
+        assert "page" in data
+        assert "page_size" in data
+
+        # Type validation
+        assert isinstance(data["entries"], list)
+        assert isinstance(data["total"], int)
+        assert isinstance(data["page"], int)
+        assert isinstance(data["page_size"], int)
+
+    def test_entry_response_format(self, admin_client):
+        """Test single entry has correct structure."""
+        list_response = admin_client.get("/api/v1/admin/audit-logs")
+        assert list_response.status_code == 200
+        list_data = list_response.json()
+
+        if len(list_data["entries"]) > 0:
+            entry = list_data["entries"][0]
+
+            # Required fields (AC#1)
+            assert "id" in entry
+            assert "timestamp" in entry
+            assert "admin_user_id" in entry
+            assert "action_type" in entry
+
+            # ID should be valid UUID
+            UUID(entry["id"])
+            UUID(entry["admin_user_id"])

@@ -1,19 +1,23 @@
 """
-Audit Logging Service (Story 9.13, Task 4)
+Audit Logging Service (Story 9.13, 9.14, 9.15)
 
 Provides audit logging for admin configuration changes.
 
-AC#3: Audit log entry is created for all write operations
-AC#4: Include batch_id for bulk operations
+Story 9.15 - Admin Audit Logging:
+AC#1: Log entries with timestamp, admin_user_id, action_type, target, before/after values
+AC#3: Entries are tamper-evident (append-only), 90-day retention
+AC#4: batch_id links bulk operations
 
 Features:
-- Immutable append-only audit log
+- Immutable append-only audit log (audit_logs table)
 - Captures before/after states for updates
 - Groups batch operations with batch_id
 - Stores admin user ID and timestamp
+- Action type enum support
 
 References:
-- [Source: prd/prd-functional-requirements.md#FR50, FR56]
+- [Source: prd/prd-functional-requirements.md#FR50, FR55, FR56]
+- [Source: prd/prd-non-functional-requirements.md#NFR25]
 """
 import logging
 from datetime import datetime, timezone
@@ -28,6 +32,7 @@ from app.models.admin import (
     AuditEntityType,
     AuditLogEntry,
     AssignmentChange,
+    AuditLogActionType,
 )
 
 logger = logging.getLogger(__name__)
@@ -82,12 +87,12 @@ class AuditLogger:
             return log_id
 
         try:
-            result = client.table("admin_audit_logs").insert(log_data).execute()
+            result = client.table("audit_logs").insert(log_data).execute()
             if result.data and len(result.data) > 0:
                 log_id = UUID(result.data[0]["id"])
                 logger.info(
-                    f"Stored audit log {log_id}: {log_data['action_type']} "
-                    f"on {log_data['entity_type']}"
+                    f"Stored audit log {log_id}: {log_data.get('action_type')} "
+                    f"on {log_data.get('entity_type')}"
                 )
                 return log_id
         except Exception as e:
@@ -100,6 +105,133 @@ class AuditLogger:
             return log_id
 
         return None
+
+    def _store_to_audit_logs_table(self, log_data: Dict[str, Any]) -> Optional[UUID]:
+        """
+        Store audit log entry to the audit_logs table (Story 9.15 Task 2.3).
+
+        Uses the new unified audit_logs table that is append-only.
+        """
+        client = self._get_client()
+
+        if client is None:
+            # Store in memory for testing/development
+            log_id = uuid4()
+            log_data["id"] = str(log_id)
+            self._in_memory_logs.append(log_data)
+            logger.info(f"Stored audit log in memory: {log_data.get('action_type')}")
+            return log_id
+
+        try:
+            result = client.table("audit_logs").insert(log_data).execute()
+            if result.data and len(result.data) > 0:
+                log_id = UUID(result.data[0]["id"])
+                logger.info(
+                    f"Stored audit log {log_id}: {log_data.get('action_type')} "
+                    f"on {log_data.get('target_type')}"
+                )
+                return log_id
+        except Exception as e:
+            # Audit logging should never fail the main operation
+            logger.error(f"Failed to store audit log: {e}")
+            # Fallback to in-memory
+            log_id = uuid4()
+            log_data["id"] = str(log_id)
+            self._in_memory_logs.append(log_data)
+            return log_id
+
+        return None
+
+    def log_action(
+        self,
+        admin_user_id: UUID,
+        action_type: str,
+        target_type: str,
+        target_id: Optional[UUID] = None,
+        target_user_id: Optional[UUID] = None,
+        target_asset_id: Optional[UUID] = None,
+        before_value: Optional[Dict[str, Any]] = None,
+        after_value: Optional[Dict[str, Any]] = None,
+        batch_id: Optional[UUID] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Optional[UUID]:
+        """
+        Log a single audit entry to the audit_logs table (Story 9.15 Task 2.4).
+
+        This is the primary method for logging all admin actions.
+
+        Args:
+            admin_user_id: ID of admin performing the action
+            action_type: Type of action (role_change, assignment_create, etc.)
+            target_type: Type of target entity ('user', 'assignment', 'role', etc.)
+            target_id: Generic target reference ID
+            target_user_id: ID of affected user (if applicable)
+            target_asset_id: ID of affected asset (if applicable)
+            before_value: State before the change (for updates/deletes)
+            after_value: State after the change (for creates/updates)
+            batch_id: ID grouping batch operations (AC#4)
+            metadata: Additional context
+
+        Returns:
+            UUID of created audit log entry, or None if failed
+        """
+        now = datetime.now(timezone.utc)
+
+        log_data = {
+            "timestamp": now.isoformat(),
+            "admin_user_id": str(admin_user_id),
+            "action_type": action_type,
+            "target_type": target_type,
+            "target_id": str(target_id) if target_id else None,
+            "target_user_id": str(target_user_id) if target_user_id else None,
+            "target_asset_id": str(target_asset_id) if target_asset_id else None,
+            "before_value": before_value,
+            "after_value": after_value,
+            "batch_id": str(batch_id) if batch_id else None,
+            "metadata": metadata,
+        }
+
+        return self._store_to_audit_logs_table(log_data)
+
+    def log_batch_start(self) -> UUID:
+        """
+        Generate a batch_id for linking multiple actions (Story 9.15 Task 2.5).
+
+        Returns:
+            UUID to use as batch_id for related operations
+        """
+        return uuid4()
+
+    async def log_action_async(
+        self,
+        admin_user_id: UUID,
+        action_type: str,
+        target_type: str,
+        target_id: Optional[UUID] = None,
+        target_user_id: Optional[UUID] = None,
+        target_asset_id: Optional[UUID] = None,
+        before_value: Optional[Dict[str, Any]] = None,
+        after_value: Optional[Dict[str, Any]] = None,
+        batch_id: Optional[UUID] = None,
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> Optional[UUID]:
+        """
+        Async version of log_action (Story 9.15 Task 2.3).
+
+        Note: Currently wraps sync implementation but allows for future async support.
+        """
+        return self.log_action(
+            admin_user_id=admin_user_id,
+            action_type=action_type,
+            target_type=target_type,
+            target_id=target_id,
+            target_user_id=target_user_id,
+            target_asset_id=target_asset_id,
+            before_value=before_value,
+            after_value=after_value,
+            batch_id=batch_id,
+            metadata=metadata,
+        )
 
     def log_assignment_change(
         self,
@@ -351,7 +483,7 @@ class AuditLogger:
             ]
 
         try:
-            query = client.table("admin_audit_logs").select("*")
+            query = client.table("audit_logs").select("*")
 
             if entity_type:
                 query = query.eq("entity_type", entity_type.value)
@@ -467,3 +599,59 @@ def log_role_change(
         new_role=new_role,
         metadata=metadata,
     )
+
+
+def log_action(
+    admin_user_id: UUID,
+    action_type: str,
+    target_type: str,
+    target_id: Optional[UUID] = None,
+    target_user_id: Optional[UUID] = None,
+    target_asset_id: Optional[UUID] = None,
+    before_value: Optional[Dict[str, Any]] = None,
+    after_value: Optional[Dict[str, Any]] = None,
+    batch_id: Optional[UUID] = None,
+    metadata: Optional[Dict[str, Any]] = None,
+) -> Optional[UUID]:
+    """
+    Convenience function to log admin action using singleton (Story 9.15 Task 2.4).
+
+    This is the primary function for logging all admin actions to the audit_logs table.
+
+    Args:
+        admin_user_id: ID of admin performing the action
+        action_type: Type of action (role_change, assignment_create, etc.)
+        target_type: Type of target entity ('user', 'assignment', 'role', etc.)
+        target_id: Generic target reference ID
+        target_user_id: ID of affected user (if applicable)
+        target_asset_id: ID of affected asset (if applicable)
+        before_value: State before the change (for updates/deletes)
+        after_value: State after the change (for creates/updates)
+        batch_id: ID grouping batch operations (AC#4)
+        metadata: Additional context
+
+    Returns:
+        UUID of created audit log entry, or None if failed
+    """
+    return get_audit_logger().log_action(
+        admin_user_id=admin_user_id,
+        action_type=action_type,
+        target_type=target_type,
+        target_id=target_id,
+        target_user_id=target_user_id,
+        target_asset_id=target_asset_id,
+        before_value=before_value,
+        after_value=after_value,
+        batch_id=batch_id,
+        metadata=metadata,
+    )
+
+
+def log_batch_start() -> UUID:
+    """
+    Generate a batch_id for linking multiple actions (Story 9.15 Task 2.5).
+
+    Returns:
+        UUID to use as batch_id for related operations
+    """
+    return get_audit_logger().log_batch_start()

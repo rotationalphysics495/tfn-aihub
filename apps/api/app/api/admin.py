@@ -1212,3 +1212,287 @@ async def update_user_role(
             status_code=500,
             detail=f"Failed to update role: {str(e)}"
         )
+
+
+# ============================================================================
+# Audit Log Endpoints (Story 9.15)
+# ============================================================================
+
+# Import Story 9.15 models
+from app.models.admin import (
+    AuditLogEntryResponse,
+    AuditLogListResponseV2,
+    AuditLogActionType,
+)
+
+# In-memory mock audit logs for development
+_mock_audit_logs: List[dict] = []
+
+
+def _init_mock_audit_logs():
+    """Initialize mock audit logs if empty."""
+    if not _mock_audit_logs:
+        now = datetime.now(timezone.utc)
+        # Add sample audit log entries
+        _mock_audit_logs.extend([
+            {
+                "id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                "timestamp": (now - timedelta(hours=2)).isoformat(),
+                "admin_user_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+                "action_type": "role_change",
+                "target_type": "user",
+                "target_user_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                "before_value": {"role": "supervisor"},
+                "after_value": {"role": "plant_manager"},
+                "batch_id": None,
+                "metadata": {"source": "admin_ui"},
+            },
+            {
+                "id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                "timestamp": (now - timedelta(hours=1)).isoformat(),
+                "admin_user_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+                "action_type": "assignment_create",
+                "target_type": "assignment",
+                "target_user_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                "target_asset_id": "22222222-2222-2222-2222-222222222221",
+                "before_value": None,
+                "after_value": {"user_id": "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", "asset_id": "22222222-2222-2222-2222-222222222221"},
+                "batch_id": None,
+                "metadata": {"source": "admin_ui"},
+            },
+            {
+                "id": "cccccccc-cccc-cccc-cccc-cccccccccccc",
+                "timestamp": now.isoformat(),
+                "admin_user_id": "dddddddd-dddd-dddd-dddd-dddddddddddd",
+                "action_type": "assignment_delete",
+                "target_type": "assignment",
+                "target_user_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                "target_asset_id": "11111111-1111-1111-1111-111111111111",
+                "before_value": {"user_id": "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "asset_id": "11111111-1111-1111-1111-111111111111"},
+                "after_value": None,
+                "batch_id": None,
+                "metadata": {"source": "admin_ui"},
+            },
+        ])
+
+
+# Import timedelta for mock data
+from datetime import timedelta
+
+
+@router.get("/audit-logs", response_model=AuditLogListResponseV2)
+async def list_audit_logs(
+    page: int = Query(1, ge=1, description="Page number"),
+    page_size: int = Query(50, ge=1, le=100, description="Items per page"),
+    start_date: Optional[datetime] = Query(None, description="Filter entries after this date"),
+    end_date: Optional[datetime] = Query(None, description="Filter entries before this date"),
+    action_type: Optional[str] = Query(None, description="Filter by action type"),
+    target_user_id: Optional[UUID] = Query(None, description="Filter by target user"),
+    admin_user_id: Optional[UUID] = Query(None, description="Filter by admin who performed action"),
+    current_user: CurrentUser = Depends(require_admin),
+):
+    """
+    List audit log entries with pagination and optional filters (Story 9.15 Task 3.2).
+
+    AC#2: Entries displayed in reverse chronological order.
+    AC#2: Filters available - date range, action type, target user.
+
+    Returns:
+        AuditLogListResponseV2 with entries and pagination metadata
+    """
+    logger.info(f"Admin {current_user.id} listing audit logs (page={page}, size={page_size})")
+
+    supabase = _get_supabase_client()
+
+    if supabase is None:
+        # Return mock data for development
+        _init_mock_audit_logs()
+
+        # Apply filters
+        logs = _mock_audit_logs.copy()
+
+        if start_date:
+            logs = [l for l in logs if datetime.fromisoformat(l["timestamp"].replace("Z", "+00:00")) >= start_date]
+        if end_date:
+            logs = [l for l in logs if datetime.fromisoformat(l["timestamp"].replace("Z", "+00:00")) <= end_date]
+        if action_type:
+            logs = [l for l in logs if l.get("action_type") == action_type]
+        if target_user_id:
+            logs = [l for l in logs if l.get("target_user_id") == str(target_user_id)]
+        if admin_user_id:
+            logs = [l for l in logs if l.get("admin_user_id") == str(admin_user_id)]
+
+        # Sort by timestamp descending (AC#2: reverse chronological order)
+        logs.sort(key=lambda l: l.get("timestamp", ""), reverse=True)
+
+        # Apply pagination
+        total = len(logs)
+        offset = (page - 1) * page_size
+        logs = logs[offset:offset + page_size]
+
+        # Convert to response models
+        entries = [
+            AuditLogEntryResponse(
+                id=UUID(l["id"]),
+                timestamp=datetime.fromisoformat(l["timestamp"].replace("Z", "+00:00")),
+                admin_user_id=UUID(l["admin_user_id"]),
+                admin_email="admin@example.com",  # Mock email
+                action_type=l["action_type"],
+                target_type=l.get("target_type"),
+                target_id=UUID(l["target_id"]) if l.get("target_id") else None,
+                target_user_id=UUID(l["target_user_id"]) if l.get("target_user_id") else None,
+                target_user_email=None,  # Would be populated from DB
+                target_asset_id=UUID(l["target_asset_id"]) if l.get("target_asset_id") else None,
+                target_asset_name=None,  # Would be populated from DB
+                before_value=l.get("before_value"),
+                after_value=l.get("after_value"),
+                batch_id=UUID(l["batch_id"]) if l.get("batch_id") else None,
+                metadata=l.get("metadata"),
+            )
+            for l in logs
+        ]
+
+        return AuditLogListResponseV2(
+            entries=entries,
+            total=total,
+            page=page,
+            page_size=page_size,
+        )
+
+    try:
+        # Build query with count
+        query = supabase.table("audit_logs").select("*", count="exact")
+
+        # Apply filters
+        if start_date:
+            query = query.gte("timestamp", start_date.isoformat())
+        if end_date:
+            query = query.lte("timestamp", end_date.isoformat())
+        if action_type:
+            query = query.eq("action_type", action_type)
+        if target_user_id:
+            query = query.eq("target_user_id", str(target_user_id))
+        if admin_user_id:
+            query = query.eq("admin_user_id", str(admin_user_id))
+
+        # Order by timestamp descending (AC#2)
+        query = query.order("timestamp", desc=True)
+
+        # Apply pagination
+        offset = (page - 1) * page_size
+        result = query.range(offset, offset + page_size - 1).execute()
+
+        # Convert to response models
+        entries = []
+        for row in result.data:
+            entries.append(AuditLogEntryResponse(
+                id=UUID(row["id"]),
+                timestamp=datetime.fromisoformat(row["timestamp"].replace("Z", "+00:00")),
+                admin_user_id=UUID(row["admin_user_id"]),
+                admin_email=None,  # Would need to join with auth.users
+                action_type=row["action_type"],
+                target_type=row.get("target_type"),
+                target_id=UUID(row["target_id"]) if row.get("target_id") else None,
+                target_user_id=UUID(row["target_user_id"]) if row.get("target_user_id") else None,
+                target_user_email=None,  # Would need to join with auth.users
+                target_asset_id=UUID(row["target_asset_id"]) if row.get("target_asset_id") else None,
+                target_asset_name=None,  # Would need to join with assets
+                before_value=row.get("before_value"),
+                after_value=row.get("after_value"),
+                batch_id=UUID(row["batch_id"]) if row.get("batch_id") else None,
+                metadata=row.get("metadata"),
+            ))
+
+        return AuditLogListResponseV2(
+            entries=entries,
+            total=result.count or len(entries),
+            page=page,
+            page_size=page_size,
+        )
+
+    except Exception as e:
+        logger.error(f"Error listing audit logs: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to list audit logs: {str(e)}"
+        )
+
+
+@router.get("/audit-logs/{log_id}", response_model=AuditLogEntryResponse)
+async def get_audit_log(
+    log_id: UUID,
+    current_user: CurrentUser = Depends(require_admin),
+):
+    """
+    Get a single audit log entry by ID (Story 9.15 Task 3.4).
+
+    Args:
+        log_id: ID of the audit log entry
+
+    Returns:
+        AuditLogEntryResponse with entry details
+    """
+    logger.info(f"Admin {current_user.id} getting audit log {log_id}")
+
+    supabase = _get_supabase_client()
+
+    if supabase is None:
+        # Return mock data for development
+        _init_mock_audit_logs()
+
+        log = next((l for l in _mock_audit_logs if l["id"] == str(log_id)), None)
+        if not log:
+            raise HTTPException(status_code=404, detail="Audit log entry not found")
+
+        return AuditLogEntryResponse(
+            id=UUID(log["id"]),
+            timestamp=datetime.fromisoformat(log["timestamp"].replace("Z", "+00:00")),
+            admin_user_id=UUID(log["admin_user_id"]),
+            admin_email="admin@example.com",  # Mock email
+            action_type=log["action_type"],
+            target_type=log.get("target_type"),
+            target_id=UUID(log["target_id"]) if log.get("target_id") else None,
+            target_user_id=UUID(log["target_user_id"]) if log.get("target_user_id") else None,
+            target_user_email=None,
+            target_asset_id=UUID(log["target_asset_id"]) if log.get("target_asset_id") else None,
+            target_asset_name=None,
+            before_value=log.get("before_value"),
+            after_value=log.get("after_value"),
+            batch_id=UUID(log["batch_id"]) if log.get("batch_id") else None,
+            metadata=log.get("metadata"),
+        )
+
+    try:
+        result = supabase.table("audit_logs").select("*").eq("id", str(log_id)).execute()
+
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Audit log entry not found")
+
+        row = result.data[0]
+
+        return AuditLogEntryResponse(
+            id=UUID(row["id"]),
+            timestamp=datetime.fromisoformat(row["timestamp"].replace("Z", "+00:00")),
+            admin_user_id=UUID(row["admin_user_id"]),
+            admin_email=None,  # Would need to join with auth.users
+            action_type=row["action_type"],
+            target_type=row.get("target_type"),
+            target_id=UUID(row["target_id"]) if row.get("target_id") else None,
+            target_user_id=UUID(row["target_user_id"]) if row.get("target_user_id") else None,
+            target_user_email=None,
+            target_asset_id=UUID(row["target_asset_id"]) if row.get("target_asset_id") else None,
+            target_asset_name=None,
+            before_value=row.get("before_value"),
+            after_value=row.get("after_value"),
+            batch_id=UUID(row["batch_id"]) if row.get("batch_id") else None,
+            metadata=row.get("metadata"),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting audit log: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get audit log: {str(e)}"
+        )

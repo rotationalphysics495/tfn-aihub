@@ -293,7 +293,7 @@ development_status:
   # Story 9.15: Admin Audit Logging
   # - Log all admin configuration changes
   # - 90-day retention, tamper-evident
-  9-15-admin-audit-logging: ready-for-dev
+  9-15-admin-audit-logging: done
 
   epic-9-retrospective: optional
 

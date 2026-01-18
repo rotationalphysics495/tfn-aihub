@@ -1,6 +1,6 @@
 # Story 9.15: Admin Audit Logging
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -36,88 +36,88 @@ So that **we have accountability and can troubleshoot issues**.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create audit_logs database migration (AC: #1, #3, #4)
-  - [ ] 1.1 Create `supabase/migrations/20260115_007_audit_logs.sql`
-  - [ ] 1.2 Define `audit_logs` table with timestamp, admin_user_id, action_type, target columns
-  - [ ] 1.3 Add JSONB columns for before_value and after_value
-  - [ ] 1.4 Add batch_id UUID column for linking bulk operations
-  - [ ] 1.5 Create indexes on timestamp, admin_user_id, action_type for efficient queries
-  - [ ] 1.6 Create composite index on (timestamp DESC, action_type) for filtered queries
-  - [ ] 1.7 Create append-only RLS policy (INSERT only for system, SELECT for admin)
-  - [ ] 1.8 Add CHECK constraint preventing UPDATE and DELETE operations
-  - [ ] 1.9 Add retention policy comment (90 days minimum per NFR25)
+- [x] Task 1: Create audit_logs database migration (AC: #1, #3, #4)
+  - [x] 1.1 Create `supabase/migrations/20260120_001_audit_logs.sql`
+  - [x] 1.2 Define `audit_logs` table with timestamp, admin_user_id, action_type, target columns
+  - [x] 1.3 Add JSONB columns for before_value and after_value
+  - [x] 1.4 Add batch_id UUID column for linking bulk operations
+  - [x] 1.5 Create indexes on timestamp, admin_user_id, action_type for efficient queries
+  - [x] 1.6 Create composite index on (timestamp DESC, action_type) for filtered queries
+  - [x] 1.7 Create append-only RLS policy (INSERT only for system, SELECT for admin)
+  - [x] 1.8 Add CHECK constraint preventing UPDATE and DELETE operations (via triggers)
+  - [x] 1.9 Add retention policy comment (90 days minimum per NFR25)
 
-- [ ] Task 2: Create Audit Logging Service (AC: #1, #4)
-  - [ ] 2.1 Create `apps/api/app/services/audit/__init__.py`
-  - [ ] 2.2 Create `apps/api/app/services/audit/logger.py`
-  - [ ] 2.3 Implement `AuditLogger` class with async methods
-  - [ ] 2.4 Implement `log_action()` method with admin_user_id, action_type, target, before/after values
-  - [ ] 2.5 Implement `log_batch_action()` method that auto-generates and links batch_id
-  - [ ] 2.6 Add support for action_type enum: role_change, assignment_change, assignment_create, assignment_delete
-  - [ ] 2.7 Create helper methods: `log_role_change()`, `log_assignment_change()`
-  - [ ] 2.8 Add validation to ensure required fields are present
+- [x] Task 2: Create Audit Logging Service (AC: #1, #4)
+  - [x] 2.1 Update `apps/api/app/services/audit/__init__.py`
+  - [x] 2.2 Update `apps/api/app/services/audit/logger.py`
+  - [x] 2.3 Implement `AuditLogger` class with sync and async methods
+  - [x] 2.4 Implement `log_action()` method with admin_user_id, action_type, target, before/after values
+  - [x] 2.5 Implement `log_batch_start()` method that generates batch_id for linking
+  - [x] 2.6 Add support for action_type enum: AuditLogActionType
+  - [x] 2.7 Create helper methods: `log_role_change()`, `log_assignment_change()`
+  - [x] 2.8 Add validation to ensure required fields are present
 
-- [ ] Task 3: Create Audit Log API Endpoints (AC: #2, #3)
-  - [ ] 3.1 Add audit log routes to `apps/api/app/api/admin.py`
-  - [ ] 3.2 Implement `GET /api/v1/admin/audit-logs` - paginated list
-  - [ ] 3.3 Add query parameters: page, page_size, start_date, end_date, action_type, target_user_id
-  - [ ] 3.4 Implement `GET /api/v1/admin/audit-logs/{id}` - single entry details
-  - [ ] 3.5 Add `require_admin` dependency to all audit endpoints
-  - [ ] 3.6 Implement response with total count for pagination
+- [x] Task 3: Create Audit Log API Endpoints (AC: #2, #3)
+  - [x] 3.1 Add audit log routes to `apps/api/app/api/admin.py`
+  - [x] 3.2 Implement `GET /api/v1/admin/audit-logs` - paginated list
+  - [x] 3.3 Add query parameters: page, page_size, start_date, end_date, action_type, target_user_id
+  - [x] 3.4 Implement `GET /api/v1/admin/audit-logs/{id}` - single entry details
+  - [x] 3.5 Add `require_admin` dependency to all audit endpoints
+  - [x] 3.6 Implement response with total count for pagination
 
-- [ ] Task 4: Create Pydantic Models for Audit Logging (AC: #1, #2, #4)
-  - [ ] 4.1 Update `apps/api/app/models/admin.py` with audit models
-  - [ ] 4.2 Define `AuditLogEntry` model with all fields
-  - [ ] 4.3 Define `AuditLogActionType` enum (role_change, assignment_change, etc.)
-  - [ ] 4.4 Define `AuditLogListResponse` with entries and pagination metadata
-  - [ ] 4.5 Define `AuditLogFilters` model for query parameters
+- [x] Task 4: Create Pydantic Models for Audit Logging (AC: #1, #2, #4)
+  - [x] 4.1 Update `apps/api/app/models/admin.py` with audit models
+  - [x] 4.2 Define `AuditLogEntryResponse` model with all fields
+  - [x] 4.3 Define `AuditLogActionType` enum (role_change, assignment_create, etc.)
+  - [x] 4.4 Define `AuditLogListResponseV2` with entries and pagination metadata
+  - [x] 4.5 Define `AuditLogFilters` model for query parameters
 
-- [ ] Task 5: Integrate Audit Logging into Admin Endpoints (AC: #1, #4)
-  - [ ] 5.1 Import AuditLogger into admin.py
-  - [ ] 5.2 Add audit logging to `PUT /api/v1/admin/users/{id}/role` endpoint
-  - [ ] 5.3 Add audit logging to `POST /api/v1/admin/assignments/batch` endpoint
-  - [ ] 5.4 Add audit logging to `DELETE /api/v1/admin/assignments/{id}` endpoint
-  - [ ] 5.5 Ensure batch operations use linked batch_id
+- [x] Task 5: Integrate Audit Logging into Admin Endpoints (AC: #1, #4)
+  - [x] 5.1 Import AuditLogger into admin.py (already integrated from Stories 9.13/9.14)
+  - [x] 5.2 Audit logging for role changes (from Story 9.14)
+  - [x] 5.3 Audit logging for batch assignments (from Story 9.13)
+  - [x] 5.4 Audit logging for individual assignments (from Story 9.13)
+  - [x] 5.5 Batch operations use linked batch_id
 
-- [ ] Task 6: Create Audit Log Viewer Page (AC: #2)
-  - [ ] 6.1 Create `apps/web/src/app/(admin)/audit/page.tsx`
-  - [ ] 6.2 Implement paginated table display
-  - [ ] 6.3 Display columns: timestamp, admin user, action type, target, summary
-  - [ ] 6.4 Add expandable row detail for before/after values
-  - [ ] 6.5 Add loading and error states
+- [x] Task 6: Create Audit Log Viewer Page (AC: #2)
+  - [x] 6.1 Create `apps/web/src/app/(admin)/audit/page.tsx`
+  - [x] 6.2 Implement paginated table display
+  - [x] 6.3 Display columns: timestamp, admin user, action type, target, summary
+  - [x] 6.4 Add expandable row detail for before/after values
+  - [x] 6.5 Add loading and error states
 
-- [ ] Task 7: Create Audit Log Filter Components (AC: #2)
-  - [ ] 7.1 Create `apps/web/src/components/admin/AuditLogFilters.tsx`
-  - [ ] 7.2 Implement date range picker (start date, end date)
-  - [ ] 7.3 Implement action type dropdown filter
-  - [ ] 7.4 Implement target user search/filter
-  - [ ] 7.5 Add "Clear Filters" button
-  - [ ] 7.6 Wire up filter state to URL query parameters for shareable links
+- [x] Task 7: Create Audit Log Filter Components (AC: #2)
+  - [x] 7.1 Create `apps/web/src/components/admin/AuditLogFilters.tsx`
+  - [x] 7.2 Implement date range picker (start date, end date)
+  - [x] 7.3 Implement action type dropdown filter
+  - [x] 7.4 Implement target user search/filter
+  - [x] 7.5 Add "Clear Filters" button
+  - [x] 7.6 Wire up filter state to URL query parameters for shareable links
 
-- [ ] Task 8: Create Audit Log Table Component (AC: #2, #3, #4)
-  - [ ] 8.1 Create `apps/web/src/components/admin/AuditLogTable.tsx`
-  - [ ] 8.2 Render entries in reverse chronological order
-  - [ ] 8.3 Display batch_id indicator for linked entries
-  - [ ] 8.4 Add expandable JSON diff view for before/after
-  - [ ] 8.5 Implement pagination controls
-  - [ ] 8.6 Add "Load More" or page navigation
+- [x] Task 8: Create Audit Log Table Component (AC: #2, #3, #4)
+  - [x] 8.1 Create `apps/web/src/components/admin/AuditLogTable.tsx`
+  - [x] 8.2 Render entries in reverse chronological order
+  - [x] 8.3 Display batch_id indicator for linked entries
+  - [x] 8.4 Add expandable JSON diff view for before/after
+  - [x] 8.5 Implement pagination controls (in page.tsx)
+  - [x] 8.6 Add "Next/Previous" page navigation
 
-- [ ] Task 9: Add Audit Link to Admin Navigation (AC: #2)
-  - [ ] 9.1 Update `apps/web/src/components/admin/AdminNav.tsx`
-  - [ ] 9.2 Add "Audit Logs" navigation item
-  - [ ] 9.3 Add icon for audit logs menu item
+- [x] Task 9: Add Audit Link to Admin Navigation (AC: #2)
+  - [x] 9.1 AdminNav already includes "Audit Log" item (from Story 9.14)
+  - [x] 9.2 "Audit Logs" navigation item present
+  - [x] 9.3 Shield icon for audit logs menu item
 
-- [ ] Task 10: Write Tests (All ACs)
-  - [ ] 10.1 Create `apps/api/app/tests/services/test_audit_logger.py`
-  - [ ] 10.2 Test `log_action()` creates correct entry
-  - [ ] 10.3 Test `log_batch_action()` links entries with batch_id
-  - [ ] 10.4 Test before/after value capture accuracy
-  - [ ] 10.5 Create `apps/api/app/tests/api/test_admin_audit_endpoints.py`
-  - [ ] 10.6 Test audit log list endpoint with pagination
-  - [ ] 10.7 Test audit log filters work correctly
-  - [ ] 10.8 Test admin-only access control
-  - [ ] 10.9 Create `apps/web/src/components/admin/__tests__/AuditLogTable.test.tsx`
-  - [ ] 10.10 Test table rendering and expansion
+- [x] Task 10: Write Tests (All ACs)
+  - [x] 10.1 Create `apps/api/app/tests/services/test_audit_logger.py`
+  - [x] 10.2 Test `log_action()` creates correct entry
+  - [x] 10.3 Test `log_batch_start()` links entries with batch_id
+  - [x] 10.4 Test before/after value capture accuracy
+  - [x] 10.5 Add audit log tests to `apps/api/app/tests/api/test_admin_endpoints.py`
+  - [x] 10.6 Test audit log list endpoint with pagination
+  - [x] 10.7 Test audit log filters work correctly
+  - [x] 10.8 Test admin-only access control
+  - [x] 10.9 Create `apps/web/src/components/admin/__tests__/AuditLogTable.test.tsx`
+  - [x] 10.10 Test table rendering and expansion
 
 ## Dev Notes
 
@@ -222,13 +222,13 @@ apps/web/src/
 │   └── audit/
 │       └── page.tsx              # Audit log viewer page
 └── components/admin/
-    ├── AuditLogTable.tsx         # Table component with expansion
+    ├── AuditLogTable.tsx         # Table component with expansion (includes row/detail logic)
     ├── AuditLogFilters.tsx       # Filter controls
-    ├── AuditLogRow.tsx           # Individual row with expand
-    ├── AuditLogDetail.tsx        # Expanded detail view
     └── __tests__/
         └── AuditLogTable.test.tsx
 ```
+
+Note: AuditLogRow.tsx and AuditLogDetail.tsx planned in Dev Notes were consolidated into AuditLogTable.tsx for simplicity.
 
 ### Backend File Structure
 
@@ -240,11 +240,11 @@ apps/api/app/
 │   └── admin.py                  # ADD: audit log models
 └── services/
     └── audit/
-        ├── __init__.py           # NEW
-        └── logger.py             # NEW: AuditLogger class
+        ├── __init__.py           # UPDATE: exports
+        └── logger.py             # UPDATE: AuditLogger class
 
 supabase/migrations/
-└── 20260115_007_audit_logs.sql   # NEW: audit_logs table
+└── 20260120_001_audit_logs.sql   # NEW: audit_logs table
 ```
 
 ### Existing Patterns to Follow
@@ -468,11 +468,34 @@ export function AuditLogTable({ entries, isLoading }: AuditLogTableProps) {
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.5 (claude-opus-4-5-20251101)
 
 ### Debug Log References
 
+N/A
+
 ### Completion Notes List
 
+- Code review performed on 2026-01-18 by Claude Opus 4.5
+- Fixed 2 HIGH severity issues: Inconsistent table name `admin_audit_logs` → `audit_logs` in logger.py (_store_log and get_logs methods)
+- Updated Frontend/Backend File Structure in Dev Notes to match actual implementation
+- Migration filename was planned as `20260115_007` but implemented as `20260120_001` - both are valid
+- AuditLogRow.tsx and AuditLogDetail.tsx planned components were consolidated into AuditLogTable.tsx
+
 ### File List
+
+**New Files:**
+- `supabase/migrations/20260120_001_audit_logs.sql` - Audit logs table migration with append-only design
+- `apps/api/app/tests/services/test_audit_logger.py` - Unit tests for AuditLogger service
+- `apps/web/src/app/(admin)/audit/page.tsx` - Audit log viewer page
+- `apps/web/src/components/admin/AuditLogFilters.tsx` - Filter controls component
+- `apps/web/src/components/admin/AuditLogTable.tsx` - Table component with expansion
+- `apps/web/src/components/admin/__tests__/AuditLogTable.test.tsx` - Frontend tests
+
+**Modified Files:**
+- `apps/api/app/services/audit/__init__.py` - Added exports for log_action, log_batch_start
+- `apps/api/app/services/audit/logger.py` - Added log_action(), log_batch_start() methods, fixed table names
+- `apps/api/app/api/admin.py` - Added GET /audit-logs and GET /audit-logs/{id} endpoints
+- `apps/api/app/models/admin.py` - Added AuditLogEntryResponse, AuditLogListResponseV2, AuditLogFilters, AuditLogActionType
+- `apps/api/app/tests/api/test_admin_endpoints.py` - Added audit log endpoint tests
 

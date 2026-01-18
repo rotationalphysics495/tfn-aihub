@@ -50,6 +50,22 @@ class AuditEntityType(str, Enum):
     USER_ROLE = "user_role"
 
 
+class AuditLogActionType(str, Enum):
+    """
+    Type of audit log action (Story 9.15 Task 2.6).
+
+    Unified action types for the audit_logs table.
+    """
+    ROLE_CHANGE = "role_change"
+    ASSIGNMENT_CREATE = "assignment_create"
+    ASSIGNMENT_UPDATE = "assignment_update"
+    ASSIGNMENT_DELETE = "assignment_delete"
+    BATCH_ASSIGNMENT = "batch_assignment"
+    USER_CREATE = "user_create"
+    USER_UPDATE = "user_update"
+    PREFERENCE_UPDATE = "preference_update"
+
+
 # ============================================================================
 # Supervisor Assignment Models (AC: 1, 2, 3, 4)
 # ============================================================================
@@ -450,3 +466,88 @@ class RoleAuditLogEntry(BaseModel):
     before_value: Optional[Dict[str, Any]] = Field(None, description="Previous role state")
     after_value: Optional[Dict[str, Any]] = Field(None, description="New role state")
     metadata: Optional[Dict[str, Any]] = Field(None, description="Additional context")
+
+
+# ============================================================================
+# Audit Log Models (Story 9.15)
+# ============================================================================
+
+
+class AuditLogEntryResponse(BaseModel):
+    """
+    Response model for a single audit log entry (Story 9.15 Task 4.2).
+
+    AC#1: Entry includes timestamp, admin_user_id, action_type, target, before/after values.
+    """
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "id": "audit-uuid-1",
+                "timestamp": "2026-01-19T08:00:00Z",
+                "admin_user_id": "admin-uuid-1",
+                "admin_email": "admin@example.com",
+                "action_type": "role_change",
+                "target_type": "user",
+                "target_id": "user-uuid-1",
+                "target_user_id": "user-uuid-1",
+                "target_asset_id": None,
+                "before_value": {"role": "supervisor"},
+                "after_value": {"role": "plant_manager"},
+                "batch_id": None,
+                "metadata": {"source": "admin_ui"},
+            }
+        }
+    )
+
+    id: UUID = Field(..., description="Unique audit log ID")
+    timestamp: datetime = Field(..., description="When the action occurred")
+    admin_user_id: UUID = Field(..., description="Admin who performed the action")
+    admin_email: Optional[str] = Field(None, description="Admin email (populated on read)")
+    action_type: str = Field(..., description="Type of action (role_change, assignment_create, etc.)")
+    target_type: Optional[str] = Field(None, description="Type of entity affected")
+    target_id: Optional[UUID] = Field(None, description="Generic target ID")
+    target_user_id: Optional[UUID] = Field(None, description="User affected by the change")
+    target_user_email: Optional[str] = Field(None, description="Target user email (populated on read)")
+    target_asset_id: Optional[UUID] = Field(None, description="Asset affected by the change")
+    target_asset_name: Optional[str] = Field(None, description="Asset name (populated on read)")
+    before_value: Optional[Dict[str, Any]] = Field(None, description="State before the change")
+    after_value: Optional[Dict[str, Any]] = Field(None, description="State after the change")
+    batch_id: Optional[UUID] = Field(None, description="Groups batch operations together")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional context")
+
+
+class AuditLogFilters(BaseModel):
+    """
+    Filter parameters for audit log queries (Story 9.15 Task 4.5).
+
+    AC#2: Filters available - date range, action type, target user.
+    """
+    start_date: Optional[datetime] = Field(None, description="Filter entries after this date (ISO 8601)")
+    end_date: Optional[datetime] = Field(None, description="Filter entries before this date (ISO 8601)")
+    action_type: Optional[str] = Field(None, description="Filter by action type")
+    target_user_id: Optional[UUID] = Field(None, description="Filter by target user")
+    admin_user_id: Optional[UUID] = Field(None, description="Filter by admin who performed action")
+    batch_id: Optional[UUID] = Field(None, description="Filter by batch operation ID")
+
+
+class AuditLogListResponseV2(BaseModel):
+    """
+    Response for listing audit logs (Story 9.15 Task 4.4).
+
+    AC#2: Entries displayed in reverse chronological order with pagination.
+    """
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "entries": [],
+                "total": 100,
+                "page": 1,
+                "page_size": 50,
+            }
+        }
+    )
+
+    entries: List[AuditLogEntryResponse] = Field(..., description="List of audit log entries")
+    total: int = Field(..., description="Total count of entries matching filters")
+    page: int = Field(default=1, ge=1, description="Current page number")
+    page_size: int = Field(default=50, ge=1, le=100, description="Items per page")
