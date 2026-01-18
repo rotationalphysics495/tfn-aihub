@@ -278,7 +278,7 @@ development_status:
   # Story 9.12: EOD Push Notification Reminders
   # - Optional reminder for EOD summary review
   # - Web Push via Supabase Edge Function
-  9-12-eod-push-notification-reminders: ready-for-dev
+  9-12-eod-push-notification-reminders: review
 
   # Story 9.13: Admin UI - Asset Assignment
   # - Assign supervisors to assets/areas

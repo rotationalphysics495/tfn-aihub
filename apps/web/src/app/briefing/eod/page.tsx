@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * End of Day Summary Page (Story 9.10)
+ * End of Day Summary Page (Story 9.10, 9.12)
  *
  * EOD summary UI for Plant Managers to review the day's performance
  * and compare against morning briefing predictions.
@@ -10,13 +10,20 @@
  * AC#2: Summary Content Structure - performance, wins, concerns, outlook
  * AC#3: No Morning Briefing Fallback - works without morning briefing
  *
+ * Story 9.12 additions:
+ * Task 7: EOD View Tracking (AC: 3)
+ * - 7.1: Update last_eod_viewed_at when EOD summary page loads
+ * - 7.2: Add API endpoint or direct Supabase update on page view
+ * - 7.3: Ensure timestamp is user's local date for day comparison
+ *
  * References:
  * - [Source: architecture/voice-briefing.md#Voice Integration Architecture]
  * - [Source: prd/prd-functional-requirements.md#FR31-FR34]
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { createClient } from '@/lib/supabase/client';
 
 /**
  * EOD section from API response.
@@ -79,6 +86,46 @@ const sectionColors: Record<string, { bg: string; border: string; icon: string }
 };
 
 /**
+ * Track EOD page view in user_preferences table.
+ * Story 9.12 Task 7: EOD View Tracking (AC#3)
+ * - 7.1: Update last_eod_viewed_at when EOD summary page loads
+ * - 7.2: Direct Supabase update on page view
+ * - 7.3: Ensure timestamp is UTC for consistent comparison
+ */
+async function trackEodPageView(): Promise<void> {
+  try {
+    const supabase = createClient();
+
+    // Get current user
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      console.debug('Cannot track EOD view: user not authenticated');
+      return;
+    }
+
+    // Update last_eod_viewed_at in user_preferences
+    const { error: updateError } = await supabase
+      .from('user_preferences')
+      .update({
+        last_eod_viewed_at: new Date().toISOString(),
+      })
+      .eq('user_id', user.id);
+
+    if (updateError) {
+      console.error('Failed to track EOD view:', updateError);
+    } else {
+      console.debug('EOD view tracked successfully');
+    }
+  } catch (err) {
+    console.error('Error tracking EOD view:', err);
+  }
+}
+
+/**
  * End of Day Summary Page component.
  */
 export default function EODSummaryPage() {
@@ -86,6 +133,11 @@ export default function EODSummaryPage() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'complete' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [expandedSections, setExpandedSections] = useState<Set<number>>(new Set([0]));
+
+  // Track EOD page view on mount (Story 9.12 Task 7)
+  useEffect(() => {
+    trackEodPageView();
+  }, []);
 
   /**
    * Fetch EOD summary from API.

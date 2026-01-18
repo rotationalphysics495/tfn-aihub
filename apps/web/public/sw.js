@@ -1,11 +1,14 @@
 /**
- * Service Worker for Offline Handoff Caching (Story 9.9)
+ * Service Worker for Offline Handoff Caching and Push Notifications
  *
- * Provides offline access to shift handoffs with cache-then-network strategy.
+ * Provides:
+ * - Offline access to shift handoffs with cache-then-network strategy (Story 9.9)
+ * - Push notification handling for EOD reminders (Story 9.12)
  *
  * @see Story 9.9 - Offline Handoff Caching
+ * @see Story 9.12 - EOD Push Notification Reminders
  * @see AC#1 - Online Handoff Caching
- * @see AC#2 - Offline Handoff Access
+ * @see AC#2 - Offline Handoff Access / Notification Tap Navigation
  * @see AC#3 - Offline Voice Note Playback
  * @see AC#5 - Connectivity Restoration Sync
  */
@@ -213,38 +216,141 @@ async function syncPendingAcknowledgments() {
 }
 
 // ============================================================================
-// Push Notification Handling
+// Push Notification Handling (Story 9.8, 9.12)
 // ============================================================================
 
+/**
+ * Handle incoming push notifications
+ * Task 5.1-5.4: Push event listener with EOD support (Story 9.12)
+ * AC#1: Push Notification Trigger - display notification
+ */
 self.addEventListener('push', (event) => {
   if (!event.data) return;
 
-  const data = event.data.json();
+  let data;
+  try {
+    data = event.data.json();
+  } catch (e) {
+    console.warn('[SW] Failed to parse push data:', e);
+    return;
+  }
+
+  // Build notification options based on notification type
+  const notificationType = data.data?.type || 'general';
+  const options = buildNotificationOptions(data, notificationType);
 
   event.waitUntil(
-    self.registration.showNotification(data.title || 'TFN AIHub', {
-      body: data.body,
-      icon: '/icon-192.png',
-      badge: '/badge-72.png',
-      data: data.data,
-    })
+    self.registration.showNotification(data.title || 'TFN AIHub', options)
   );
 });
 
+/**
+ * Build notification options based on type.
+ * Task 5.3: Display notification with title and body
+ * Task 5.4: Include EOD deep link in notification data
+ *
+ * @param {Object} data - Push notification data
+ * @param {string} notificationType - Type of notification
+ * @returns {Object} Notification options
+ */
+function buildNotificationOptions(data, notificationType) {
+  const baseOptions = {
+    body: data.body,
+    icon: data.icon || '/icon-192.png',
+    badge: data.badge || '/badge-72.png',
+    data: data.data || {},
+    tag: data.tag,
+  };
+
+  // EOD reminder specific options (Story 9.12)
+  if (notificationType === 'eod_reminder') {
+    return {
+      ...baseOptions,
+      icon: '/icons/eod-reminder-192.png',
+      requireInteraction: true, // Keep visible until user interacts
+      actions: [
+        { action: 'view', title: 'View Summary' },
+        { action: 'dismiss', title: 'Dismiss' },
+      ],
+      // Ensure URL is set for EOD page
+      data: {
+        ...baseOptions.data,
+        url: data.data?.url || '/briefing/eod',
+      },
+    };
+  }
+
+  // Handoff acknowledgment specific options (Story 9.8)
+  if (notificationType === 'handoff_acknowledged') {
+    return {
+      ...baseOptions,
+      icon: '/icons/handoff-ack-192.png',
+      actions: data.actions || [{ action: 'view', title: 'View Details' }],
+    };
+  }
+
+  return baseOptions;
+}
+
+/**
+ * Handle notification click events.
+ * Task 5.5: Handle notification click to navigate to /briefing/eod
+ * AC#2: Notification Tap Navigation - EOD summary page displayed directly
+ */
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
-  const url = event.notification.data?.url || '/';
+  // Handle action buttons
+  const action = event.action;
+  const notificationType = event.notification.data?.type;
+
+  // If user clicked dismiss action, just close
+  if (action === 'dismiss') {
+    return;
+  }
+
+  // Get URL to navigate to
+  let url = event.notification.data?.url || '/';
+
+  // For EOD reminders, always navigate to EOD page
+  if (notificationType === 'eod_reminder') {
+    url = '/briefing/eod';
+  }
+
+  // For handoff notifications, navigate to specific handoff
+  if (notificationType === 'handoff_acknowledged' && event.notification.data?.handoff_id) {
+    url = `/handoff/${event.notification.data.handoff_id}`;
+  }
 
   event.waitUntil(
-    self.clients.matchAll({ type: 'window' }).then((clients) => {
-      // Try to focus existing window
-      for (const client of clients) {
-        if (client.url === url && 'focus' in client) {
-          return client.focus();
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      // Try to find existing window with matching URL
+      for (const client of windowClients) {
+        const clientUrl = new URL(client.url);
+        if (clientUrl.pathname === url || clientUrl.pathname.startsWith(url)) {
+          // Focus existing window and navigate if needed
+          return client.focus().then((focusedClient) => {
+            if (focusedClient && 'navigate' in focusedClient) {
+              return focusedClient.navigate(url);
+            }
+            return focusedClient;
+          });
         }
       }
-      // Open new window
+
+      // Try to find any existing app window
+      for (const client of windowClients) {
+        if ('focus' in client) {
+          return client.focus().then((focusedClient) => {
+            if (focusedClient && 'navigate' in focusedClient) {
+              return focusedClient.navigate(url);
+            }
+            return focusedClient;
+          });
+        }
+      }
+
+      // No existing window, open new one
       if (self.clients.openWindow) {
         return self.clients.openWindow(url);
       }

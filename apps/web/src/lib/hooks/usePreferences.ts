@@ -27,6 +27,10 @@ export interface UserPreferences {
   voiceEnabled: boolean
   onboardingComplete: boolean
   updatedAt: string
+  // EOD Reminder preferences (Story 9.12)
+  eodReminderEnabled: boolean
+  eodReminderTime: string
+  userTimezone: string
 }
 
 interface UsePreferencesState {
@@ -123,6 +127,10 @@ export function usePreferences(
         voiceEnabled: data.voice_enabled,
         onboardingComplete: data.onboarding_complete,
         updatedAt: data.updated_at,
+        // EOD Reminder preferences (Story 9.12)
+        eodReminderEnabled: data.eod_reminder_enabled ?? false,
+        eodReminderTime: data.eod_reminder_time ?? '17:00',
+        userTimezone: data.user_timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
       }
 
       if (mountedRef.current) {
@@ -176,6 +184,10 @@ export function usePreferences(
       if (prefs.detailLevel !== undefined) requestBody.detail_level = prefs.detailLevel
       if (prefs.voiceEnabled !== undefined) requestBody.voice_enabled = prefs.voiceEnabled
       if (prefs.onboardingComplete !== undefined) requestBody.onboarding_complete = prefs.onboardingComplete
+      // EOD Reminder preferences (Story 9.12)
+      if (prefs.eodReminderEnabled !== undefined) requestBody.eod_reminder_enabled = prefs.eodReminderEnabled
+      if (prefs.eodReminderTime !== undefined) requestBody.eod_reminder_time = prefs.eodReminderTime
+      if (prefs.userTimezone !== undefined) requestBody.user_timezone = prefs.userTimezone
 
       const response = await fetch('/api/v1/preferences', {
         method,
@@ -201,6 +213,10 @@ export function usePreferences(
         voiceEnabled: data.voice_enabled,
         onboardingComplete: data.onboarding_complete,
         updatedAt: data.updated_at,
+        // EOD Reminder preferences (Story 9.12)
+        eodReminderEnabled: data.eod_reminder_enabled ?? false,
+        eodReminderTime: data.eod_reminder_time ?? '17:00',
+        userTimezone: data.user_timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone,
       }
 
       if (mountedRef.current) {

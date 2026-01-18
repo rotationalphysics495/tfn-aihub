@@ -1,12 +1,16 @@
 'use client'
 
 /**
- * Settings > Preferences Page (Story 8.8)
+ * Settings > Preferences Page (Story 8.8, 9.12)
  *
  * AC#5: All onboarding options available to edit
  * - Reuse all preference components (AreaOrderSelector, etc.)
  * - Load current preferences on mount
  * - Save on submit with feedback message
+ *
+ * Story 9.12 additions:
+ * - EOD Reminder toggle and time picker
+ * - Push notification permission handling
  *
  * References:
  * - [Source: architecture/voice-briefing.md#User Preferences Architecture]
@@ -19,7 +23,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { AreaOrderSelector, DEFAULT_AREA_ORDER } from '@/components/preferences/AreaOrderSelector'
 import { DetailLevelToggle, type DetailLevel } from '@/components/preferences/DetailLevelToggle'
 import { VoiceToggle } from '@/components/preferences/VoiceToggle'
+import { EODReminderSettings } from '@/components/preferences/EODReminderSettings'
 import { usePreferences, type UserPreferences } from '@/lib/hooks/usePreferences'
+
+// VAPID public key for push notifications (from environment)
+const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''
 
 export default function PreferencesPage() {
   const {
@@ -38,11 +46,16 @@ export default function PreferencesPage() {
     areaOrder: string[]
     detailLevel: DetailLevel
     voiceEnabled: boolean
+    // EOD Reminder preferences (Story 9.12)
+    eodReminderEnabled: boolean
+    eodReminderTime: string
   }>({
     role: 'plant_manager',
     areaOrder: DEFAULT_AREA_ORDER,
     detailLevel: 'summary',
     voiceEnabled: true,
+    eodReminderEnabled: false,
+    eodReminderTime: '17:00',
   })
 
   const [hasChanges, setHasChanges] = useState(false)
@@ -56,6 +69,9 @@ export default function PreferencesPage() {
         areaOrder: preferences.areaOrder.length > 0 ? preferences.areaOrder : DEFAULT_AREA_ORDER,
         detailLevel: preferences.detailLevel,
         voiceEnabled: preferences.voiceEnabled,
+        // EOD Reminder preferences (Story 9.12)
+        eodReminderEnabled: preferences.eodReminderEnabled,
+        eodReminderTime: preferences.eodReminderTime,
       })
     }
   }, [preferences])
@@ -71,7 +87,10 @@ export default function PreferencesPage() {
       localPrefs.role !== preferences.role ||
       JSON.stringify(localPrefs.areaOrder) !== JSON.stringify(preferences.areaOrder) ||
       localPrefs.detailLevel !== preferences.detailLevel ||
-      localPrefs.voiceEnabled !== preferences.voiceEnabled
+      localPrefs.voiceEnabled !== preferences.voiceEnabled ||
+      // EOD Reminder changes (Story 9.12)
+      localPrefs.eodReminderEnabled !== preferences.eodReminderEnabled ||
+      localPrefs.eodReminderTime !== preferences.eodReminderTime
 
     setHasChanges(changed)
     if (changed) {
@@ -95,6 +114,15 @@ export default function PreferencesPage() {
     setLocalPrefs(prev => ({ ...prev, role }))
   }, [])
 
+  // EOD Reminder handlers (Story 9.12)
+  const handleEodReminderEnabledChange = useCallback((enabled: boolean) => {
+    setLocalPrefs(prev => ({ ...prev, eodReminderEnabled: enabled }))
+  }, [])
+
+  const handleEodReminderTimeChange = useCallback((time: string) => {
+    setLocalPrefs(prev => ({ ...prev, eodReminderTime: time }))
+  }, [])
+
   const handleSave = useCallback(async () => {
     setSaveSuccess(false)
     clearError()
@@ -104,6 +132,10 @@ export default function PreferencesPage() {
       areaOrder: localPrefs.areaOrder,
       detailLevel: localPrefs.detailLevel,
       voiceEnabled: localPrefs.voiceEnabled,
+      // EOD Reminder preferences (Story 9.12)
+      eodReminderEnabled: localPrefs.eodReminderEnabled,
+      eodReminderTime: localPrefs.eodReminderTime,
+      userTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     })
 
     if (success) {
@@ -121,6 +153,9 @@ export default function PreferencesPage() {
         areaOrder: preferences.areaOrder.length > 0 ? preferences.areaOrder : DEFAULT_AREA_ORDER,
         detailLevel: preferences.detailLevel,
         voiceEnabled: preferences.voiceEnabled,
+        // EOD Reminder preferences (Story 9.12)
+        eodReminderEnabled: preferences.eodReminderEnabled,
+        eodReminderTime: preferences.eodReminderTime,
       })
     }
     clearError()
@@ -367,6 +402,42 @@ export default function PreferencesPage() {
             />
           </CardContent>
         </Card>
+
+        {/* EOD Reminder Section (Story 9.12) */}
+        {localPrefs.role === 'plant_manager' && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <svg
+                  className="w-5 h-5 text-primary"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+                  />
+                </svg>
+                EOD Summary Reminders
+              </CardTitle>
+              <CardDescription>
+                Get reminded to review your End of Day summary
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <EODReminderSettings
+                enabled={localPrefs.eodReminderEnabled}
+                reminderTime={localPrefs.eodReminderTime}
+                onEnabledChange={handleEodReminderEnabledChange}
+                onTimeChange={handleEodReminderTimeChange}
+                vapidPublicKey={VAPID_PUBLIC_KEY}
+              />
+            </CardContent>
+          </Card>
+        )}
 
         {/* Action buttons */}
         <div className="flex gap-3 justify-end pt-4">

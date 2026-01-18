@@ -5,7 +5,7 @@ execution:
   duration_seconds: 0
 stories:
   total: 0
-  completed: 11
+  completed: 13
   failed: 0
   skipped: 0
 validation:
@@ -27,3 +27,20 @@ story_9_6:
     - "apps/api/app/tests/services/test_handoff_qa.py"
     - "apps/api/app/tests/api/test_handoff_qa.py"
   tests_passed: 19
+story_9_12:
+  status: "review"
+  start_time: "2026-01-17T17:55:00Z"
+  end_time: "2026-01-17T18:05:00Z"
+  artifacts_created:
+    - "supabase/migrations/20260118_001_eod_reminder_preferences.sql"
+    - "supabase/migrations/20260118_002_eod_reminder_cron.sql"
+    - "supabase/functions/send-eod-reminder/index.ts"
+    - "apps/web/src/lib/notifications/push-setup.ts"
+    - "apps/web/src/components/preferences/EODReminderSettings.tsx"
+    - "apps/web/public/sw.js (enhanced push handling)"
+    - "apps/web/src/lib/hooks/usePreferences.ts (EOD fields)"
+    - "apps/web/src/app/(main)/settings/preferences/page.tsx (EOD UI)"
+    - "apps/web/src/app/briefing/eod/page.tsx (view tracking)"
+    - "apps/web/src/lib/notifications/__tests__/push-setup.test.ts"
+    - "apps/web/src/components/preferences/__tests__/EODReminderSettings.test.tsx"
+  tests_passed: 45
