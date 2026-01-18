@@ -283,7 +283,7 @@ development_status:
   # Story 9.13: Admin UI - Asset Assignment
   # - Assign supervisors to assets/areas
   # - Grid UI with preview
-  9-13-admin-ui-asset-assignment: ready-for-dev
+  9-13-admin-ui-asset-assignment: done
 
   # Story 9.14: Admin UI - Role Management
   # - Assign roles to users

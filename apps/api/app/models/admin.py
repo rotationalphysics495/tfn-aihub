@@ -1,0 +1,344 @@
+"""
+Admin Models for Asset Assignment (Story 9.13)
+
+Pydantic models for admin operations including supervisor assignments,
+batch operations, preview calculations, and audit logging.
+
+References:
+- [Source: architecture/voice-briefing.md#Admin UI Architecture]
+- [Source: prd/prd-functional-requirements.md#FR46-FR50]
+"""
+from datetime import datetime, timezone
+from enum import Enum
+from typing import List, Optional, Dict, Any
+from uuid import UUID
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+# ============================================================================
+# Enums
+# ============================================================================
+
+
+class AssignmentAction(str, Enum):
+    """Action type for assignment changes."""
+    ADD = "add"
+    REMOVE = "remove"
+
+
+class AuditActionType(str, Enum):
+    """Type of admin action for audit logging (FR50, FR56)."""
+    ASSIGNMENT_CREATED = "assignment_created"
+    ASSIGNMENT_DELETED = "assignment_deleted"
+    ASSIGNMENT_UPDATED = "assignment_updated"
+    BATCH_UPDATE = "batch_update"
+
+
+class AuditEntityType(str, Enum):
+    """Type of entity affected by admin action."""
+    SUPERVISOR_ASSIGNMENT = "supervisor_assignment"
+    USER_ROLE = "user_role"
+
+
+# ============================================================================
+# Supervisor Assignment Models (AC: 1, 2, 3, 4)
+# ============================================================================
+
+
+class SupervisorAssignment(BaseModel):
+    """
+    Model for a supervisor assignment record (Task 3.2).
+
+    Maps a supervisor to an asset they are responsible for.
+    """
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "id": "123e4567-e89b-12d3-a456-426614174000",
+                "user_id": "user-uuid-1",
+                "asset_id": "asset-uuid-1",
+                "assigned_by": "admin-uuid-1",
+                "assigned_at": "2026-01-19T08:00:00Z",
+                "expires_at": None,
+                "created_at": "2026-01-19T08:00:00Z",
+                "updated_at": "2026-01-19T08:00:00Z",
+            }
+        }
+    )
+
+    id: UUID = Field(..., description="Unique assignment ID")
+    user_id: UUID = Field(..., description="Supervisor user ID")
+    asset_id: UUID = Field(..., description="Assigned asset ID")
+    assigned_by: UUID = Field(..., description="Admin who made the assignment")
+    assigned_at: datetime = Field(..., description="When the assignment was made")
+    expires_at: Optional[datetime] = Field(
+        None,
+        description="Expiration date for temporary assignments (FR49). NULL = permanent."
+    )
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    # Related data populated on response
+    user_email: Optional[str] = Field(None, description="Supervisor email (populated on read)")
+    user_name: Optional[str] = Field(None, description="Supervisor name (populated on read)")
+    asset_name: Optional[str] = Field(None, description="Asset name (populated on read)")
+    area_name: Optional[str] = Field(None, description="Asset area name (populated on read)")
+
+    @property
+    def is_temporary(self) -> bool:
+        """Check if this is a temporary assignment."""
+        return self.expires_at is not None
+
+    @property
+    def is_expired(self) -> bool:
+        """Check if this temporary assignment has expired."""
+        if self.expires_at is None:
+            return False
+        return self.expires_at < datetime.now(timezone.utc)
+
+
+class SupervisorInfo(BaseModel):
+    """Basic supervisor information for grid display."""
+    user_id: UUID = Field(..., description="User ID")
+    email: str = Field(..., description="User email")
+    name: Optional[str] = Field(None, description="User display name")
+
+
+class AssetInfo(BaseModel):
+    """Basic asset information for grid display."""
+    asset_id: UUID = Field(..., description="Asset ID")
+    name: str = Field(..., description="Asset name")
+    area: Optional[str] = Field(None, description="Area where asset is located")
+
+
+class AssignmentCell(BaseModel):
+    """
+    Represents a single cell in the assignment grid (AC: 1).
+
+    Each cell shows whether a supervisor is assigned to an asset.
+    """
+    user_id: UUID
+    asset_id: UUID
+    is_assigned: bool = False
+    expires_at: Optional[datetime] = None
+    assignment_id: Optional[UUID] = None
+
+    @property
+    def is_temporary(self) -> bool:
+        """Check if this is a temporary assignment."""
+        return self.is_assigned and self.expires_at is not None
+
+
+# ============================================================================
+# Preview Models (AC: 2 - FR48)
+# ============================================================================
+
+
+class AssignmentChange(BaseModel):
+    """
+    A single assignment change for preview/batch operations (Task 3.4).
+
+    Used in both preview requests and batch update requests.
+    """
+    user_id: UUID = Field(..., description="Supervisor user ID")
+    asset_id: UUID = Field(..., description="Asset ID")
+    action: AssignmentAction = Field(..., description="Whether to add or remove assignment")
+    expires_at: Optional[datetime] = Field(
+        None,
+        description="For temporary assignments, when they expire (FR49)"
+    )
+
+
+class UserImpact(BaseModel):
+    """Impact of changes on a single user for preview (FR48)."""
+    user_id: UUID
+    user_email: Optional[str] = None
+    current_asset_count: int = Field(..., description="Current number of assigned assets")
+    current_area_count: int = Field(..., description="Current number of unique areas")
+    new_asset_count: int = Field(..., description="Asset count after changes")
+    new_area_count: int = Field(..., description="Area count after changes")
+    assets_added: List[UUID] = Field(default_factory=list)
+    assets_removed: List[UUID] = Field(default_factory=list)
+
+
+class AssignmentPreview(BaseModel):
+    """
+    Preview response showing impact of pending changes (Task 3.3, FR48).
+
+    AC#2: Preview shows impact: "User will see X assets across Y areas"
+    """
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "changes_count": 5,
+                "users_affected": 2,
+                "impact_summary": "2 supervisors affected: Supervisor A will see 5 assets across 2 areas",
+                "user_impacts": [],
+                "warnings": [],
+            }
+        }
+    )
+
+    changes_count: int = Field(..., description="Total number of changes")
+    users_affected: int = Field(..., description="Number of users affected by changes")
+    impact_summary: str = Field(
+        ...,
+        description="Human-readable summary: 'User will see X assets across Y areas'"
+    )
+    user_impacts: List[UserImpact] = Field(
+        default_factory=list,
+        description="Detailed impact per affected user"
+    )
+    warnings: List[str] = Field(
+        default_factory=list,
+        description="Warning messages (e.g., removing all assets from user)"
+    )
+
+
+# ============================================================================
+# Request/Response Models (Task 2)
+# ============================================================================
+
+
+class AssignmentPreviewRequest(BaseModel):
+    """Request body for preview calculation (Task 2.4)."""
+    changes: List[AssignmentChange] = Field(
+        ...,
+        description="List of changes to preview",
+        min_length=1
+    )
+
+
+class BatchAssignmentRequest(BaseModel):
+    """
+    Request body for batch assignment changes (Task 3.4).
+
+    AC#3: Changes are saved atomically when confirmed.
+    """
+    changes: List[AssignmentChange] = Field(
+        ...,
+        description="List of changes to apply atomically",
+        min_length=1
+    )
+
+    @field_validator("changes")
+    @classmethod
+    def validate_changes(cls, v: List[AssignmentChange]) -> List[AssignmentChange]:
+        """Ensure no duplicate user-asset pairs in changes."""
+        seen = set()
+        for change in v:
+            key = (str(change.user_id), str(change.asset_id))
+            if key in seen:
+                raise ValueError(
+                    f"Duplicate change for user {change.user_id} and asset {change.asset_id}"
+                )
+            seen.add(key)
+        return v
+
+
+class BatchAssignmentResponse(BaseModel):
+    """Response for batch assignment update."""
+    success: bool = True
+    applied_count: int = Field(..., description="Number of changes applied")
+    batch_id: UUID = Field(..., description="Batch ID for audit trail")
+    message: str = "Assignment changes applied successfully"
+
+
+class AssignmentListResponse(BaseModel):
+    """Response for listing all assignments (Task 2.2)."""
+    assignments: List[SupervisorAssignment]
+    total_count: int
+    # Include basic user/asset info for grid display
+    supervisors: List[SupervisorInfo] = Field(
+        default_factory=list,
+        description="List of all supervisors for grid rows"
+    )
+    assets: List[AssetInfo] = Field(
+        default_factory=list,
+        description="List of all assets grouped by area for grid columns"
+    )
+
+
+class UserAssignmentsResponse(BaseModel):
+    """Response for getting a specific user's assignments (Task 2.3)."""
+    user_id: UUID
+    user_email: Optional[str] = None
+    assignments: List[SupervisorAssignment]
+    asset_count: int
+    area_count: int
+
+
+class CreateAssignmentRequest(BaseModel):
+    """Request to create a single assignment."""
+    user_id: UUID
+    asset_id: UUID
+    expires_at: Optional[datetime] = None
+
+
+class CreateAssignmentResponse(BaseModel):
+    """Response for creating a single assignment."""
+    success: bool = True
+    assignment: SupervisorAssignment
+    message: str = "Assignment created successfully"
+
+
+# ============================================================================
+# Audit Log Models (Task 3.5, FR50, FR56)
+# ============================================================================
+
+
+class AuditLogEntry(BaseModel):
+    """
+    Audit log entry for admin actions (Task 3.5).
+
+    Every admin change creates an immutable audit record.
+    AC#3: Audit log entry is created for all write operations.
+    """
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "id": "audit-uuid-1",
+                "action_type": "assignment_created",
+                "entity_type": "supervisor_assignment",
+                "entity_id": "assignment-uuid-1",
+                "admin_user_id": "admin-uuid-1",
+                "target_user_id": "supervisor-uuid-1",
+                "state_before": None,
+                "state_after": {"user_id": "...", "asset_id": "..."},
+                "batch_id": None,
+                "metadata": {"source": "admin_ui"},
+                "created_at": "2026-01-19T08:00:00Z",
+            }
+        }
+    )
+
+    id: UUID = Field(..., description="Unique audit log ID")
+    action_type: AuditActionType = Field(..., description="Type of action performed")
+    entity_type: AuditEntityType = Field(..., description="Type of entity affected")
+    entity_id: Optional[UUID] = Field(None, description="ID of affected entity")
+    admin_user_id: UUID = Field(..., description="Admin who performed the action")
+    target_user_id: Optional[UUID] = Field(
+        None, description="User affected by the change"
+    )
+    state_before: Optional[Dict[str, Any]] = Field(
+        None, description="State before the change"
+    )
+    state_after: Optional[Dict[str, Any]] = Field(
+        None, description="State after the change"
+    )
+    batch_id: Optional[UUID] = Field(
+        None, description="Groups batch operations together"
+    )
+    metadata: Optional[Dict[str, Any]] = Field(
+        None, description="Additional context"
+    )
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class AuditLogListResponse(BaseModel):
+    """Response for listing audit logs."""
+    logs: List[AuditLogEntry]
+    total_count: int
+    page: int = 1
+    page_size: int = 50
