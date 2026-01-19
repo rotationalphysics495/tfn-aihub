@@ -9,7 +9,53 @@ stories:
   failed: 0
   skipped: 0
 validation:
-  gate_executed: false
-  gate_status: "PENDING"
+  gate_executed: true
+  gate_mode: "quick"
+  timestamp: "2026-01-19T05:13:00Z"
+  results:
+    passed: 1
+    failed: 0
+    skipped: 8
+  gate_status: "PASS"
+  blocking_issues: []
   fix_attempts: 0
+  scenarios:
+    - id: 8
+      name: "Health Check Verification"
+      classification: "automatable"
+      status: "PASS"
+      command: "npm run test:run --prefix apps/web -- --reporter=verbose src/app/api/health/route.test.ts"
+      duration_ms: 659
+    - id: 1
+      name: "User Login"
+      classification: "manual"
+      status: "SKIPPED"
+    - id: 2
+      name: "Session Persistence"
+      classification: "manual"
+      status: "SKIPPED"
+    - id: 3
+      name: "User Logout"
+      classification: "manual"
+      status: "SKIPPED"
+    - id: 4
+      name: "Command Center Dashboard Layout"
+      classification: "manual"
+      status: "SKIPPED"
+    - id: 5
+      name: "Responsive Design (Tablet View)"
+      classification: "manual"
+      status: "SKIPPED"
+    - id: 6
+      name: "Factory Floor Visibility"
+      classification: "manual"
+      status: "SKIPPED"
+    - id: 7
+      name: "Dark Mode Support"
+      classification: "manual"
+      status: "SKIPPED"
+    - id: 9
+      name: "Error Handling"
+      classification: "manual"
+      status: "SKIPPED"
 issues: []

@@ -49,6 +49,7 @@ BMAD rules have been installed to: `.cursor/rules/bmad/`
 - @bmad/bmm/agents/sm - sm
 - @bmad/bmm/agents/tea - tea
 - @bmad/bmm/agents/tech-writer - tech-writer
+- @bmad/bmm/agents/uat-validator - uat-validator
 - @bmad/bmm/agents/ux-designer - ux-designer
 
 **Workflows:**
@@ -85,6 +86,7 @@ BMAD rules have been installed to: `.cursor/rules/bmad/`
 - @bmad/bmm/workflows/testarch-trace - testarch-trace
 - @bmad/bmm/workflows/workflow-init - workflow-init
 - @bmad/bmm/workflows/workflow-status - workflow-status
+- @bmad/bmm/workflows/uat-validate - uat-validate
 
 
 ## Quick Reference

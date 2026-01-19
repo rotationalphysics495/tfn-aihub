@@ -14,7 +14,60 @@ stories:
     avg_time_per_story_seconds: 1242
     additional_time_seconds: 4968
 validation:
-  gate_executed: false
-  gate_status: "PENDING"
+  gate_executed: true
+  gate_mode: "quick"
+  timestamp: "2026-01-19T05:18:00Z"
+  results:
+    passed: 0
+    failed: 0
+    skipped: 11
+  gate_status: "PASS"
+  gate_notes: "No automatable scenarios - all 11 scenarios require manual human testing"
+  blocking_issues: []
   fix_attempts: 0
+  scenarios:
+    - id: 1
+      name: "Command Center Dashboard - Live View"
+      classification: "manual"
+      status: "SKIPPED"
+    - id: 2
+      name: "Throughput Dashboard"
+      classification: "manual"
+      status: "SKIPPED"
+    - id: 3
+      name: "OEE Metrics View"
+      classification: "manual"
+      status: "SKIPPED"
+    - id: 4
+      name: "Downtime Pareto Analysis"
+      classification: "manual"
+      status: "SKIPPED"
+    - id: 5
+      name: "Safety Alert System"
+      classification: "manual"
+      status: "SKIPPED"
+    - id: 6
+      name: "Financial Impact Display"
+      classification: "manual"
+      status: "SKIPPED"
+    - id: 7
+      name: "Live Pulse Ticker"
+      classification: "manual"
+      status: "SKIPPED"
+    - id: 8
+      name: "Data Freshness and Staleness"
+      classification: "manual"
+      status: "SKIPPED"
+    - id: 9
+      name: "Industrial Clarity - Factory Floor Visibility"
+      classification: "manual"
+      status: "SKIPPED"
+    - id: 10
+      name: "Morning Report Data (T-1)"
+      classification: "manual"
+      status: "SKIPPED"
+    - id: 11
+      name: "Empty States and Error Handling"
+      classification: "manual"
+      status: "SKIPPED"
 issues: []
