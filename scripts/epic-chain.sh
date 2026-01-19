@@ -37,14 +37,14 @@ set -e
 # =============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-BMAD_DIR="$PROJECT_ROOT/_bmad"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+BMAD_DIR="$PROJECT_ROOT/.bmad"
 
-STORIES_DIR="$PROJECT_ROOT/_bmad-output/implementation-artifacts"
-SPRINT_ARTIFACTS_DIR="$PROJECT_ROOT/_bmad-output/implementation-artifacts"
-EPICS_DIR="$PROJECT_ROOT/_bmad-output/planning-artifacts"
-UAT_DIR="$PROJECT_ROOT/_bmad-output/uat"
-HANDOFF_DIR="$PROJECT_ROOT/_bmad-output/handoffs"
+STORIES_DIR="$PROJECT_ROOT/docs/stories"
+SPRINT_ARTIFACTS_DIR="$PROJECT_ROOT/docs/sprint-artifacts"
+EPICS_DIR="$PROJECT_ROOT/docs/epics"
+UAT_DIR="$PROJECT_ROOT/docs/uat"
+HANDOFF_DIR="$PROJECT_ROOT/docs/handoffs"
 
 LOG_FILE="/tmp/bmad-epic-chain-$$.log"
 CHAIN_PLAN_FILE="$SPRINT_ARTIFACTS_DIR/chain-plan.yaml"
@@ -333,15 +333,12 @@ for i in "${!EPIC_IDS[@]}"; do
     EPIC_FILES_LIST[$i]="$epic_file"
     log_success "Epic $epic_id: Found $(basename "$epic_file")"
 
-    # Find stories for this epic (dedupe directories to avoid double-counting)
+    # Find stories for this epic
     story_count=0
-    searched_dirs=""
     for search_dir in "$STORIES_DIR" "$SPRINT_ARTIFACTS_DIR"; do
-        # Skip if directory already searched or doesn't exist
-        if [ -d "$search_dir" ] && [[ ! "$searched_dirs" =~ "$search_dir" ]]; then
+        if [ -d "$search_dir" ]; then
             count=$(find "$search_dir" -name "${epic_id}-*-*.md" 2>/dev/null | wc -l)
             story_count=$((story_count + count))
-            searched_dirs="$searched_dirs:$search_dir"
         fi
     done
 
@@ -523,13 +520,7 @@ for current_idx in "${!EXECUTION_ORDER[@]}"; do
         echo "[DRY RUN] Would execute: $exec_cmd"
         ((COMPLETED_EPICS++))
     else
-        # Disable set -e temporarily to capture exit code properly
-        set +e
-        $exec_cmd
-        exec_exit_code=$?
-        set -e
-
-        if [ $exec_exit_code -eq 0 ]; then
+        if $exec_cmd; then
             log_success "Epic $epic_id completed"
 
             # Run UAT validation if enabled
@@ -605,7 +596,7 @@ for current_idx in "${!EXECUTION_ORDER[@]}"; do
                     if [ "$UAT_GATE_ENABLED" = true ]; then
                         if echo "$uat_output" | grep -q "UAT_GATE_RESULT: PASS"; then
                             uat_status="PASS"
-                            fix_count=$(echo "$uat_output" | grep -oE "UAT_FIX_ATTEMPTS: [0-9]+" | grep -oE "[0-9]+" || echo "0")
+                            local fix_count=$(echo "$uat_output" | grep -oE "UAT_FIX_ATTEMPTS: [0-9]+" | grep -oE "[0-9]+" || echo "0")
                             if [ "$fix_count" -gt 0 ]; then
                                 uat_status="PASS (after $fix_count fix attempts)"
                                 uat_fix_info="Self-healing fixes were applied. Review fix contexts at:
@@ -657,15 +648,8 @@ EOF
                 fi
             fi
         else
-            log_error "Epic $epic_id failed (exit code: $exec_exit_code)"
+            log_error "Epic $epic_id failed"
             ((FAILED_EPICS++))
-
-            # Exit code 2 from epic-execute means degradation detected - stop immediately
-            if [ $exec_exit_code -eq 2 ]; then
-                log_error "Degradation detected in epic-execute - halting chain"
-                log_error "Check _bmad-output/issues/ for details"
-                break
-            fi
 
             # Ask whether to continue or abort
             echo ""
@@ -758,14 +742,84 @@ if [ "$GENERATE_REPORT" = true ] && [ "$DRY_RUN" = false ]; then
     else
         log "Found $metrics_found metrics files"
 
-        # Generate basic report directly (avoids memory issues with Claude)
-        # Claude-based enhanced report can be generated separately if needed
-        log "Creating report from metrics..."
-        create_basic_report
+        # Determine workflow path (installed vs source)
+        WORKFLOW_PATH=""
+        if [ -d "$BMAD_DIR/bmm/workflows/4-implementation/epic-chain" ]; then
+            WORKFLOW_PATH="$BMAD_DIR/bmm/workflows/4-implementation/epic-chain"
+        elif [ -d "$PROJECT_ROOT/src/modules/bmm/workflows/4-implementation/epic-chain" ]; then
+            WORKFLOW_PATH="$PROJECT_ROOT/src/modules/bmm/workflows/4-implementation/epic-chain"
+        fi
 
-        if [ -f "$CHAIN_REPORT_FILE" ]; then
+        # Build report generation prompt
+        report_prompt="You are Bob, the Scrum Master, generating a chain execution report.
+
+## Your Task
+
+Generate a comprehensive chain execution report for the completed epic chain.
+
+## Configuration
+
+- Chain Plan: $CHAIN_PLAN_FILE
+- Metrics Folder: $METRICS_DIR
+- Output File: $CHAIN_REPORT_FILE
+- Stories Location: $STORIES_DIR
+- UAT Location: $UAT_DIR
+- Epics Location: $EPICS_DIR
+- Handoffs Location: $HANDOFF_DIR
+
+## Epics in Chain
+
+${EPIC_IDS[*]}
+
+## Process
+
+1. Read the chain plan file to understand the epic sequence
+2. For each epic, load the metrics file from: $METRICS_DIR/epic-{id}-metrics.yaml
+3. Aggregate metrics across all epics:
+   - Total duration
+   - Story counts (total, completed, failed, skipped)
+   - UAT gate results
+   - Issues encountered
+4. Generate the report following the template structure
+
+## Report Structure
+
+Generate a markdown report with these sections:
+- Executive Summary (status, counts, duration)
+- Timeline (epic-by-epic execution details)
+- What Was Built (brief per-epic summary)
+- Issues Encountered (aggregated from metrics)
+- UAT Validation Summary (gate results, fix attempts)
+- Artifacts Generated (list generated files)
+- Conclusion
+
+## Output
+
+Write the report to: $CHAIN_REPORT_FILE
+
+When complete, output exactly:
+REPORT_GENERATED: $CHAIN_REPORT_FILE"
+
+        log "Invoking report generator..."
+
+        # Execute report generation
+        report_result=$(claude --dangerously-skip-permissions -p "$report_prompt" 2>&1) || true
+
+        echo "$report_result" >> "$LOG_FILE"
+
+        if echo "$report_result" | grep -q "REPORT_GENERATED"; then
             log_success "Report generated: $CHAIN_REPORT_FILE"
+
+            # Stage report file
             git add "$CHAIN_REPORT_FILE" 2>/dev/null || true
+        else
+            log_warn "Report generation may not have completed cleanly"
+
+            # If Claude didn't generate it, create a basic report
+            if [ ! -f "$CHAIN_REPORT_FILE" ]; then
+                log "Creating basic report from metrics..."
+                create_basic_report
+            fi
         fi
     fi
 fi
