@@ -43,7 +43,7 @@ CREATE INDEX IF NOT EXISTS idx_supervisor_assignments_expires_at
 -- This table is append-only for immutability.
 
 CREATE TABLE IF NOT EXISTS admin_audit_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     action_type VARCHAR(50) NOT NULL,  -- 'assignment_created', 'assignment_deleted', 'assignment_updated', 'batch_update'
     entity_type VARCHAR(50) NOT NULL,  -- 'supervisor_assignment', 'user_role'
     entity_id UUID,                    -- ID of the affected entity (nullable for batch operations)

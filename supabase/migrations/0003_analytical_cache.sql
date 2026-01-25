@@ -20,7 +20,7 @@
 -- at 06:00 AM via Railway Cron.
 
 CREATE TABLE IF NOT EXISTS daily_summaries (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     asset_id UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
     report_date DATE NOT NULL,
     oee_percentage DECIMAL(5, 2),
@@ -68,7 +68,7 @@ CREATE TRIGGER update_daily_summaries_updated_at
 -- via Python Background Scheduler. This is ephemeral/time-series data.
 
 CREATE TABLE IF NOT EXISTS live_snapshots (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     asset_id UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
     snapshot_timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
     current_output INTEGER,
@@ -101,7 +101,7 @@ CREATE INDEX IF NOT EXISTS idx_live_snapshots_asset_snapshot_timestamp ON live_s
 -- reason_code = 'Safety Issue' is encountered.
 
 CREATE TABLE IF NOT EXISTS safety_events (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     asset_id UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
     event_timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
     reason_code TEXT NOT NULL,

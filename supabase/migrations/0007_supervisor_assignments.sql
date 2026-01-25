@@ -51,7 +51,7 @@ CREATE TRIGGER update_user_roles_updated_at
 -- Used to scope briefings to only show relevant assets (FR15).
 
 CREATE TABLE IF NOT EXISTS supervisor_assignments (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     asset_id UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
     assigned_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -171,6 +171,7 @@ CREATE POLICY "Allow service_role full access on supervisor_assignments"
 -- Drop existing policies if they exist (for idempotency)
 DROP POLICY IF EXISTS "Allow authenticated read own preferences" ON user_preferences;
 DROP POLICY IF EXISTS "Allow authenticated update own preferences" ON user_preferences;
+DROP POLICY IF EXISTS "Allow authenticated insert own preferences" ON user_preferences;
 DROP POLICY IF EXISTS "Allow service_role full access on user_preferences" ON user_preferences;
 
 -- Users can read their own preferences

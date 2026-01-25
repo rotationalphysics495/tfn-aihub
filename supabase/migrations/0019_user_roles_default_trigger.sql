@@ -50,8 +50,11 @@ CREATE TRIGGER on_auth_user_created_assign_role
 -- General audit logs for role changes and other security-sensitive operations.
 -- This is separate from admin_audit_logs which is specific to assignment operations.
 
-CREATE TABLE IF NOT EXISTS audit_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+-- Drop and recreate to ensure correct schema
+DROP TABLE IF EXISTS audit_logs CASCADE;
+
+CREATE TABLE audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     timestamp TIMESTAMPTZ DEFAULT NOW() NOT NULL,
     admin_user_id UUID NOT NULL REFERENCES auth.users(id),
     action_type TEXT NOT NULL,  -- 'role_change', 'assignment_change', etc.
@@ -65,16 +68,6 @@ CREATE TABLE IF NOT EXISTS audit_logs (
 
 -- Add comments
 COMMENT ON TABLE audit_logs IS 'Audit trail for role changes and security-sensitive operations (FR56)';
-COMMENT ON COLUMN audit_logs.id IS 'Unique identifier (UUID)';
-COMMENT ON COLUMN audit_logs.timestamp IS 'When the action occurred';
-COMMENT ON COLUMN audit_logs.admin_user_id IS 'Admin who performed the action';
-COMMENT ON COLUMN audit_logs.action_type IS 'Type of action: role_change, assignment_change, etc.';
-COMMENT ON COLUMN audit_logs.target_user_id IS 'User affected by the change';
-COMMENT ON COLUMN audit_logs.target_asset_id IS 'Asset affected by the change (if applicable)';
-COMMENT ON COLUMN audit_logs.before_value IS 'JSON snapshot of state before change';
-COMMENT ON COLUMN audit_logs.after_value IS 'JSON snapshot of state after change';
-COMMENT ON COLUMN audit_logs.batch_id IS 'Groups batch operations together';
-COMMENT ON COLUMN audit_logs.metadata IS 'Additional context (IP, user agent, etc.)';
 
 -- Indexes for efficient querying (NFR25: 90-day retention means we need fast queries)
 CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp DESC);

@@ -26,7 +26,7 @@ CREATE EXTENSION IF NOT EXISTS vector;
 -- Used for AI context retrieval when answering questions like "Why does X keep failing?"
 
 CREATE TABLE IF NOT EXISTS asset_history (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     asset_id UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
     event_type VARCHAR(50) NOT NULL CHECK (event_type IN ('downtime', 'maintenance', 'resolution', 'note', 'incident')),
     title VARCHAR(255) NOT NULL,
@@ -81,7 +81,7 @@ CREATE TRIGGER update_asset_history_updated_at
 -- Uses OpenAI text-embedding-3-small (1536 dimensions).
 
 CREATE TABLE IF NOT EXISTS asset_history_embeddings (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     history_id UUID NOT NULL REFERENCES asset_history(id) ON DELETE CASCADE,
     embedding vector(1536) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

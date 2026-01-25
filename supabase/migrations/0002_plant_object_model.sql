@@ -40,7 +40,7 @@ $$ LANGUAGE plpgsql;
 -- The source_id field maps to MSSQL locationName for data synchronization.
 
 CREATE TABLE IF NOT EXISTS assets (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
     source_id VARCHAR(255) NOT NULL,
     area VARCHAR(100),
@@ -71,7 +71,7 @@ CREATE TRIGGER update_assets_updated_at
 -- Links assets to financial cost center information for impact calculations.
 
 CREATE TABLE IF NOT EXISTS cost_centers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     asset_id UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
     standard_hourly_rate DECIMAL(10, 2) NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -100,7 +100,7 @@ CREATE TRIGGER update_cost_centers_updated_at
 -- Stores production targets per shift for each asset.
 
 CREATE TABLE IF NOT EXISTS shift_targets (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     asset_id UUID NOT NULL REFERENCES assets(id) ON DELETE CASCADE,
     target_output INTEGER NOT NULL,
     shift VARCHAR(50),
