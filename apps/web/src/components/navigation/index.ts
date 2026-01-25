@@ -8,3 +8,8 @@
 
 export { ViewModeToggle, ViewModeToggleExtended } from './ViewModeToggle'
 export { Breadcrumb } from './Breadcrumb'
+export { AppHeader } from './AppHeader'
+export { AppLogo } from './AppLogo'
+export { UserMenu } from './UserMenu'
+export { AppSidebar } from './AppSidebar'
+export { AppShell } from './AppShell'
