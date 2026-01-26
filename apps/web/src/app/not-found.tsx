@@ -16,9 +16,9 @@ export default function NotFound() {
       <Card className="max-w-md w-full text-center">
         <CardContent className="pt-8 pb-8">
           {/* Icon */}
-          <div className="mx-auto w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-6">
+          <div className="mx-auto w-10 h-10 rounded-full bg-muted flex items-center justify-center mb-4">
             <svg
-              className="w-8 h-8 text-muted-foreground"
+              className="w-5 h-5 text-muted-foreground"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
