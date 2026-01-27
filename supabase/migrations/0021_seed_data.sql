@@ -115,7 +115,7 @@ INSERT INTO daily_summaries (asset_id, report_date, oee_percentage, actual_outpu
     -- Roaster 1 - Last 7 days (quality-focused narratives)
     ('a0000001-0000-0000-0000-000000000001', CURRENT_DATE - 1, 89.50, 128, 143, 35, 3, 145.83, 'Roaster 1 performed well yesterday with 89.5% OEE. Batch quality excellent - all passed cupping tests. Brief cooling system delay resolved.'),
     ('a0000001-0000-0000-0000-000000000001', CURRENT_DATE - 2, 94.20, 135, 143, 18, 1, 75.00, 'Outstanding roasting day. Colombian single-origin profile nailed consistently. Minimal waste from one overroasted batch.'),
-    ('a0000001-0000-0000-0000-000000000001', CURRENT_DATE - 3, 75.80, 108, 143, 95, 8, 395.83, 'Drum temperature sensor malfunction caused extended downtime. Calibration team called in. 8 batches below spec discarded.'),
+    ('a0000001-0000-0000-0000-000000000001', CURRENT_DATE - 3, 65.50, 94, 143, 145, 12, 1250.00, 'Drum temperature sensor malfunction caused extended downtime. Calibration team called in. 12 batches below spec discarded. Significant production loss due to equipment failure.'),
     ('a0000001-0000-0000-0000-000000000001', CURRENT_DATE - 4, 91.50, 131, 143, 25, 2, 104.17, 'Strong recovery post-maintenance. Ethiopian Yirgacheffe roast profile optimized.'),
     ('a0000001-0000-0000-0000-000000000001', CURRENT_DATE - 5, 87.20, 125, 143, 42, 4, 175.00, 'Green bean moisture variance caused adjustments mid-shift. QC approved all batches after profile tweaks.'),
     ('a0000001-0000-0000-0000-000000000001', CURRENT_DATE - 6, 92.80, 133, 143, 22, 2, 91.67, 'Smooth operation. New Brazilian beans roasting beautifully at current profile settings.'),
@@ -130,7 +130,7 @@ INSERT INTO daily_summaries (asset_id, report_date, oee_percentage, actual_outpu
     ('a0000001-0000-0000-0000-000000000004', CURRENT_DATE - 1, 91.20, 1780, 1950, 30, 25, 87.50, 'Grinder 1 running well. Espresso grind consistency excellent per QC samples. Minor burr adjustment completed.'),
     ('a0000001-0000-0000-0000-000000000004', CURRENT_DATE - 2, 88.50, 1725, 1950, 48, 35, 140.00, 'Slight throughput dip due to harder bean batch from Roaster 3. Adjusted feed rate.'),
     ('a0000001-0000-0000-0000-000000000004', CURRENT_DATE - 3, 94.80, 1848, 1950, 15, 18, 43.75, 'Outstanding grinding day. Medium roast flowing through at optimal rate.'),
-    ('a0000001-0000-0000-0000-000000000004', CURRENT_DATE - 4, 82.50, 1608, 1950, 75, 45, 218.75, 'Burr replacement scheduled after detecting uneven particle distribution. Preventive maintenance performed.'),
+    ('a0000001-0000-0000-0000-000000000004', CURRENT_DATE - 4, 72.30, 1409, 1950, 125, 65, 1150.00, 'Burr replacement required after detecting uneven particle distribution. Extended downtime for maintenance. Significant throughput loss during critical production period.'),
     ('a0000001-0000-0000-0000-000000000004', CURRENT_DATE - 5, 93.20, 1817, 1950, 20, 22, 58.33, 'Post-maintenance performance excellent. New burrs producing consistent grind.'),
 
     -- Grinder 2 - Last 7 days
