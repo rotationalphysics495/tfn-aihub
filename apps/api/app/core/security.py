@@ -27,8 +27,8 @@ security = HTTPBearer(
 # Cache JWKS for 1 hour to avoid repeated fetches
 _jwks_cache: TTLCache = TTLCache(maxsize=1, ttl=3600)
 
-# Supabase JWT algorithm
-ALGORITHM = "RS256"
+# Supabase JWT algorithm - supports both RSA and ECDSA
+ALGORITHMS = ["RS256", "ES256"]
 
 
 async def _fetch_jwks(supabase_url: str) -> dict[str, Any]:
@@ -149,7 +149,7 @@ async def verify_supabase_jwt(token: str) -> dict[str, Any]:
         payload = jwt.decode(
             token,
             public_key,
-            algorithms=[ALGORITHM],
+            algorithms=ALGORITHMS,
             audience="authenticated",
             options={
                 "verify_exp": True,

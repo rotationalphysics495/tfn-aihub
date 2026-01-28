@@ -113,7 +113,7 @@ ON CONFLICT DO NOTHING;
 
 INSERT INTO daily_summaries (asset_id, report_date, oee_percentage, actual_output, target_output, downtime_minutes, waste_count, financial_loss_dollars, smart_summary_text) VALUES
     -- Roaster 1 - Last 7 days (quality-focused narratives)
-    ('a0000001-0000-0000-0000-000000000001', CURRENT_DATE - 1, 89.50, 128, 143, 35, 3, 145.83, 'Roaster 1 performed well yesterday with 89.5% OEE. Batch quality excellent - all passed cupping tests. Brief cooling system delay resolved.'),
+    ('a0000001-0000-0000-0000-000000000001', CURRENT_DATE - 1, 87.50, 125, 143, 45, 8, 1450.00, 'Roaster 1 experienced cooling system issues causing extended batch cycle times. 8 batches discarded due to over-roasting. Maintenance investigating root cause.'),
     ('a0000001-0000-0000-0000-000000000001', CURRENT_DATE - 2, 94.20, 135, 143, 18, 1, 75.00, 'Outstanding roasting day. Colombian single-origin profile nailed consistently. Minimal waste from one overroasted batch.'),
     ('a0000001-0000-0000-0000-000000000001', CURRENT_DATE - 3, 65.50, 94, 143, 145, 12, 1250.00, 'Drum temperature sensor malfunction caused extended downtime. Calibration team called in. 12 batches below spec discarded. Significant production loss due to equipment failure.'),
     ('a0000001-0000-0000-0000-000000000001', CURRENT_DATE - 4, 91.50, 131, 143, 25, 2, 104.17, 'Strong recovery post-maintenance. Ethiopian Yirgacheffe roast profile optimized.'),
@@ -139,7 +139,7 @@ INSERT INTO daily_summaries (asset_id, report_date, oee_percentage, actual_outpu
     ('a0000001-0000-0000-0000-000000000005', CURRENT_DATE - 3, 90.30, 1760, 1950, 35, 28, 102.08, 'Steady performance. Bean hopper sensor calibrated during shift change.'),
 
     -- Filler Line A - Last 7 days (volume-focused)
-    ('a0000001-0000-0000-0000-000000000008', CURRENT_DATE - 1, 84.50, 3886, 4600, 68, 85, 141.67, 'Filler A running 12oz bags. Nitrogen flush timing optimized for freshness seal. Some bag rejects from seal quality.'),
+    ('a0000001-0000-0000-0000-000000000008', CURRENT_DATE - 1, 72.50, 3335, 4600, 95, 120, 265.00, 'Filler A experiencing valve sticking issues. Multiple stoppages throughout shift. Maintenance called - awaiting parts for full repair.'),
     ('a0000001-0000-0000-0000-000000000008', CURRENT_DATE - 2, 92.30, 4246, 4600, 28, 45, 58.33, 'Strong filling performance. New bag stock feeding well through magazine.'),
     ('a0000001-0000-0000-0000-000000000008', CURRENT_DATE - 3, 78.60, 3616, 4600, 95, 120, 197.92, 'Valve sticking issue caused multiple stoppages. Cleaned and reseated during break.'),
     ('a0000001-0000-0000-0000-000000000008', CURRENT_DATE - 4, 95.10, 4374, 4600, 15, 35, 31.25, 'Excellent recovery. K-Cup filling mode achieving target weights consistently.'),
