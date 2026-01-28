@@ -14,14 +14,14 @@ const MIGRATION_PATH = path.join(
   __dirname,
   '..',
   'migrations',
-  '20260106000001_analytical_cache.sql'
+  '0003_analytical_cache.sql'
 )
 
 const ROLLBACK_PATH = path.join(
   __dirname,
   '..',
   'migrations',
-  '20260106000001_analytical_cache_down.sql'
+  '_0003_analytical_cache_down.sql'
 )
 
 describe('Analytical Cache Schema Migration', () => {

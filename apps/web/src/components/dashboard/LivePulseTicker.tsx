@@ -193,12 +193,12 @@ export function LivePulseTicker({
         />
 
         {/* Two-Column Layout for Production and Financial */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {/* Production Status */}
           <div className="space-y-2">
             <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-2">
               <svg
-                className="w-4 h-4 text-live-primary"
+                className="w-4 h-4 text-live-primary flex-shrink-0"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -220,7 +220,7 @@ export function LivePulseTicker({
           </div>
 
           {/* Financial Context */}
-          <div className="space-y-2">
+          <div className="space-y-2 border-t xl:border-t-0 xl:border-l border-live-border dark:border-live-border-dark pt-6 xl:pt-0 xl:pl-6">
             <FinancialContextWidget
               data={data?.financial ?? null}
               isLoading={isLoading && !data}

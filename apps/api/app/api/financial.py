@@ -304,14 +304,14 @@ async def get_financial_summary(
         else:
             # Query daily_summaries
             query = client.table("daily_summaries").select(
-                "asset_id, downtime_minutes, waste, financial_loss"
+                "asset_id, downtime_minutes, waste_count, financial_loss_dollars"
             )
 
             if start_date == end_date:
-                query = query.eq("date", start_date.isoformat())
+                query = query.eq("report_date", start_date.isoformat())
             else:
-                query = query.gte("date", start_date.isoformat())
-                query = query.lte("date", end_date.isoformat())
+                query = query.gte("report_date", start_date.isoformat())
+                query = query.lte("report_date", end_date.isoformat())
 
             if asset_filter:
                 query = query.in_("asset_id", asset_filter)
@@ -332,7 +332,7 @@ async def get_financial_summary(
             for record in response.data or []:
                 asset_id = record.get("asset_id")
                 downtime = record.get("downtime_minutes") or 0
-                waste = record.get("waste") or 0
+                waste = record.get("waste_count") or 0
 
                 total_downtime_minutes += downtime
                 total_waste_count += waste
@@ -481,8 +481,8 @@ async def get_cost_of_loss(
         else:
             # Query daily_summaries for T-1 data
             query = client.table("daily_summaries").select(
-                "asset_id, downtime_minutes, waste, financial_loss, oee_percentage, created_at"
-            ).eq("date", yesterday.isoformat())
+                "asset_id, downtime_minutes, waste_count, financial_loss_dollars, oee_percentage, created_at"
+            ).eq("report_date", yesterday.isoformat())
 
             if asset_id:
                 query = query.eq("asset_id", asset_id)
@@ -492,7 +492,7 @@ async def get_cost_of_loss(
             for record in response.data or []:
                 rec_asset_id = record.get("asset_id")
                 downtime_minutes = record.get("downtime_minutes") or 0
-                waste_count = record.get("waste") or 0
+                waste_count = record.get("waste_count") or 0
                 oee_percentage = record.get("oee_percentage") or 0.0
 
                 # Get rates for this asset

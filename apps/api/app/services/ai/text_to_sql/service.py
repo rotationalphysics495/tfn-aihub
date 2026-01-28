@@ -20,7 +20,6 @@ from typing import Any, Dict, List, Optional
 
 from langchain_community.utilities import SQLDatabase
 from langchain_openai import ChatOpenAI
-from langchain.chains import create_sql_query_chain
 from langchain_core.prompts import PromptTemplate
 from langchain_core.messages import HumanMessage
 

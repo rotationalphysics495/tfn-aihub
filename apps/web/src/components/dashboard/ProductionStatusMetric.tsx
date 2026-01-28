@@ -66,33 +66,33 @@ export function ProductionStatusMetric({
   return (
     <div className={cn('space-y-4', className)}>
       {/* Primary Metrics Row - Large Text for Glanceability */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="flex flex-wrap gap-x-8 gap-y-4">
         {/* Throughput */}
-        <div>
+        <div className="min-w-[120px]">
           <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
             Throughput
           </p>
           <div className="flex items-baseline gap-2">
-            <span className={cn('text-4xl font-bold tabular-nums', throughputStatus.color)}>
+            <span className={cn('text-3xl sm:text-4xl font-bold tabular-nums', throughputStatus.color)}>
               {output_percentage.toFixed(0)}%
             </span>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             {current_output.toLocaleString()} / {target_output.toLocaleString()} units
           </p>
         </div>
 
         {/* OEE */}
-        <div>
+        <div className="min-w-[120px]">
           <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
             OEE
           </p>
           <div className="flex items-baseline gap-2">
-            <span className={cn('text-4xl font-bold tabular-nums', getOeeStatus())}>
+            <span className={cn('text-3xl sm:text-4xl font-bold tabular-nums', getOeeStatus())}>
               {oee_percentage.toFixed(1)}%
             </span>
           </div>
-          <p className="text-sm text-muted-foreground mt-1">
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
             Current efficiency
           </p>
         </div>
@@ -103,35 +103,35 @@ export function ProductionStatusMetric({
         <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">
           Machine Status
         </p>
-        <div className="flex gap-4">
+        <div className="flex flex-wrap gap-x-4 gap-y-2">
           {/* Running */}
-          <div className="flex items-center gap-2">
-            <span className="inline-flex h-3 w-3 rounded-full bg-success-green" />
-            <span className="text-xl font-semibold tabular-nums">
+          <div className="flex items-center gap-1.5">
+            <span className="inline-flex h-2.5 w-2.5 rounded-full bg-success-green flex-shrink-0" />
+            <span className="text-lg font-semibold tabular-nums">
               {machine_status.running}
             </span>
-            <span className="text-sm text-muted-foreground">Running</span>
+            <span className="text-xs text-muted-foreground">Running</span>
           </div>
 
           {/* Idle */}
-          <div className="flex items-center gap-2">
-            <span className="inline-flex h-3 w-3 rounded-full bg-warning-amber" />
-            <span className="text-xl font-semibold tabular-nums">
+          <div className="flex items-center gap-1.5">
+            <span className="inline-flex h-2.5 w-2.5 rounded-full bg-warning-amber flex-shrink-0" />
+            <span className="text-lg font-semibold tabular-nums">
               {machine_status.idle}
             </span>
-            <span className="text-sm text-muted-foreground">Idle</span>
+            <span className="text-xs text-muted-foreground">Idle</span>
           </div>
 
           {/* Down */}
-          <div className="flex items-center gap-2">
-            <span className="inline-flex h-3 w-3 rounded-full bg-industrial-400" />
-            <span className="text-xl font-semibold tabular-nums">
+          <div className="flex items-center gap-1.5">
+            <span className="inline-flex h-2.5 w-2.5 rounded-full bg-industrial-400 flex-shrink-0" />
+            <span className="text-lg font-semibold tabular-nums">
               {machine_status.down}
             </span>
-            <span className="text-sm text-muted-foreground">Down</span>
+            <span className="text-xs text-muted-foreground">Down</span>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground mt-1">
+        <p className="text-xs text-muted-foreground mt-2">
           {machine_status.total} total machines
         </p>
       </div>

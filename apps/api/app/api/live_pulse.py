@@ -235,13 +235,13 @@ async def get_live_pulse_data(
 
         # Load cost centers for financial calculations
         cost_centers_response = client.table("cost_centers").select(
-            "asset_id, standard_hourly_rate, cost_per_unit"
+            "asset_id, standard_hourly_rate"
         ).execute()
         cost_centers_map = {}
         for cc in cost_centers_response.data or []:
             cost_centers_map[cc["asset_id"]] = {
                 "hourly_rate": Decimal(str(cc.get("standard_hourly_rate") or settings.default_hourly_rate)),
-                "cost_per_unit": Decimal(str(cc.get("cost_per_unit") or settings.default_cost_per_unit)),
+                "cost_per_unit": Decimal(str(settings.default_cost_per_unit)),  # Not in schema - use default
             }
 
         # =====================================================================
@@ -249,9 +249,9 @@ async def get_live_pulse_data(
         # =====================================================================
 
         # Get latest snapshot per asset
+        # Note: Schema only has: id, asset_id, snapshot_timestamp, current_output, target_output, output_variance, status
         snapshots_response = client.table("live_snapshots").select(
-            "id, asset_id, snapshot_timestamp, current_output, target_output, "
-            "oee_percentage, status, financial_loss_dollars, downtime_reason, downtime_minutes"
+            "id, asset_id, snapshot_timestamp, current_output, target_output, output_variance, status"
         ).order("snapshot_timestamp", desc=True).execute()
 
         # Group by asset, taking latest per asset
@@ -287,48 +287,25 @@ async def get_live_pulse_data(
             total_output += current
             total_target += target
 
-            # OEE (average across assets with data)
-            oee = snapshot.get("oee_percentage")
-            if oee is not None:
-                total_oee += float(oee)
+            # OEE - calculate from output variance if available (schema doesn't have oee_percentage)
+            # OEE approximation: current_output / target_output * 100
+            if current > 0 and target > 0:
+                oee = (current / target) * 100
+                total_oee += oee
                 oee_count += 1
 
-            # Machine status based on snapshot status
+            # Machine status based on snapshot status field
             status_val = snapshot.get("status", "on_target")
-            if status_val == "above_target" or status_val == "on_target":
-                running_count += 1
-            elif status_val == "below_target":
-                # Below target but still running
-                running_count += 1
+            if status_val == "down":
+                down_count += 1
             elif status_val == "idle":
                 idle_count += 1
-            elif status_val == "down":
-                down_count += 1
             else:
-                running_count += 1  # Default to running
+                # "ahead", "on_target", "behind" all mean running
+                running_count += 1
 
-            # Check for active downtime
-            downtime_reason = snapshot.get("downtime_reason")
-            if downtime_reason and downtime_reason.strip():
-                asset_info = assets_map.get(asset_id, {})
-                # Use actual downtime_minutes if available, otherwise use poll cycle as approximation
-                downtime_duration = snapshot.get("downtime_minutes")
-                if downtime_duration is None or downtime_duration <= 0:
-                    downtime_duration = 15  # Default to poll cycle if not available
-                active_downtime_list.append(
-                    ActiveDowntime(
-                        asset_name=asset_info.get("name", "Unknown"),
-                        reason_code=downtime_reason,
-                        duration_minutes=int(downtime_duration),
-                    )
-                )
-                down_count += 1
-                running_count = max(0, running_count - 1)
-
-            # Financial loss (accumulated from snapshots)
-            loss = snapshot.get("financial_loss_dollars")
-            if loss is not None:
-                total_financial_loss += Decimal(str(loss))
+            # Note: downtime_reason and financial_loss_dollars are not in the schema
+            # These would need to be calculated from other sources or added to schema
 
         # Calculate aggregated metrics
         output_percentage = 0.0
@@ -341,13 +318,18 @@ async def get_live_pulse_data(
 
         total_machines = len(assets_map)
 
+        # Assets without recent snapshots are considered idle (no data)
+        assets_with_snapshots = set(latest_snapshots.keys())
+        assets_without_snapshots = set(assets_map.keys()) - assets_with_snapshots
+        idle_count += len(assets_without_snapshots)
+
         # =====================================================================
-        # 3. Fetch Safety Events (Active/Unacknowledged)
+        # 3. Fetch Safety Events (Active/Unresolved)
         # =====================================================================
 
         safety_response = client.table("safety_events").select(
-            "id, asset_id, event_timestamp, reason_code, severity, acknowledged"
-        ).eq("acknowledged", False).execute()
+            "id, asset_id, event_timestamp, reason_code, severity, is_resolved"
+        ).eq("is_resolved", False).execute()
 
         active_incidents = []
         for event in safety_response.data or []:

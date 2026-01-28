@@ -95,7 +95,7 @@ export function FinancialContextWidget({
         </p>
         <div className="flex items-baseline gap-1">
           <span className={cn(
-            'text-3xl font-bold tabular-nums',
+            'text-2xl sm:text-3xl font-bold tabular-nums',
             getLossSeverity(shift_to_date_loss)
           )}>
             {formatCurrency(shift_to_date_loss, currency)}
@@ -113,7 +113,7 @@ export function FinancialContextWidget({
         </p>
         <div className="flex items-baseline gap-1">
           <span className={cn(
-            'text-xl font-semibold tabular-nums',
+            'text-lg sm:text-xl font-semibold tabular-nums',
             getLossSeverity(rolling_15_min_loss)
           )}>
             {formatCurrency(rolling_15_min_loss, currency)}

@@ -1,42 +1,59 @@
+import Link from 'next/link'
+
+const routes = [
+  { href: '/login', label: 'Login', description: 'Sign in to your account' },
+  { href: '/dashboard', label: 'Dashboard', description: 'Main performance dashboard' },
+  { href: '/dashboard/production/oee', label: 'OEE', description: 'Overall Equipment Effectiveness' },
+  { href: '/dashboard/production/downtime', label: 'Downtime', description: 'Downtime tracking & analysis' },
+  { href: '/dashboard/production/throughput', label: 'Throughput', description: 'Production throughput metrics' },
+  { href: '/briefing', label: 'Briefings', description: 'Voice briefings list' },
+  { href: '/briefing/eod', label: 'EOD Briefing', description: 'End of day briefing' },
+  { href: '/morning-report', label: 'Morning Report', description: 'Daily morning report' },
+  { href: '/handoff', label: 'Shift Handoffs', description: 'Shift handoff management' },
+  { href: '/handoff/new', label: 'New Handoff', description: 'Create a new shift handoff' },
+  { href: '/settings/preferences', label: 'Preferences', description: 'User preferences' },
+  { href: '/assignments', label: 'Assignments', description: 'Admin: Supervisor assignments' },
+  { href: '/users', label: 'Users', description: 'Admin: User management' },
+  { href: '/audit', label: 'Audit Log', description: 'Admin: Audit logs' },
+]
+
 export default function Home() {
   return (
-    <main className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center space-y-6 p-8">
-        <h1 className="text-4xl font-bold text-foreground">
-          Manufacturing Performance Assistant
-        </h1>
-        <p className="text-lg text-muted-foreground max-w-md mx-auto">
-          Plant performance monitoring and insights dashboard.
-        </p>
-        <div className="flex flex-col items-center gap-4 pt-4">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100 text-green-600">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </span>
-            <span>Next.js 14 with App Router</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100 text-green-600">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </span>
-            <span>Tailwind CSS with Shadcn/UI</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-100 text-green-600">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </span>
-            <span>TypeScript configured</span>
-          </div>
+    <main className="min-h-screen bg-background py-12 px-4">
+      <div className="max-w-4xl mx-auto space-y-8">
+        <div className="text-center space-y-4">
+          <h1 className="text-4xl font-bold text-foreground">
+            Manufacturing Performance Assistant
+          </h1>
+          <p className="text-lg text-muted-foreground">
+            Plant performance monitoring and insights dashboard.
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Test user: <code className="bg-muted px-2 py-1 rounded">heimdall@test.com</code>
+          </p>
         </div>
-        <p className="text-xs text-muted-foreground pt-6">
-          Setup complete. Ready for development.
-        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {routes.map((route) => (
+            <Link
+              key={route.href}
+              href={route.href}
+              className="block p-4 rounded-lg border border-border bg-card hover:bg-accent hover:border-accent-foreground/20 transition-colors"
+            >
+              <h2 className="font-semibold text-foreground">{route.label}</h2>
+              <p className="text-sm text-muted-foreground mt-1">{route.description}</p>
+              <span className="text-xs text-muted-foreground/60 mt-2 block font-mono">
+                {route.href}
+              </span>
+            </Link>
+          ))}
+        </div>
+
+        <div className="text-center pt-4">
+          <p className="text-xs text-muted-foreground">
+            Development environment ready. Click any route above to navigate.
+          </p>
+        </div>
       </div>
     </main>
   )

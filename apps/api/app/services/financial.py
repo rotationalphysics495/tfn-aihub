@@ -102,7 +102,7 @@ class FinancialService:
         try:
             client = self._get_supabase_client()
             response = client.table("cost_centers").select(
-                "id, asset_id, standard_hourly_rate, cost_per_unit"
+                "id, asset_id, standard_hourly_rate"
             ).execute()
 
             self._cost_center_cache = {}
@@ -110,11 +110,10 @@ class FinancialService:
                 asset_id = cc.get("asset_id")
                 if asset_id:
                     hourly_rate = cc.get("standard_hourly_rate")
-                    cost_per_unit = cc.get("cost_per_unit")
                     self._cost_center_cache[asset_id] = {
                         "id": cc.get("id"),
                         "hourly_rate": Decimal(str(hourly_rate)) if hourly_rate is not None else None,
-                        "cost_per_unit": Decimal(str(cost_per_unit)) if cost_per_unit is not None else None,
+                        "cost_per_unit": None,  # Not in schema - will use default
                     }
 
             self._cache_timestamp = datetime.utcnow()

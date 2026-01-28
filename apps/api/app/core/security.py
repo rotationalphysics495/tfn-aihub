@@ -27,8 +27,8 @@ security = HTTPBearer(
 # Cache JWKS for 1 hour to avoid repeated fetches
 _jwks_cache: TTLCache = TTLCache(maxsize=1, ttl=3600)
 
-# Supabase JWT algorithm
-ALGORITHM = "RS256"
+# Supabase JWT algorithm (ES256 for newer Supabase projects)
+ALGORITHM = "ES256"
 
 
 async def _fetch_jwks(supabase_url: str) -> dict[str, Any]:

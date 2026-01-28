@@ -51,7 +51,7 @@ export function Breadcrumb({ items, className }: BreadcrumbProps) {
         {/* Home link */}
         <li>
           <Link
-            href="/morning-report"
+            href="/dashboard"
             className="text-muted-foreground hover:text-foreground transition-colors touch-target inline-flex items-center"
             aria-label="Home"
           >

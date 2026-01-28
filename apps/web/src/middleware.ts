@@ -36,9 +36,17 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // Protected routes - redirect to login if not authenticated
-  // Story 3.3 AC#9: Added /morning-report as protected path
-  // Story 9.13 AC#1: Added /admin as protected path
-  const protectedPaths = ['/dashboard', '/morning-report', '/api/protected', '/admin']
+  const protectedPaths = [
+    '/dashboard',
+    '/morning-report',
+    '/briefing',
+    '/handoff',
+    '/settings',
+    '/assignments',
+    '/users',
+    '/audit',
+    '/api/protected',
+  ]
   const isProtectedPath = protectedPaths.some((path) =>
     request.nextUrl.pathname.startsWith(path)
   )
@@ -67,10 +75,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // Story 3.3 AC#9: Redirect root path to morning-report for authenticated users
-  if (request.nextUrl.pathname === '/' && user) {
+  // Redirect root path based on auth status
+  if (request.nextUrl.pathname === '/') {
     const url = request.nextUrl.clone()
-    url.pathname = '/morning-report'
+    url.pathname = user ? '/morning-report' : '/login'
     return NextResponse.redirect(url)
   }
 

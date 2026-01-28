@@ -81,19 +81,19 @@ class LiveSnapshotData:
             self.status = "on_target"
 
     def to_dict(self) -> dict:
-        """Convert to dictionary for Supabase insertion."""
+        """Convert to dictionary for Supabase insertion.
+
+        Schema columns: id, asset_id, snapshot_timestamp, current_output,
+        target_output, output_variance (computed), status
+        """
         data = {
             "asset_id": str(self.asset_id),
             "snapshot_timestamp": self.snapshot_timestamp.isoformat(),
-            "output_actual": self.output_actual,
-            "output_target": self.output_target,
-            "variance_percent": float(self.variance_percent),
+            "current_output": self.output_actual,
+            "target_output": self.output_target,
+            # output_variance is auto-computed by PostgreSQL
             "status": self.status,
-            "oee_current": float(self.oee_current) if self.oee_current else None,
         }
-        # Story 2.7 - AC #7: Add financial loss to live snapshots
-        if self.financial_loss_dollars is not None:
-            data["financial_loss_dollars"] = float(self.financial_loss_dollars)
         return data
 
 
@@ -270,7 +270,7 @@ class LivePulsePipeline:
         try:
             client = self._get_supabase_client()
             response = client.table("cost_centers").select(
-                "asset_id, standard_hourly_rate, cost_per_unit"
+                "asset_id, standard_hourly_rate"
             ).execute()
 
             self._cost_center_cache = {}
@@ -278,10 +278,9 @@ class LivePulsePipeline:
                 asset_id = cc.get("asset_id")
                 if asset_id:
                     hourly_rate = cc.get("standard_hourly_rate")
-                    cost_per_unit = cc.get("cost_per_unit")
                     self._cost_center_cache[UUID(asset_id)] = {
                         "hourly_rate": Decimal(str(hourly_rate)) if hourly_rate else None,
-                        "cost_per_unit": Decimal(str(cost_per_unit)) if cost_per_unit else None,
+                        "cost_per_unit": None,  # Not in schema - will use default
                     }
 
             logger.debug(f"Loaded {len(self._cost_center_cache)} cost centers for financial calc")
