@@ -566,44 +566,50 @@ Report defects to: [Contact your IT administrator or QA lead]
 
 | Field | Entry |
 |-------|-------|
-| **Tester Name** | _________________________________ |
-| **Role/Title** | _________________________________ |
-| **Test Date** | _________________________________ |
-| **Test Environment** | _________________________________ |
-| **Browser/Device Used** | _________________________________ |
+| **Tester Name** | Dmitri Spiropoulos |
+| **Role/Title** | QA |
+| **Test Date** | January 2026 |
+| **Test Environment** | Test |
+| **Browser/Device Used** | Desktop + Tablet (simulation app) |
 
 ### Test Results Summary
 
 | Category | Pass | Fail | Not Tested | Notes |
 |----------|------|------|------------|-------|
-| Morning Report Landing (Scenarios 1-2) | [ ] | [ ] | [ ] | |
-| Safety Priority (Scenario 3) | [ ] | [ ] | [ ] | |
-| OEE Priority (Scenario 4) | [ ] | [ ] | [ ] | |
-| Financial Priority (Scenario 5) | [ ] | [ ] | [ ] | |
-| Morning Summary Section (Scenario 6) | [ ] | [ ] | [ ] | |
-| Insight + Evidence Cards (Scenarios 7-10) | [ ] | [ ] | [ ] | |
-| Smart Summary AI (Scenario 11) | [ ] | [ ] | [ ] | |
-| Data Citations (Scenario 12) | [ ] | [ ] | [ ] | |
-| View Navigation (Scenarios 13-14) | [ ] | [ ] | [ ] | |
-| Industrial Clarity (Scenario 15) | [ ] | [ ] | [ ] | |
-| Responsive Design (Scenario 16) | [ ] | [ ] | [ ] | |
-| Performance (Scenario 17) | [ ] | [ ] | [ ] | |
-| Empty/Error States (Scenarios 18-19) | [ ] | [ ] | [ ] | |
-| Authentication (Scenario 20) | [ ] | [ ] | [ ] | |
+| Morning Report Landing (Scenarios 1-2) | [ ] | [x] | [ ] | 1.2: Redirects to Live Pulse instead of Morning Report (tablet & desktop) |
+| Safety Priority (Scenario 3) | [ ] | [x] | [ ] | 3.6: No "CRITICAL" label displayed for safety items |
+| OEE Priority (Scenario 4) | [x] | [ ] | [ ] | Passed |
+| Financial Priority (Scenario 5) | [ ] | [x] | [ ] | 5.4 & 5.5: Dollar amounts shortened (e.g., $1.4K instead of $1,450) |
+| Morning Summary Section (Scenario 6) | [x] | [ ] | [ ] | Passed (Scenarios 6-9) |
+| Insight + Evidence Cards (Scenarios 7-10) | [ ] | [x] | [ ] | 10.4: Dollar amounts shortened (same issue as Scenario 5) |
+| Smart Summary AI (Scenario 11) | [x] | [ ] | [ ] | Passed (Scenarios 11-20) |
+| Data Citations (Scenario 12) | [x] | [ ] | [ ] | Passed |
+| View Navigation (Scenarios 13-14) | [x] | [ ] | [ ] | Passed |
+| Industrial Clarity (Scenario 15) | [x] | [ ] | [ ] | Passed |
+| Responsive Design (Scenario 16) | [x] | [ ] | [ ] | Passed |
+| Performance (Scenario 17) | [x] | [ ] | [ ] | Passed |
+| Empty/Error States (Scenarios 18-19) | [x] | [ ] | [ ] | Passed |
+| Authentication (Scenario 20) | [x] | [ ] | [ ] | Passed |
 
 ### Overall Assessment
 
 - [ ] **APPROVED** - All critical scenarios pass. Epic 3 is ready for production deployment.
-- [ ] **APPROVED WITH CONDITIONS** - Minor issues noted but do not block deployment.
+- [x] **APPROVED WITH CONDITIONS** - Minor issues noted but do not block deployment.
 - [ ] **NOT APPROVED** - Critical issues found. Requires fixes before deployment.
 
 ### Comments/Notes
 
-_________________________________________________________________________
+**Issue - Scenario 1 Step 1.2 (Morning Report Landing):**
+When signing in on tablet (via simulation app) and desktop, users are redirected to the Live Pulse page instead of the Morning Report page. The spec requires Morning Report to be the default landing page after login.
 
-_________________________________________________________________________
+**Issue - Scenario 2 Step 2.2 (Daily Action List):**
+Items are not numbered but are ranked correctly. Minor display issue - numbering (#1, #2, #3) should be visible per spec.
 
-_________________________________________________________________________
+**Issue - Scenario 3 Step 3.6 (Safety Priority):**
+No "CRITICAL" label is displayed for safety items in the Morning Report. Safety items should show "CRITICAL" priority badge.
+
+**Issue - Scenarios 5 & 10 (Financial Display):**
+Dollar amounts are shortened (e.g., "$1.4K" instead of "$1,450"). Per spec, full dollar formatting with commas should be used ($X,XXX.XX format) for readability from 3 feet away on factory floor.
 
 ### Signatures
 

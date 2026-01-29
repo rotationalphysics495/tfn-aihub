@@ -398,41 +398,44 @@ Report defects to: [Contact your IT administrator or QA lead]
 
 | Field | Entry |
 |-------|-------|
-| **Tester Name** | _________________________________ |
-| **Role/Title** | _________________________________ |
-| **Test Date** | _________________________________ |
-| **Test Environment** | _________________________________ |
-| **Browser/Device Used** | _________________________________ |
+| **Tester Name** | Dmitri Spiropoulos |
+| **Role/Title** | QA |
+| **Test Date** | January 2026 |
+| **Test Environment** | Test |
+| **Browser/Device Used** | Desktop + Tablet (simulation app) |
 
 ### Test Results Summary
 
 | Category | Pass | Fail | Not Tested | Notes |
 |----------|------|------|------------|-------|
-| Live View Dashboard (Scenario 1) | [ ] | [ ] | [ ] | |
-| Throughput Dashboard (Scenario 2) | [ ] | [ ] | [ ] | |
-| OEE Metrics View (Scenario 3) | [ ] | [ ] | [ ] | |
-| Downtime Pareto (Scenario 4) | [ ] | [ ] | [ ] | |
-| Safety Alert System (Scenario 5) | [ ] | [ ] | [ ] | |
-| Financial Impact Display (Scenario 6) | [ ] | [ ] | [ ] | |
-| Live Pulse Ticker (Scenario 7) | [ ] | [ ] | [ ] | |
-| Data Freshness (Scenario 8) | [ ] | [ ] | [ ] | |
-| Factory Floor Visibility (Scenario 9) | [ ] | [ ] | [ ] | |
-| Morning Report Data (Scenario 10) | [ ] | [ ] | [ ] | |
-| Empty States/Errors (Scenario 11) | [ ] | [ ] | [ ] | |
+| Live View Dashboard (Scenario 1) | [x] | [ ] | [ ] | Passed |
+| Throughput Dashboard (Scenario 2) | [ ] | [x] | [ ] | Step 2.3: Values below 90% of target are green, should be dark amber |
+| OEE Metrics View (Scenario 3) | [x] | [ ] | [ ] | Passed |
+| Downtime Pareto (Scenario 4) | [ ] | [x] | [ ] | **BLOCKER**: No data populates - missing database columns (see notes) |
+| Safety Alert System (Scenario 5) | [x] | [ ] | [ ] | Passed |
+| Financial Impact Display (Scenario 6) | [ ] | [ ] | [x] | **BLOCKER**: Live data cannot be fetched - potential API key issue |
+| Live Pulse Ticker (Scenario 7) | [ ] | [ ] | [x] | **BLOCKER**: Live data cannot be fetched - potential API key issue |
+| Data Freshness (Scenario 8) | [ ] | [ ] | [x] | **BLOCKER**: Live data cannot be fetched - potential API key issue |
+| Factory Floor Visibility (Scenario 9) | [x] | [ ] | [ ] | Passed |
+| Morning Report Data (Scenario 10) | [x] | [ ] | [ ] | Passed |
+| Empty States/Errors (Scenario 11) | [x] | [ ] | [ ] | Passed |
 
 ### Overall Assessment
 
 - [ ] **APPROVED** - All critical scenarios pass. Epic 2 is ready for production deployment.
 - [ ] **APPROVED WITH CONDITIONS** - Minor issues noted but do not block deployment.
-- [ ] **NOT APPROVED** - Critical issues found. Requires fixes before deployment.
+- [x] **NOT APPROVED** - Critical issues found. Requires fixes before deployment.
 
 ### Comments/Notes
 
-_________________________________________________________________________
+**CRITICAL BLOCKER - Scenario 4 (Downtime Pareto Analysis):**
+No data populates on this page regardless of data changes. Investigation revealed that the API code expects database columns that were never created in any migration. This is a schema/code mismatch bug - the code references columns that don't exist in the database.
 
-_________________________________________________________________________
+**CRITICAL BLOCKER - Scenarios 6, 7, 8 (Live Data Features):**
+Live data could not be fetched. Investigation suggests the Supabase API key in the .env file may be incorrect. The key was taken directly from the shared .env file - needs verification from the development team.
 
-_________________________________________________________________________
+**Minor Issue - Scenario 2 Step 2.3:**
+Color threshold incorrect: Values below 90% of target display as green but should be dark amber per the spec.
 
 ### Signatures
 

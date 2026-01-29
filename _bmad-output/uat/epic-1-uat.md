@@ -267,37 +267,33 @@ Report defects to: [Contact your IT administrator or QA lead]
 
 | Field | Entry |
 |-------|-------|
-| **Tester Name** | _________________________________ |
-| **Role/Title** | _________________________________ |
-| **Test Date** | _________________________________ |
-| **Test Environment** | _________________________________ |
-| **Browser/Device Used** | _________________________________ |
+| **Tester Name** | Dmitri Spiropoulos |
+| **Role/Title** | QA |
+| **Test Date** | January 2026 |
+| **Test Environment** | Test |
+| **Browser/Device Used** | Desktop + Tablet (simulation app) |
 
 ### Test Results Summary
 
 | Category | Pass | Fail | Not Tested | Notes |
 |----------|------|------|------------|-------|
-| Authentication (Scenarios 1-3) | [ ] | [ ] | [ ] | |
-| Dashboard Layout (Scenario 4) | [ ] | [ ] | [ ] | |
-| Responsive Design (Scenario 5) | [ ] | [ ] | [ ] | |
-| Factory Visibility (Scenario 6) | [ ] | [ ] | [ ] | |
-| Dark Mode (Scenario 7) | [ ] | [ ] | [ ] | |
-| Health Check (Scenario 8) | [ ] | [ ] | [ ] | |
-| Error Handling (Scenario 9) | [ ] | [ ] | [ ] | |
+| Authentication (Scenarios 1-3) | [x] | [ ] | [ ] | All passed |
+| Dashboard Layout (Scenario 4) | [x] | [ ] | [ ] | All passed |
+| Responsive Design (Scenario 5) | [x] | [ ] | [ ] | All passed |
+| Factory Visibility (Scenario 6) | [x] | [ ] | [ ] | All passed |
+| Dark Mode (Scenario 7) | [x] | [ ] | [ ] | All passed |
+| Health Check (Scenario 8) | [x] | [ ] | [ ] | All passed |
+| Error Handling (Scenario 9) | [x] | [ ] | [ ] | All passed |
 
 ### Overall Assessment
 
-- [ ] **APPROVED** - All critical scenarios pass. Epic 1 is ready for production deployment.
+- [x] **APPROVED** - All critical scenarios pass. Epic 1 is ready for production deployment.
 - [ ] **APPROVED WITH CONDITIONS** - Minor issues noted but do not block deployment.
 - [ ] **NOT APPROVED** - Critical issues found. Requires fixes before deployment.
 
 ### Comments/Notes
 
-_________________________________________________________________________
-
-_________________________________________________________________________
-
-_________________________________________________________________________
+All Epic 1 scenarios passed testing successfully.
 
 ### Signatures
 
