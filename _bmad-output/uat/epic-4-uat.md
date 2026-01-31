@@ -387,53 +387,67 @@ Report defects to: [Contact your IT administrator or QA lead]
 
 | Field | Entry |
 |-------|-------|
-| **Tester Name** | _________________________________ |
-| **Role/Title** | _________________________________ |
-| **Test Date** | _________________________________ |
-| **Test Environment** | _________________________________ |
+| **Tester Name** | Dmitri Spiropoulos |
+| **Role/Title** | QA |
+| **Test Date** | January 30, 2026 |
+| **Test Environment** | UAT |
 | **Browser/Device Used** | _________________________________ |
 
 ### Test Results Summary
 
 | Category | Pass | Fail | Not Tested | Notes |
 |----------|------|------|------------|-------|
-| Chat Interface (Scenarios 1-2) | [ ] | [ ] | [ ] | |
-| Production Queries (Scenario 3) | [ ] | [ ] | [ ] | |
-| Citations (Scenarios 4-5) | [ ] | [ ] | [ ] | |
-| Memory - Context (Scenario 6) | [ ] | [ ] | [ ] | |
-| Asset History (Scenario 7) | [ ] | [ ] | [ ] | |
-| Financial Questions (Scenario 8) | [ ] | [ ] | [ ] | |
-| Multi-Asset Queries (Scenario 9) | [ ] | [ ] | [ ] | |
-| Error Handling (Scenarios 10, 14) | [ ] | [ ] | [ ] | |
-| Accessibility (Scenarios 11-12) | [ ] | [ ] | [ ] | |
-| Performance (Scenario 13) | [ ] | [ ] | [ ] | |
+| Chat Interface (Scenarios 1-2) | [x] | [ ] | [ ] | All scenarios pass |
+| Production Queries (Scenario 3) | [x] | [ ] | [ ] | All scenarios pass |
+| Citations (Scenarios 4-5) | [ ] | [x] | [ ] | 5.3: Confidence percentage always shows 80% regardless of actual grounding score |
+| Memory - Context (Scenario 6) | [ ] | [x] | [ ] | 6.2-6.3: Date logic off by 1 day; 6.4: "Unable to execute query" error, retry failed |
+| Asset History (Scenario 7) | [ ] | [x] | [ ] | 7.5: No purple memory link displayed |
+| Financial Questions (Scenario 8) | [ ] | [x] | [ ] | 8.2, 8.5: "Unable to provide reliable answer" even at 0.2 threshold; 8.3: Blocked by 8.2 failure |
+| Multi-Asset Queries (Scenario 9) | [ ] | [x] | [ ] | 9.4: "Unable to provide reliable answer" even at 0.2 threshold |
+| Error Handling (Scenarios 10, 14) | [x] | [ ] | [ ] | All scenarios pass |
+| Accessibility (Scenarios 11-12) | [x] | [ ] | [ ] | All scenarios pass |
+| Performance (Scenario 13) | [x] | [ ] | [ ] | All scenarios pass |
 
 ### NFR1 Compliance Verification
 
 - [ ] **VERIFIED** - All AI responses include citations to data sources
 - [ ] **VERIFIED** - Citations link to actual data (no hallucinated references)
 - [ ] **VERIFIED** - Confidence indicators present on responses
-- [ ] **NOT VERIFIED** - Issues found (document in comments)
+- [x] **NOT VERIFIED** - Issues found (document in comments)
 
 ### Overall Assessment
 
 - [ ] **APPROVED** - All critical scenarios pass. Epic 4 is ready for production deployment.
 - [ ] **APPROVED WITH CONDITIONS** - Minor issues noted but do not block deployment.
-- [ ] **NOT APPROVED** - Critical issues found. Requires fixes before deployment.
+- [x] **NOT APPROVED** - Critical issues found. Requires fixes before deployment.
 
 ### Comments/Notes
 
-_________________________________________________________________________
+**Grounding Threshold Issues:**
+- Chat would not respond with answers to any questions until grounding confidence level was lowered to 0.2
+- After lowering threshold, responses returned grounding confidence consistently between 0.25-0.30 with no deviation
+- Several tests continued to have "Unable to provide reliable answer" errors even with the lowered threshold
 
-_________________________________________________________________________
+**Response Formatting Issues:**
+- Chatbot returns raw database query results instead of human-readable format
+- Example: `datetime.datetime(2026, 1, 29, 2, 15, 59, 455000, tzinfo=datetime.timezone.utc)` instead of "January 29, 2026"
 
-_________________________________________________________________________
+**Input Handling Issues:**
+- "Hello" receives AI response, but shorter greetings like "Hi" returns a processing error
+- General questions/statements (e.g., "Hello", "What will performance be next week?") have responses prefixed with "Col 0:" and extra periods at end of sentences
+
+**Specific Scenario Failures:**
+- Scenario 5.3: Confidence percentage always displays 80% regardless of actual grounding score
+- Scenario 6.2-6.3: Date logic off by 1 day (yesterday returns today, day before returns yesterday)
+- Scenario 6.4: "Unable to execute query" error, retry button non-functional
+- Scenario 7.5: Purple memory link not displayed
+- Scenario 8.2, 8.5, 9.4: "Unable to provide reliable answer" errors persist at 0.2 threshold
 
 ### Signatures
 
 | Role | Name | Signature | Date |
 |------|------|-----------|------|
-| **Tester** | | | |
+| **Tester** | Dmitri Spiropoulos | | January 30, 2026 |
 | **QA Lead** | | | |
 | **Product Owner** | | | |
 | **Technical Lead** | | | |
@@ -445,6 +459,7 @@ _________________________________________________________________________
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | January 7, 2026 | QA Specialist | Initial UAT document for Epic 4 |
+| 1.1 | January 30, 2026 | Dmitri Spiropoulos | UAT testing completed - NOT APPROVED with critical issues documented |
 
 ---
 
