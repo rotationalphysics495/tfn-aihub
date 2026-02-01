@@ -2,10 +2,10 @@
 
 ## Epic 5: Agent Foundation & Core Tools
 
-**Version:** 1.0
-**Date:** January 9, 2026
+**Version:** 1.1
+**Date:** January 31, 2026
 **Prepared For:** Plant Managers, Line Supervisors, QA Team
-**Status:** Ready for Testing
+**Status:** Testing Complete
 
 ---
 
@@ -561,66 +561,106 @@ Report defects to: [Contact your IT administrator or QA lead]
 
 | Field | Entry |
 |-------|-------|
-| **Tester Name** | _________________________________ |
-| **Role/Title** | _________________________________ |
-| **Test Date** | _________________________________ |
-| **Test Environment** | _________________________________ |
-| **Browser/Device Used** | _________________________________ |
+| **Tester Name** | Dmitri Spiropoulos |
+| **Role/Title** | QA |
+| **Test Date** | January 31, 2026 |
+| **Test Environment** | UAT |
+| **Browser/Device Used** | Chrome / Desktop |
 
 ### Test Results Summary
 
 | Category | Pass | Fail | Not Tested | Notes |
 |----------|------|------|------------|-------|
-| Chat Basics (Scenario 1) | [ ] | [ ] | [ ] | |
-| Asset Lookup (Scenarios 2-4) | [ ] | [ ] | [ ] | |
-| OEE Queries (Scenarios 5-7) | [ ] | [ ] | [ ] | |
-| Downtime Analysis (Scenarios 8-10) | [ ] | [ ] | [ ] | |
-| Production Status (Scenarios 11-14) | [ ] | [ ] | [ ] | |
-| Citations (Scenario 15) | [ ] | [ ] | [ ] | |
-| Follow-Up Chips (Scenario 16) | [ ] | [ ] | [ ] | |
-| Error Handling (Scenarios 17, 20) | [ ] | [ ] | [ ] | |
-| Caching & Performance (Scenarios 18-19) | [ ] | [ ] | [ ] | |
-| Responsive Design (Scenario 21) | [ ] | [ ] | [ ] | |
-| Formatting (Scenario 22) | [ ] | [ ] | [ ] | |
+| Chat Basics (Scenario 1) | [x] | [ ] | [ ] | All scenarios pass |
+| Asset Lookup (Scenarios 2-4) | [ ] | [x] | [ ] | 2.5 missing items b-e; 2.7 no follow-up questions; 4.4 misspelled assets not found; 4.6 hash symbol not recognized |
+| OEE Queries (Scenarios 5-7) | [ ] | [x] | [ ] | 5.5 raw format output; 5.6 "unable to understand" error; 6.5 missing items b-d; 6.6 no follow-up questions; 7.2 only 6 of 7 days; 7.4 & 7.6 "no data found" errors |
+| Downtime Analysis (Scenarios 8-10) | [ ] | [x] | [ ] | 8.4-8.6 query executes but returns "no data" despite data existing; 9.3 missing items b-c; 10.3 returns only source, no information |
+| Production Status (Scenarios 11-14) | [ ] | [x] | [ ] | 11.4 "no data" error; 12.3 "no data" error; 13.2-13.3 no staleness warning; 14.1 "How are we doing today?" fails; 14.5 no color coding |
+| Citations (Scenario 15) | [ ] | [x] | [ ] | 15.2 no numbered badges (correct order); 15.3 no badges |
+| Follow-Up Chips (Scenario 16) | [ ] | [x] | [ ] | Scenarios 2-5 fail - no follow-up questions displayed |
+| Error Handling (Scenarios 17, 20) | [x] | [ ] | [ ] | All scenarios pass |
+| Caching & Performance (Scenarios 18-19) | [ ] | [x] | [ ] | 18.2 & 18.5 response time ~15 seconds (not faster on repeat); 19 passes |
+| Responsive Design (Scenario 21) | [x] | [ ] | [ ] | All scenarios pass |
+| Formatting (Scenario 22) | [ ] | [x] | [ ] | 22.1 "no data" error; 22.2 raw data format; 22.3 no color indicators; 22.4 no bold/lists |
 
 ### Epic 5 Acceptance Criteria Verification
 
-- [ ] **VERIFIED** - Agent framework operational with tool selection
-- [ ] **VERIFIED** - All 4 core tools (Asset, OEE, Downtime, Production) work correctly
-- [ ] **VERIFIED** - Agent correctly selects tools based on user intent
-- [ ] **VERIFIED** - All responses include citations with source and timestamp
-- [ ] **VERIFIED** - Response time < 2 seconds for typical queries
-- [ ] **VERIFIED** - Agent gracefully handles unknown queries
-- [ ] **VERIFIED** - Tool response caching improves repeated query speed
-- [ ] **VERIFIED** - Chat UI connected to new agent with follow-up chips
-- [ ] **NOT VERIFIED** - Issues found (document in comments)
+- [x] **VERIFIED** - Agent framework operational with tool selection
+- [ ] **NOT VERIFIED** - All 4 core tools (Asset, OEE, Downtime, Production) work correctly - Multiple "no data" errors despite data existing
+- [ ] **NOT VERIFIED** - Agent correctly selects tools based on user intent - Some queries return "unable to understand" errors
+- [ ] **NOT VERIFIED** - All responses include citations with source and timestamp - No numbered badges displayed
+- [ ] **NOT VERIFIED** - Response time < 2 seconds for typical queries - Response time ~15 seconds
+- [x] **VERIFIED** - Agent gracefully handles unknown queries
+- [ ] **NOT VERIFIED** - Tool response caching improves repeated query speed - No improvement on repeat queries
+- [ ] **NOT VERIFIED** - Chat UI connected to new agent with follow-up chips - No follow-up questions displayed
+- [x] **NOT VERIFIED** - Issues found (document in comments)
 
 ### NFR Compliance Verification
 
-- [ ] **NFR4 (Agent Honesty)** - Agent never fabricates data; unknown items handled gracefully
+- [x] **NFR4 (Agent Honesty)** - Agent never fabricates data; unknown items handled gracefully
 - [ ] **NFR5 (Tool Extensibility)** - Tools auto-register without code changes (dev verification)
-- [ ] **NFR6 (Response Structure)** - All responses follow consistent citation format
-- [ ] **NFR7 (Tool Response Caching)** - Cached queries noticeably faster
+- [ ] **NFR6 (Response Structure)** - All responses follow consistent citation format - Raw format output, no badges
+- [ ] **NFR7 (Tool Response Caching)** - Cached queries noticeably faster - No improvement observed
 
 ### Overall Assessment
 
 - [ ] **APPROVED** - All critical scenarios pass. Epic 5 is ready for production deployment.
 - [ ] **APPROVED WITH CONDITIONS** - Minor issues noted but do not block deployment.
-- [ ] **NOT APPROVED** - Critical issues found. Requires fixes before deployment.
+- [x] **NOT APPROVED** - Critical issues found. Requires fixes before deployment.
 
 ### Comments/Notes
 
-_________________________________________________________________________
+**Critical Issues:**
 
-_________________________________________________________________________
+1. **AI Assistant Inoperable Without Configuration Change:** AI Assistant was unable to respond to any inquiries until disabling the grounding threshold (`GROUNDING_THRESHOLD_MIN = 0.0`). This is a blocker for production deployment.
 
-_________________________________________________________________________
+2. **SQL Result Parsing Failure:** Query executes correctly but results are not returned to user. Multiple scenarios return "No data found" error despite data existing in the database. Root cause: SQL result parsing issue in Text-to-SQL service.
+
+3. **Response Formatting:** Responses return raw data format (e.g., `Result: [('Grinder 3', Decimal('84.20'))`) instead of human-friendly formatted text.
+
+4. **Follow-Up Questions Missing:** No follow-up question chips are displayed after any response.
+
+5. **Citations Not Displayed:** No numbered citation badges appear in responses.
+
+6. **Performance:** Response times ~15 seconds, no improvement observed with caching.
+
+**UI Issues:**
+
+- Response to "Hello" includes "Col 0:" prefix and extra period at end of sentences (noted in Epic 4 UAT)
+- Double X's in the top right corner of the AI chat sidebar
+
+**Detailed Findings by Scenario:**
+
+| Epic | Scenario | Finding / Notes |
+|------|----------|-----------------|
+| 5 | 1 | All scenarios pass |
+| 5 | 2 | 2.5 - does not show items b, c, d, or e; 2.7 - no follow up questions available |
+| 5 | 3 | All scenarios pass |
+| 5 | 4 | 4.4 - AI does not find misspelled assets, suggests correct spelling; 4.6 - Does not recognize asset with hash symbol |
+| 5 | 5 | 5.5 - returns correct information but in raw format; 5.6 - failed, "unable to understand question" error |
+| 5 | 6 | 6.5 - missing items b, c, d; 6.6 - does not suggest follow up questions |
+| 5 | 7 | 7.2 - only 6 of 7 days present; 7.4 - "no data found" for "How about yesterday"; 7.6 - "no data found" for "How about this month" |
+| 5 | 8 | 8.4 - Query executes but no results returned; 8.5 - failed, no response; 8.6 - failed, no response |
+| 5 | 9 | 9.3 - returns correct asset, missing items b and c |
+| 5 | 10 | 10.3 - did not return any information, only the source |
+| 5 | 11 | 11.4 - "no data" error despite data existing |
+| 5 | 12 | 12.3 - "no data" error despite data existing |
+| 5 | 13 | 13.2 - no staleness warning for >30 min data; 13.3 - no warning message |
+| 5 | 14 | 14.1 - "How are we doing today?" returns "no data" error; 14.5 - no color coding |
+| 5 | 15 | 15.2 - no numbered badges but correct order; 15.3 - no badges |
+| 5 | 16 | Scenarios 2-5 fail - no follow up questions |
+| 5 | 17 | All scenarios pass |
+| 5 | 18 | 18.2 - response time ~15 seconds; 18.5 - no improvement on repeat (~15 seconds) |
+| 5 | 19 | All scenarios pass |
+| 5 | 20 | All scenarios pass |
+| 5 | 21 | All scenarios pass |
+| 5 | 22 | 22.1 - "no data" error; 22.2 - raw data format; 22.3 - no color indicators; 22.4 - no bold/lists |
 
 ### Signatures
 
 | Role | Name | Signature | Date |
 |------|------|-----------|------|
-| **Tester** | | | |
+| **Tester** | Dmitri Spiropoulos | | January 31, 2026 |
 | **QA Lead** | | | |
 | **Product Owner** | | | |
 | **Technical Lead** | | | |
@@ -632,6 +672,7 @@ _________________________________________________________________________
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | January 9, 2026 | QA Specialist | Initial UAT document for Epic 5 |
+| 1.1 | January 31, 2026 | Dmitri Spiropoulos | Added testing results - NOT APPROVED |
 
 ---
 
