@@ -399,11 +399,11 @@ Report defects to: [Contact your IT administrator or QA lead]
 |----------|------|------|------------|-------|
 | Chat Interface (Scenarios 1-2) | [x] | [ ] | [ ] | All scenarios pass |
 | Production Queries (Scenario 3) | [x] | [ ] | [ ] | All scenarios pass |
-| Citations (Scenarios 4-5) | [ ] | [x] | [ ] | 5.3: Confidence percentage always shows 80% regardless of actual grounding score |
-| Memory - Context (Scenario 6) | [ ] | [x] | [ ] | 6.2-6.3: Date logic off by 1 day; 6.4: "Unable to execute query" error, retry failed |
+| Citations (Scenarios 4-5) | [ ] | [x] | [ ] | 5.3: Confidence percentage always shows 80% even when grounding confidence is different |
+| Memory - Context (Scenario 6) | [ ] | [x] | [ ] | 6.3: AI unable to answer follow-up about previously mentioned asset; required more context. 6.4: Unable to test (dependent on 6.3) |
 | Asset History (Scenario 7) | [ ] | [x] | [ ] | 7.5: No purple memory link displayed |
-| Financial Questions (Scenario 8) | [ ] | [x] | [ ] | 8.2, 8.5: "Unable to provide reliable answer" even at 0.2 threshold; 8.3: Blocked by 8.2 failure |
-| Multi-Asset Queries (Scenario 9) | [ ] | [x] | [ ] | 9.4: "Unable to provide reliable answer" even at 0.2 threshold |
+| Financial Questions (Scenario 8) | [ ] | [x] | [ ] | 8.2: "Unable to provide financial data"; 8.3: Unable to test (dependent on 8.2); 8.5: "Unable to break down costs by day" |
+| Multi-Asset Queries (Scenario 9) | [x] | [ ] | [ ] | All scenarios pass |
 | Error Handling (Scenarios 10, 14) | [x] | [ ] | [ ] | All scenarios pass |
 | Accessibility (Scenarios 11-12) | [x] | [ ] | [ ] | All scenarios pass |
 | Performance (Scenario 13) | [x] | [ ] | [ ] | All scenarios pass |
@@ -423,25 +423,18 @@ Report defects to: [Contact your IT administrator or QA lead]
 
 ### Comments/Notes
 
-**Grounding Threshold Issues:**
-- Chat would not respond with answers to any questions until grounding confidence level was lowered to 0.2
-- After lowering threshold, responses returned grounding confidence consistently between 0.25-0.30 with no deviation
-- Several tests continued to have "Unable to provide reliable answer" errors even with the lowered threshold
-
-**Response Formatting Issues:**
-- Chatbot returns raw database query results instead of human-readable format
-- Example: `datetime.datetime(2026, 1, 29, 2, 15, 59, 455000, tzinfo=datetime.timezone.utc)` instead of "January 29, 2026"
-
-**Input Handling Issues:**
-- "Hello" receives AI response, but shorter greetings like "Hi" returns a processing error
-- General questions/statements (e.g., "Hello", "What will performance be next week?") have responses prefixed with "Col 0:" and extra periods at end of sentences
+**Resolved (since last test):**
+- Raw database formatting has been resolved; responses now display in human-readable format
+- "Col 0:" prefix and additional period at end of sentences have been removed
 
 **Specific Scenario Failures:**
-- Scenario 5.3: Confidence percentage always displays 80% regardless of actual grounding score
-- Scenario 6.2-6.3: Date logic off by 1 day (yesterday returns today, day before returns yesterday)
-- Scenario 6.4: "Unable to execute query" error, retry button non-functional
-- Scenario 7.5: Purple memory link not displayed
-- Scenario 8.2, 8.5, 9.4: "Unable to provide reliable answer" errors persist at 0.2 threshold
+- Scenario 5.3: Confidence percentage is always 80% even when the grounding confidence is different
+- Scenario 6.3: AI was unable to answer a follow-up question regarding the previously mentioned asset; required more context before it could answer
+- Scenario 6.4: Unable to get an answer; dependent on success of step 6.3
+- Scenario 7.5: No purple memory link displayed
+- Scenario 8.2: "Unable to provide financial data" response
+- Scenario 8.3: Unable to test; dependent on 8.2's success
+- Scenario 8.5: "Unable to break down costs by day" response
 
 ### Signatures
 
@@ -460,6 +453,7 @@ Report defects to: [Contact your IT administrator or QA lead]
 |---------|------|--------|---------|
 | 1.0 | January 7, 2026 | QA Specialist | Initial UAT document for Epic 4 |
 | 1.1 | January 30, 2026 | Dmitri Spiropoulos | UAT testing completed - NOT APPROVED with critical issues documented |
+| 1.2 | February 1, 2026 | Dmitri Spiropoulos | UAT results updated: Scenarios 1–4, 9–12 pass; refined failure notes for 5, 6, 7, 8; raw DB formatting and "Col 0:" prefix resolved |
 
 ---
 
