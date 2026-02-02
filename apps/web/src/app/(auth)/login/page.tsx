@@ -20,21 +20,27 @@ function LoginForm() {
     setIsLoading(true)
     setError(null)
 
-    const supabase = createClient()
+    try {
+      const supabase = createClient()
 
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+      const { error: authError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-    if (authError) {
-      setError(getAuthError(authError))
+      if (authError) {
+        setError(getAuthError(authError))
+        setIsLoading(false)
+        return
+      }
+
+      router.push(redirectTo)
+      router.refresh()
+    } catch (err) {
+      console.error('Login error:', err)
+      setError(getAuthError(err instanceof Error ? err : null))
       setIsLoading(false)
-      return
     }
-
-    router.push(redirectTo)
-    router.refresh()
   }
 
   return (

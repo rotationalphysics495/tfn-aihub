@@ -216,7 +216,11 @@ class SafetyEventsTool(ManufacturingTool):
         - "last 7 days" / "last N days"
         - "2026-01-01 to 2026-01-09" (explicit range)
         """
-        today = date.today()
+        # Use US Central timezone for date calculations (plant location)
+        # This ensures "today" matches the user's expectation
+        from zoneinfo import ZoneInfo
+        plant_tz = ZoneInfo("America/Chicago")
+        today = datetime.now(plant_tz).date()
         time_range_lower = time_range.lower().strip()
 
         # Today
@@ -288,7 +292,7 @@ class SafetyEventsTool(ManufacturingTool):
             severity=event.severity,
             description=event.description,
             resolution_status=event.resolution_status,
-            reported_by=event.reported_by,
+            reported_by=getattr(event, 'reported_by', None),
         )
 
     # =========================================================================

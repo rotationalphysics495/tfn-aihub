@@ -27,11 +27,12 @@ INSERT INTO assets (id, name, source_id, area) VALUES
     ('a0000001-0000-0000-0000-000000000001', 'Roaster 1', 'ROAST-001', 'Roasting'),
     ('a0000001-0000-0000-0000-000000000002', 'Roaster 2', 'ROAST-002', 'Roasting'),
     ('a0000001-0000-0000-0000-000000000003', 'Roaster 3', 'ROAST-003', 'Roasting'),
-    -- Grinding (4 grinders - high throughput)
+    -- Grinding (5 grinders - high throughput, Grinder 5 added for Epic 5 UAT)
     ('a0000001-0000-0000-0000-000000000004', 'Grinder 1', 'GRND-001', 'Grinding'),
     ('a0000001-0000-0000-0000-000000000005', 'Grinder 2', 'GRND-002', 'Grinding'),
     ('a0000001-0000-0000-0000-000000000006', 'Grinder 3', 'GRND-003', 'Grinding'),
     ('a0000001-0000-0000-0000-000000000007', 'Grinder 4', 'GRND-004', 'Grinding'),
+    ('a0000001-0000-0000-0000-000000000014', 'Grinder 5', 'GRND-005', 'Grinding'),
     -- Filling (3 filling lines - medium volume)
     ('a0000001-0000-0000-0000-000000000008', 'Filler Line A', 'FILL-001', 'Filling'),
     ('a0000001-0000-0000-0000-000000000009', 'Filler Line B', 'FILL-002', 'Filling'),
@@ -60,6 +61,7 @@ INSERT INTO cost_centers (asset_id, standard_hourly_rate) VALUES
     ('a0000001-0000-0000-0000-000000000005', 175.00),
     ('a0000001-0000-0000-0000-000000000006', 175.00),
     ('a0000001-0000-0000-0000-000000000007', 175.00),
+    ('a0000001-0000-0000-0000-000000000014', 175.00),
     -- Fillers: $125/hr (volumetric filling operations)
     ('a0000001-0000-0000-0000-000000000008', 125.00),
     ('a0000001-0000-0000-0000-000000000009', 125.00),
@@ -95,6 +97,9 @@ INSERT INTO shift_targets (asset_id, target_output, shift, effective_date) VALUE
     ('a0000001-0000-0000-0000-000000000005', 950, 'afternoon', '2026-01-01'),
     ('a0000001-0000-0000-0000-000000000006', 900, 'morning', '2026-01-01'),
     ('a0000001-0000-0000-0000-000000000007', 850, 'morning', '2026-01-01'),
+    -- Grinder 5 targets (Epic 5 UAT key asset)
+    ('a0000001-0000-0000-0000-000000000014', 1000, 'morning', '2026-01-01'),
+    ('a0000001-0000-0000-0000-000000000014', 950, 'afternoon', '2026-01-01'),
     -- Filler targets (bags filled)
     ('a0000001-0000-0000-0000-000000000008', 2400, 'morning', '2026-01-01'),
     ('a0000001-0000-0000-0000-000000000008', 2200, 'afternoon', '2026-01-01'),

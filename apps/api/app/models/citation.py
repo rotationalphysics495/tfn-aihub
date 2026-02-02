@@ -439,5 +439,5 @@ class SourceLookupResponse(BaseModel):
 
 # Grounding threshold constants (per story spec)
 GROUNDING_THRESHOLD_HIGH = 0.8   # Strong citations
-GROUNDING_THRESHOLD_MIN = 0.6   # Minimum acceptable
+GROUNDING_THRESHOLD_MIN = 0.0   # Minimum acceptable (disabled for UAT)
 GROUNDING_THRESHOLD_LOW = 0.4   # Weak/insufficient

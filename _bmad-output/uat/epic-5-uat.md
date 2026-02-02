@@ -2,8 +2,8 @@
 
 ## Epic 5: Agent Foundation & Core Tools
 
-**Version:** 1.1
-**Date:** January 31, 2026
+**Version:** 1.2
+**Date:** February 1, 2026
 **Prepared For:** Plant Managers, Line Supervisors, QA Team
 **Status:** Testing Complete
 
@@ -563,7 +563,7 @@ Report defects to: [Contact your IT administrator or QA lead]
 |-------|-------|
 | **Tester Name** | Dmitri Spiropoulos |
 | **Role/Title** | QA |
-| **Test Date** | January 31, 2026 |
+| **Test Date** | February 1, 2026 |
 | **Test Environment** | UAT |
 | **Browser/Device Used** | Chrome / Desktop |
 
@@ -572,16 +572,16 @@ Report defects to: [Contact your IT administrator or QA lead]
 | Category | Pass | Fail | Not Tested | Notes |
 |----------|------|------|------------|-------|
 | Chat Basics (Scenario 1) | [x] | [ ] | [ ] | All scenarios pass |
-| Asset Lookup (Scenarios 2-4) | [ ] | [x] | [ ] | 2.5 missing items b-e; 2.7 no follow-up questions; 4.4 misspelled assets not found; 4.6 hash symbol not recognized |
-| OEE Queries (Scenarios 5-7) | [ ] | [x] | [ ] | 5.5 raw format output; 5.6 "unable to understand" error; 6.5 missing items b-d; 6.6 no follow-up questions; 7.2 only 6 of 7 days; 7.4 & 7.6 "no data found" errors |
-| Downtime Analysis (Scenarios 8-10) | [ ] | [x] | [ ] | 8.4-8.6 query executes but returns "no data" despite data existing; 9.3 missing items b-c; 10.3 returns only source, no information |
-| Production Status (Scenarios 11-14) | [ ] | [x] | [ ] | 11.4 "no data" error; 12.3 "no data" error; 13.2-13.3 no staleness warning; 14.1 "How are we doing today?" fails; 14.5 no color coding |
+| Asset Lookup (Scenarios 2-4) | [ ] | [x] | [ ] | 2.7 no follow-up questions |
+| OEE Queries (Scenarios 5-7) | [ ] | [x] | [ ] | 5.6 no analysis insight; 6.6 no follow-up questions; 7.4 & 7.6 follow-up questions not understood without context |
+| Downtime Analysis (Scenarios 8-10) | [x] | [ ] | [ ] | All scenarios pass |
+| Production Status (Scenarios 11-14) | [ ] | [x] | [ ] | 11.4 no live data but handled intelligently; 12.3 no live data but handled intelligently; 14.1 "How are we doing today?" returns error; 14.5 no color coding |
 | Citations (Scenario 15) | [ ] | [x] | [ ] | 15.2 no numbered badges (correct order); 15.3 no badges |
 | Follow-Up Chips (Scenario 16) | [ ] | [x] | [ ] | Scenarios 2-5 fail - no follow-up questions displayed |
 | Error Handling (Scenarios 17, 20) | [x] | [ ] | [ ] | All scenarios pass |
-| Caching & Performance (Scenarios 18-19) | [ ] | [x] | [ ] | 18.2 & 18.5 response time ~15 seconds (not faster on repeat); 19 passes |
+| Caching & Performance (Scenarios 18-19) | [ ] | [x] | [ ] | 18.2 & 18.5 response time ~10 seconds (not faster on repeat); 19 passes |
 | Responsive Design (Scenario 21) | [x] | [ ] | [ ] | All scenarios pass |
-| Formatting (Scenario 22) | [ ] | [x] | [ ] | 22.1 "no data" error; 22.2 raw data format; 22.3 no color indicators; 22.4 no bold/lists |
+| Formatting (Scenario 22) | [ ] | [x] | [ ] | 22.1 no live data; 22.2 tables raw format; 22.3 no color indicators; 22.4 no bold/lists |
 
 ### Epic 5 Acceptance Criteria Verification
 
@@ -673,6 +673,7 @@ Report defects to: [Contact your IT administrator or QA lead]
 |---------|------|--------|---------|
 | 1.0 | January 9, 2026 | QA Specialist | Initial UAT document for Epic 5 |
 | 1.1 | January 31, 2026 | Dmitri Spiropoulos | Added testing results - NOT APPROVED |
+| 1.2 | February 1, 2026 | Dmitri Spiropoulos | Re-tested after fixes - Updated results |
 
 ---
 

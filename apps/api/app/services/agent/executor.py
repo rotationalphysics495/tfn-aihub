@@ -56,10 +56,15 @@ class AgentConfig:
     """
 
     def __init__(self):
+        # Import settings to get .env loaded values
+        from app.core.config import get_settings
+        settings = get_settings()
+
         # LLM Configuration
         self.provider = os.getenv("LLM_PROVIDER", "openai").lower()
         self.model = os.getenv("LLM_MODEL", "gpt-4-turbo-preview")
-        self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
+        # Use settings.openai_api_key which loads from .env, fallback to os.getenv
+        self.openai_api_key = settings.openai_api_key or os.getenv("OPENAI_API_KEY", "")
 
         # Agent-specific configuration
         self.temperature = float(os.getenv("AGENT_TEMPERATURE", "0.1"))

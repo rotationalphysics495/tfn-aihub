@@ -17,6 +17,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Bot, X, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import {
   Sheet,
@@ -60,11 +61,13 @@ interface ChatApiResponse {
 interface ChatSidebarProps {
   /** Optional custom class name */
   className?: string
-  /** API base URL (defaults to relative path) */
+  /** API base URL (defaults to NEXT_PUBLIC_API_URL or localhost:8000) */
   apiBaseUrl?: string
   /** Timeout for API requests in ms (default 30000) */
   requestTimeout?: number
 }
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 /**
  * AI Chat Sidebar with Sheet overlay behavior.
@@ -78,7 +81,7 @@ interface ChatSidebarProps {
  */
 export function ChatSidebar({
   className,
-  apiBaseUrl = '',
+  apiBaseUrl = API_BASE_URL,
   requestTimeout = 30000,
 }: ChatSidebarProps) {
   // State management
@@ -156,12 +159,20 @@ export function ChatSidebar({
     }, requestTimeout)
 
     try {
+      // Get Supabase session for authentication
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        throw new Error('Authentication required. Please log in again.')
+      }
+
       const response = await fetch(`${apiBaseUrl}/api/chat/query`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
         },
-        credentials: 'include',
         body: JSON.stringify({
           question: messageContent,
         }),

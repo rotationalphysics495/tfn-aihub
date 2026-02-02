@@ -12,6 +12,7 @@ export type AuthErrorCode =
   | 'too_many_requests'
   | 'network_error'
   | 'session_expired'
+  | 'configuration_error'
   | 'unknown_error'
 
 export interface AuthError {
@@ -110,6 +111,19 @@ export function getAuthError(error: Error | null): AuthError {
       code: 'session_expired',
       message: 'Your session has expired.',
       action: 'Please log in again to continue.',
+    }
+  }
+
+  // Configuration errors (invalid API key, etc.)
+  if (
+    errorMessage.includes('invalid api key') ||
+    errorMessage.includes('api key') ||
+    errorMessage.includes('apikey')
+  ) {
+    return {
+      code: 'configuration_error',
+      message: 'Authentication service is misconfigured.',
+      action: 'Please contact your system administrator.',
     }
   }
 
