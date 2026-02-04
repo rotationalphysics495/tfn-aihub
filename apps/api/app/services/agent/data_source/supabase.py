@@ -980,8 +980,9 @@ class SupabaseDataSource:
         # Handle nested asset data from joins
         asset_data = row.get("assets", {}) or {}
 
-        # Handle cost center data (may be None, empty dict, or list)
-        cost_center_data = row.get("cost_centers")
+        # Handle cost center data - now nested inside assets due to FK relationship
+        # daily_summaries -> assets -> cost_centers
+        cost_center_data = asset_data.get("cost_centers") or row.get("cost_centers")
         standard_hourly_rate = None
         cost_per_unit = None
 
@@ -1136,8 +1137,7 @@ class SupabaseDataSource:
             # Include downtime_reasons for root cause extraction
             select_fields = """
                 id, asset_id, report_date, downtime_minutes, waste_count, downtime_reasons,
-                assets!inner(id, name, area),
-                cost_centers(standard_hourly_rate, cost_per_unit)
+                assets!inner(id, name, area, cost_centers(standard_hourly_rate, cost_per_unit))
             """
 
             # Start building query based on area filter
