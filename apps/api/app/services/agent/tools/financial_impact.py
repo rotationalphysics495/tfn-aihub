@@ -138,7 +138,7 @@ class FinancialImpactTool(ManufacturingTool):
     async def _arun(
         self,
         time_range: str = "yesterday",
-        asset_id: Optional[str] = None,
+        asset_name: Optional[str] = None,
         area: Optional[str] = None,
         include_breakdown: bool = True,
         **kwargs,
@@ -150,7 +150,7 @@ class FinancialImpactTool(ManufacturingTool):
 
         Args:
             time_range: Time range to query (default: "yesterday")
-            asset_id: Optional specific asset UUID
+            asset_name: Optional asset name to look up and query
             area: Optional area name to filter by
             include_breakdown: Whether to include detailed breakdown
 
@@ -160,12 +160,27 @@ class FinancialImpactTool(ManufacturingTool):
         data_source = get_data_source()
         citations: List[Citation] = []
 
+        # Resolve asset_name to asset_id if provided
+        asset_id: Optional[str] = None
+        resolved_asset_name: Optional[str] = None
+        if asset_name:
+            asset_result = await data_source.get_asset_by_name(asset_name)
+            citations.append(self._result_to_citation(asset_result))
+            if not asset_result.has_data:
+                return ToolResult(
+                    success=False,
+                    message=f"Asset '{asset_name}' not found. Please check the asset name.",
+                    citations=citations,
+                )
+            asset_id = asset_result.data.id
+            resolved_asset_name = asset_result.data.name
+
         # Build scope description for messages
-        scope = self._build_scope_description(area, asset_id)
+        scope = self._build_scope_description(area, resolved_asset_name or asset_name)
 
         logger.info(
             f"Financial impact requested: time_range='{time_range}', "
-            f"area='{area}', asset_id='{asset_id}'"
+            f"area='{area}', asset_name='{asset_name}', asset_id='{asset_id}'"
         )
 
         try:

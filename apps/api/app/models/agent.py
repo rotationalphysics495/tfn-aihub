@@ -694,9 +694,9 @@ class FinancialImpactInput(BaseModel):
             "'last 7 days', 'last N days', or date range like '2026-01-01 to 2026-01-09'"
         )
     )
-    asset_id: Optional[str] = Field(
+    asset_name: Optional[str] = Field(
         default=None,
-        description="Specific asset UUID to calculate financial impact for"
+        description="Asset name to calculate financial impact for (e.g., 'Grinder 5', 'Packaging Line 1')"
     )
     area: Optional[str] = Field(
         default=None,
@@ -1162,7 +1162,7 @@ class TrendAnalysisInput(BaseModel):
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
-                "asset_id": "ast-grd-005",
+                "asset_name": "Grinder 5",
                 "area": None,
                 "metric": "oee",
                 "time_range_days": 30
@@ -1170,9 +1170,9 @@ class TrendAnalysisInput(BaseModel):
         }
     )
 
-    asset_id: Optional[str] = Field(
+    asset_name: Optional[str] = Field(
         default=None,
-        description="Specific asset UUID to analyze trend for"
+        description="Asset name to analyze trend for (e.g., 'Grinder 5', 'Packaging Line 1')"
     )
     area: Optional[str] = Field(
         default=None,

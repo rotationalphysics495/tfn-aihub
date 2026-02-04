@@ -1049,8 +1049,7 @@ class SupabaseDataSource:
             # Use left join for cost_centers to handle missing data gracefully
             select_fields = """
                 id, asset_id, report_date, downtime_minutes, waste_count,
-                assets!inner(id, name, area),
-                cost_centers(standard_hourly_rate, cost_per_unit)
+                assets!inner(id, name, area, cost_centers(standard_hourly_rate, cost_per_unit))
             """
 
             # Start building query based on area filter

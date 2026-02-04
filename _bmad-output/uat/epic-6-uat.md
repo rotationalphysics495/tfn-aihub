@@ -572,65 +572,93 @@ Report defects to: [Contact your IT administrator or QA lead]
 
 | Field | Entry |
 |-------|-------|
-| **Tester Name** | _________________________________ |
-| **Role/Title** | _________________________________ |
-| **Test Date** | _________________________________ |
-| **Test Environment** | _________________________________ |
-| **Browser/Device Used** | _________________________________ |
+| **Tester Name** | Dmitri Spiropoulos |
+| **Role/Title** | QA |
+| **Test Date** | February 4, 2026 |
+| **Test Environment** | UAT |
+| **Browser/Device Used** | Desktop |
 
 ### Test Results Summary
 
 | Category | Pass | Fail | Not Tested | Notes |
 |----------|------|------|------------|-------|
-| Safety Events - Basic (Scenarios 1-4) | [ ] | [ ] | [ ] | |
-| Financial Impact (Scenarios 5-7) | [ ] | [ ] | [ ] | |
-| Cost of Loss (Scenarios 8-10) | [ ] | [ ] | [ ] | |
-| Trend Analysis (Scenarios 11-15) | [ ] | [ ] | [ ] | |
-| Cross-Tool Flow (Scenario 16) | [ ] | [ ] | [ ] | |
-| Citations (Scenario 17) | [ ] | [ ] | [ ] | |
-| Time Range Interpretation (Scenario 18) | [ ] | [ ] | [ ] | |
-| Caching & Performance (Scenario 19) | [ ] | [ ] | [ ] | |
-| Error Handling (Scenario 20) | [ ] | [ ] | [ ] | |
-| Mobile Responsiveness (Scenario 21) | [ ] | [ ] | [ ] | |
-| Data Freshness (Scenario 22) | [ ] | [ ] | [ ] | |
+| Safety Events - Basic (Scenarios 1-4) | [x] | [ ] | [ ] | All scenarios pass |
+| Financial Impact (Scenarios 5-7) | [ ] | [x] | [ ] | 5.6 - Formatting issue with calculations (not user friendly, e.g., LaTeX-style formulas) |
+| Cost of Loss (Scenarios 8-10) | [ ] | [x] | [ ] | 9.3b - No comparison to previous time period; 9.4 - Trend indicators not included |
+| Trend Analysis (Scenarios 11-15) | [ ] | [x] | [ ] | 12.5, 13.4 - No response based on previous question context; 13.5 - No daily granularity |
+| Cross-Tool Flow (Scenario 16) | [ ] | [x] | [ ] | No follow-up chips for safety or cost related questions |
+| Citations (Scenario 17) | [ ] | [x] | [ ] | 17.2 - No inline calculation, but summary of calculation method provided |
+| Time Range Interpretation (Scenario 18) | [ ] | [x] | [ ] | 18.5 - Date ranges not included in responses |
+| Caching & Performance (Scenario 19) | [ ] | [x] | [ ] | 19.5/19.8 - Response times not faster (~5s safety, ~7s financial) |
+| Error Handling (Scenario 20) | [ ] | [x] | [ ] | 20.2 - No "asset not found" message or suggestions, only error; refresh button unresponsive |
+| Mobile Responsiveness (Scenario 21) | [ ] | [x] | [ ] | 21.5 - No follow-up chips provided |
+| Data Freshness (Scenario 22) | [x] | [ ] | [ ] | All scenarios pass |
+
+### Detailed Findings by Scenario
+
+| Scenario | Finding / Notes |
+|----------|-----------------|
+| 1 | All scenarios pass |
+| 2 | All scenarios pass |
+| 3 | All scenarios pass |
+| 4 | All scenarios pass |
+| 5 | 5.6 - Information is correct, but formatting is off, not user friendly e.g. "(72 \text{ min} \times $175.00/\text{hr} / 60 = $210.00)" |
+| 6 | All scenarios pass |
+| 7 | All scenarios pass |
+| 8 | All scenarios pass |
+| 9 | 9.3 - item b missing, no comparison to previous time period is included; 9.4 - not included in responses since no comparison is made |
+| 10 | All scenarios pass |
+| 11 | All scenarios pass |
+| 12 | 12.5 - Did not provide a response based on the previous question, I had to specify the asset and timeframe and then it was successful |
+| 13 | 13.4 - Did not provide a response based on the previous question, I had to specify the asset and timeframe and then it was successful; 13.5 - Provides a good summary but there is no daily granularity included in the response |
+| 14 | All scenarios pass |
+| 15 | All scenarios pass |
+| 16 | No follow up chips for any safety or cost related questions |
+| 17 | 17.2 - Did not provide an inline calculation. However, the assistant did provide a summary of how it was calculated. |
+| 18 | 18.5 - Date ranges were not included in responses |
+| 19 | 19.5 - response time was not faster, same time ~5 seconds for safety; 19.8 - response time was not faster, same time ~7 seconds for financial |
+| 20 | 20.2 - no response indicating asset was not found, and no suggestions were made, only an error. The refresh button was also not responsive. |
+| 21 | 21.5 - no follow up chips provided |
+| 22 | All scenarios pass |
 
 ### Epic 6 Acceptance Criteria Verification
 
-- [ ] **VERIFIED** - Safety Events tool returns incidents with severity, status, affected assets
-- [ ] **VERIFIED** - Financial Impact tool calculates dollar losses using cost_centers data
-- [ ] **VERIFIED** - Cost of Loss tool ranks issues by financial impact
-- [ ] **VERIFIED** - Trend Analysis tool shows performance over 7-90 day windows
-- [ ] **VERIFIED** - All tools include citations with source and timestamp
-- [ ] **VERIFIED** - Response time < 2 seconds (p95)
-- [ ] **VERIFIED** - Safety data is always fresh (60s cache max)
-- [ ] **VERIFIED** - Financial calculations are transparent (show formulas)
-- [ ] **NOT VERIFIED** - Issues found (document in comments)
+- [x] **VERIFIED** - Safety Events tool returns incidents with severity, status, affected assets
+- [x] **VERIFIED** - Financial Impact tool calculates dollar losses using cost_centers data
+- [x] **VERIFIED** - Cost of Loss tool ranks issues by financial impact
+- [x] **VERIFIED** - Trend Analysis tool shows performance over 7-90 day windows
+- [x] **VERIFIED** - All tools include citations with source and timestamp
+- [ ] **NOT VERIFIED** - Response time < 2 seconds (p95) - Response times ~5-7 seconds, caching not improving times
+- [x] **VERIFIED** - Safety data is always fresh (60s cache max)
+- [ ] **PARTIALLY VERIFIED** - Financial calculations are transparent (show formulas) - Formulas shown but formatting issues (LaTeX-style not rendering)
 
 ### NFR Compliance Verification
 
-- [ ] **NFR4 (Agent Honesty)** - Agent never fabricates data; missing data clearly indicated
-- [ ] **NFR6 (Response Structure)** - All responses follow consistent citation format
-- [ ] **NFR7 (Tool Response Caching)** - Cached queries noticeably faster; appropriate TTLs observed
+- [x] **NFR4 (Agent Honesty)** - Agent never fabricates data; missing data clearly indicated
+- [ ] **NFR6 (Response Structure)** - All responses follow consistent citation format - Follow-up chips missing for safety/cost queries
+- [ ] **NFR7 (Tool Response Caching)** - Cached queries noticeably faster; appropriate TTLs observed - No noticeable improvement on repeated queries
 
 ### Overall Assessment
 
 - [ ] **APPROVED** - All critical scenarios pass. Epic 6 is ready for production deployment.
-- [ ] **APPROVED WITH CONDITIONS** - Minor issues noted but do not block deployment.
+- [x] **APPROVED WITH CONDITIONS** - Minor issues noted but do not block deployment.
 - [ ] **NOT APPROVED** - Critical issues found. Requires fixes before deployment.
 
 ### Comments/Notes
 
-_________________________________________________________________________
+Core functionality for Safety Events, Financial Impact, Cost of Loss, and Trend Analysis tools is working correctly. Data is accurate and citations are provided. Key issues to address in future iterations:
 
-_________________________________________________________________________
-
-_________________________________________________________________________
+1. **Formula Formatting** - LaTeX-style formulas not rendering properly in chat UI
+2. **Follow-up Chips** - Not appearing for safety and cost-related queries
+3. **Conversational Context** - Tool does not maintain context for follow-up questions (requires re-specifying asset/timeframe)
+4. **Caching Performance** - No observable improvement in response times for repeated queries
+5. **Error Handling** - Asset not found errors need friendlier messaging and suggestions
 
 ### Signatures
 
 | Role | Name | Signature | Date |
 |------|------|-----------|------|
-| **Tester** | | | |
+| **Tester** | Dmitri Spiropoulos | | February 4, 2026 |
 | **QA Lead** | | | |
 | **Product Owner** | | | |
 | **Technical Lead** | | | |

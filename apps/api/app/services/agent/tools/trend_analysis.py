@@ -101,7 +101,7 @@ class TrendAnalysisTool(ManufacturingTool):
     @cached_tool(tier="daily")
     async def _arun(
         self,
-        asset_id: Optional[str] = None,
+        asset_name: Optional[str] = None,
         area: Optional[str] = None,
         metric: str = "oee",
         time_range_days: int = 30,
@@ -113,7 +113,7 @@ class TrendAnalysisTool(ManufacturingTool):
         AC#1-7: Complete trend analysis implementation
 
         Args:
-            asset_id: Optional asset UUID to analyze
+            asset_name: Optional asset name to look up and analyze
             area: Optional area name to analyze
             metric: Metric to analyze (default: "oee")
             time_range_days: Number of days to analyze (default: 30)
@@ -124,11 +124,30 @@ class TrendAnalysisTool(ManufacturingTool):
         data_source = get_data_source()
         citations: List[Citation] = []
 
+        # Resolve asset_name to asset_id if provided
+        asset_id: Optional[str] = None
+        resolved_asset_name: Optional[str] = None
+        if asset_name:
+            asset_result = await data_source.get_asset_by_name(asset_name)
+            citations.append(self._create_citation(
+                source=asset_result.source_name,
+                query=asset_result.query or f"Asset lookup for '{asset_name}'",
+                table=asset_result.table_name,
+            ))
+            if not asset_result.has_data:
+                return ToolResult(
+                    success=False,
+                    message=f"Asset '{asset_name}' not found. Please check the asset name.",
+                    citations=citations,
+                )
+            asset_id = asset_result.data.id
+            resolved_asset_name = asset_result.data.name
+
         # Build scope description for messages
-        scope = self._build_scope_description(asset_id, area)
+        scope = self._build_scope_description(resolved_asset_name or asset_name, area)
 
         logger.info(
-            f"Trend analysis requested: asset_id='{asset_id}', "
+            f"Trend analysis requested: asset_name='{asset_name}', asset_id='{asset_id}', "
             f"area='{area}', metric='{metric}', days={time_range_days}"
         )
 
@@ -208,7 +227,7 @@ class TrendAnalysisTool(ManufacturingTool):
             )
 
             # Generate follow-up questions
-            follow_ups = self._generate_follow_ups(output, asset_id, area)
+            follow_ups = self._generate_follow_ups(output, resolved_asset_name or asset_name, area)
 
             return self._create_success_result(
                 data=output.model_dump(),
