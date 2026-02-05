@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     mem0_collection_name: str = "memories"
     mem0_embedding_dims: int = 1536
     mem0_top_k: int = 5
-    mem0_similarity_threshold: float = 0.7
+    mem0_similarity_threshold: float = 0.15
 
     # OpenAI (for LangChain and Mem0 embeddings)
     openai_api_key: str = ""

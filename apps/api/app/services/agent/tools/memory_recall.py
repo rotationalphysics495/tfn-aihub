@@ -31,7 +31,10 @@ from app.services.memory.mem0_service import MemoryService, get_memory_service
 logger = logging.getLogger(__name__)
 
 # Relevance threshold for memory filtering (AC#1: sorted by relevance)
-RELEVANCE_THRESHOLD = 0.7
+# Note: Mem0 with Supabase pgvector returns significantly lower cosine similarity
+# scores than expected (~0.15-0.35 for relevant matches). This is because the
+# embeddings are compared in high-dimensional space via pgvector's cosine distance.
+RELEVANCE_THRESHOLD = 0.15
 
 # Stale memory threshold in days (AC#4)
 STALE_THRESHOLD_DAYS = 30

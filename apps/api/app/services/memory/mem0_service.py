@@ -97,8 +97,9 @@ class MemoryService:
                 "embedder": {
                     "provider": "openai",
                     "config": {
-                        "model": "text-embedding-ada-002",
+                        "model": "text-embedding-3-small",
                         "api_key": settings.openai_api_key,
+                        "embedding_dims": settings.mem0_embedding_dims,
                     }
                 },
                 "llm": {
@@ -112,6 +113,19 @@ class MemoryService:
 
             self._memory = Memory.from_config(config)
             self._initialized = True
+
+            # Fix stale connection timeouts: configure SQLAlchemy pool settings
+            # on the underlying vecs engine. Supabase drops idle connections,
+            # causing "Operation timed out" errors without pool_pre_ping.
+            try:
+                vector_store = self._memory.vector_store
+                if hasattr(vector_store, 'db') and hasattr(vector_store.db, 'engine'):
+                    engine = vector_store.db.engine
+                    engine.pool._pre_ping = True
+                    engine.pool._recycle = 300  # Recycle connections every 5 min
+                    logger.info("Configured SQLAlchemy pool: pre_ping=True, recycle=300s")
+            except Exception as pool_err:
+                logger.warning(f"Could not configure pool settings: {pool_err}")
 
             logger.info(
                 f"Memory service initialized with collection: {settings.mem0_collection_name}"
@@ -167,10 +181,14 @@ class MemoryService:
             meta["memory_id"] = memory_id
 
             # Store in Mem0
+            # Use infer=False to store messages verbatim - this ensures all conversations
+            # are stored without LLM filtering which may discard simple Q&A exchanges.
+            # The raw messages provide better recall for context retrieval.
             result = self._memory.add(
                 messages,
                 user_id=user_id,
-                metadata=meta
+                metadata=meta,
+                infer=False
             )
 
             logger.info(f"Memory stored for user {user_id}: {memory_id}")
