@@ -839,7 +839,7 @@ performance optimization and cross-tool context issues.
 | UAT Tester | Dmitri Spiropoulos | | February 6, 2026 |
 | Plant Manager (Business Owner) | | | |
 | Product Owner | | | |
-| QA Lead | Dmitri Spiropoulos | | February 6, 2026 |
+| QA Lead |  | | |
 
 ---
 

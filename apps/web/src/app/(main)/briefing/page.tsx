@@ -59,7 +59,7 @@ export default function BriefingPage() {
   useEffect(() => {
     async function fetchAreas() {
       try {
-        const response = await fetch('/api/v1/briefing/areas');
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ''}/api/v1/briefing/areas`);
         if (response.ok) {
           const data = await response.json();
           setAreas(data.areas);

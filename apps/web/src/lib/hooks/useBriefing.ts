@@ -144,7 +144,7 @@ const initialState: BriefingState = {
  */
 export function useBriefing(config: UseBriefingConfig = {}): [BriefingState, BriefingActions] {
   const {
-    apiBaseUrl = '/api/v1/briefing',
+    apiBaseUrl = `${process.env.NEXT_PUBLIC_API_URL || ''}/api/v1/briefing`,
     silenceTimeoutMs = 3500,
     onComplete,
     onError,

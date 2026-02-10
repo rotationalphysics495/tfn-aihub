@@ -782,11 +782,13 @@ class MorningBriefingService:
         from app.services.agent.tools.safety_events import SafetyEventsTool
 
         # Run tools in parallel for this area
+        # Tools query by area display name (e.g. "Packing"), not area ID (e.g. "packing")
+        area_name = area_def["name"]
         tasks = [
-            self._get_production_for_area(ProductionStatusTool(), area_id),
-            self._get_oee_for_area(OEEQueryTool(), area_id),
-            self._get_downtime_for_area(DowntimeAnalysisTool(), area_id),
-            self._get_safety_for_area(SafetyEventsTool(), area_id),
+            self._get_production_for_area(ProductionStatusTool(), area_name),
+            self._get_oee_for_area(OEEQueryTool(), area_name),
+            self._get_downtime_for_area(DowntimeAnalysisTool(), area_name),
+            self._get_safety_for_area(SafetyEventsTool(), area_name),
         ]
 
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -821,7 +823,7 @@ class MorningBriefingService:
     async def _get_oee_for_area(self, tool, area_id: str) -> ToolResultData:
         """Get OEE data for area."""
         try:
-            result = await tool._arun(scope="area", area=area_id, days=1)
+            result = await tool._arun(scope=area_id, time_range="yesterday")
             return ToolResultData(
                 tool_name="oee_data",
                 success=result.success,
@@ -836,7 +838,7 @@ class MorningBriefingService:
     async def _get_downtime_for_area(self, tool, area_id: str) -> ToolResultData:
         """Get downtime analysis for area."""
         try:
-            result = await tool._arun(area=area_id, days=1)
+            result = await tool._arun(scope=area_id, time_range="yesterday")
             return ToolResultData(
                 tool_name="downtime_analysis",
                 success=result.success,
@@ -851,7 +853,7 @@ class MorningBriefingService:
     async def _get_safety_for_area(self, tool, area_id: str) -> ToolResultData:
         """Get safety events for area."""
         try:
-            result = await tool._arun(area=area_id, days=1)
+            result = await tool._arun(time_range="yesterday", area=area_id)
             return ToolResultData(
                 tool_name="safety_events",
                 success=result.success,
