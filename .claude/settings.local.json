@@ -63,7 +63,8 @@
       "Bash(/Users/dmitri/Library/Caches/pypoetry/virtualenvs/revive-api-tJYVFgOb-py3.11/bin/pip list:*)",
       "Bash(git fetch:*)",
       "Bash(set:*)",
-      "Bash(/tmp/seed_morning_briefing.py:*)"
+      "Bash(/tmp/seed_morning_briefing.py:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }

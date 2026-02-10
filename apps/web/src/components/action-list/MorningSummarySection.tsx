@@ -1,9 +1,12 @@
 'use client'
 
-import { AlertTriangle, TrendingDown, Gauge, Calendar, Sparkles } from 'lucide-react'
+import { AlertTriangle, TrendingDown, Gauge, Calendar, Sparkles, RefreshCw, AlertCircle } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useDailyActions } from '@/hooks/useDailyActions'
+import { useSmartSummary } from '@/hooks/useSmartSummary'
 import { SummarySkeleton } from './ActionListSkeleton'
 import { cn } from '@/lib/utils'
 
@@ -43,8 +46,18 @@ function formatCurrency(value: number): string {
   return `$${value.toFixed(0)}`
 }
 
+// Strip inline citation tags like [Source: table, date] and [Asset: name, metric: value]
+// These are stored for traceability but shouldn't be shown to users in the summary
+function cleanSummaryText(text: string): string {
+  return text
+    .replace(/\s*\[Source:\s*[^\]]*\]/g, '')
+    .replace(/\s*\[Asset:\s*[^\]]*\]/g, '')
+    .trim()
+}
+
 export function MorningSummarySection({ className }: MorningSummarySectionProps) {
   const { data, isLoading, summary } = useDailyActions()
+  const { data: smartSummary, isLoading: isSummaryLoading, isGenerating, error: summaryError, refetch: refetchSummary, regenerate: regenerateSummary, hasSummary } = useSmartSummary()
 
   // Loading state
   if (isLoading && !data) {
@@ -167,28 +180,91 @@ export function MorningSummarySection({ className }: MorningSummarySectionProps)
           </div>
         </div>
 
-        {/* AI Smart Summary placeholder slot - AC #6, Story 3.5 integration */}
+        {/* AI Smart Summary - Story 3.5 */}
         <div className="mt-4 pt-4 border-t border-retrospective-border dark:border-retrospective-border-dark">
           <div className="flex items-start gap-2">
             <Sparkles
-              className="w-4 h-4 text-info-blue flex-shrink-0 mt-0.5"
+              className={cn(
+                'w-4 h-4 flex-shrink-0 mt-0.5',
+                isGenerating ? 'text-info-blue animate-pulse' : 'text-info-blue'
+              )}
               aria-hidden="true"
             />
             <div className="flex-1">
-              <p className="text-sm font-medium text-muted-foreground mb-1">
-                AI Summary
-              </p>
-              {/* Placeholder for Story 3.5 - Smart Summary Generator */}
-              <p className="text-base text-muted-foreground italic">
-                {summary.totalActions === 0
-                  ? 'All systems operating within normal parameters. No immediate attention required.'
-                  : summary.safetyCount > 0
-                    ? `${summary.safetyCount} safety event${summary.safetyCount > 1 ? 's' : ''} require immediate attention. Review safety items first before addressing ${summary.oeeCount + summary.financialCount} other action items.`
-                    : `${summary.totalActions} action item${summary.totalActions > 1 ? 's' : ''} identified for review. Focus on ${summary.oeeCount > 0 ? 'OEE performance' : 'financial impact'} items to optimize plant operations.`}
-              </p>
-              <p className="text-xs text-muted-foreground mt-2">
-                Powered by AI analysis (enhanced summary coming in Story 3.5)
-              </p>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-sm font-medium text-muted-foreground">
+                  AI Summary
+                  {smartSummary?.is_fallback && (
+                    <span className="ml-2 text-xs text-warning-amber">(fallback)</span>
+                  )}
+                </p>
+                {hasSummary && (
+                  <button
+                    onClick={() => regenerateSummary()}
+                    className="text-muted-foreground hover:text-foreground transition-colors p-1 rounded"
+                    title="Regenerate AI summary"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Loading / Generating state */}
+              {(isSummaryLoading || isGenerating) && (
+                <div className="space-y-1.5">
+                  <div className="animate-pulse bg-industrial-200 dark:bg-industrial-700 rounded h-4 w-full" />
+                  <div className="animate-pulse bg-industrial-200 dark:bg-industrial-700 rounded h-4 w-5/6" />
+                  {isGenerating && (
+                    <p className="text-xs text-info-blue mt-2">Generating AI analysis...</p>
+                  )}
+                </div>
+              )}
+
+              {/* Error state — fall back to basic template */}
+              {!isSummaryLoading && !isGenerating && summaryError && (
+                <div>
+                  <p className="text-base text-muted-foreground italic">
+                    {summary.totalActions === 0
+                      ? 'All systems operating within normal parameters. No immediate attention required.'
+                      : summary.safetyCount > 0
+                        ? `${summary.safetyCount} safety event${summary.safetyCount > 1 ? 's' : ''} require immediate attention. Review safety items first before addressing ${summary.oeeCount + summary.financialCount} other action items.`
+                        : `${summary.totalActions} action item${summary.totalActions > 1 ? 's' : ''} identified for review. Focus on ${summary.oeeCount > 0 ? 'OEE performance' : 'financial impact'} items to optimize plant operations.`}
+                  </p>
+                  <div className="flex items-center gap-1 mt-2">
+                    <AlertCircle className="w-3 h-3 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground">
+                      AI summary unavailable &mdash;{' '}
+                      <button
+                        onClick={() => refetchSummary()}
+                        className="underline hover:text-foreground transition-colors"
+                      >
+                        retry
+                      </button>
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Real AI summary */}
+              {!isSummaryLoading && !isGenerating && !summaryError && hasSummary && (
+                <div>
+                  <div className="text-sm text-foreground space-y-2 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:space-y-0.5 [&_li]:text-sm [&_strong]:font-semibold [&_strong]:text-foreground [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:mt-3 [&_h2]:mb-1 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-1 [&_p]:my-0">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {cleanSummaryText(smartSummary!.summary_text)}
+                    </ReactMarkdown>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Powered by AI analysis
+                  </p>
+                </div>
+              )}
+
+              {/* No summary and no error (shouldn't happen normally, but safe fallback) */}
+              {!isSummaryLoading && !isGenerating && !summaryError && !hasSummary && (
+                <p className="text-base text-muted-foreground italic">
+                  No AI summary available for this date.
+                </p>
+              )}
             </div>
           </div>
         </div>

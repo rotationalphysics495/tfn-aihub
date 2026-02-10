@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { Clock, MapPin } from 'lucide-react'
+import { Clock, MapPin, UserPlus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PriorityBadge, type PriorityType } from './PriorityBadge'
 import type { Recommendation, AssetReference } from './types'
@@ -26,6 +26,7 @@ interface InsightSectionProps {
   asset: AssetReference
   financialImpact: number
   timestamp: string
+  onAssign?: () => void
   className?: string
 }
 
@@ -56,6 +57,7 @@ export function InsightSection({
   asset,
   financialImpact,
   timestamp,
+  onAssign,
   className,
 }: InsightSectionProps) {
   const router = useRouter()
@@ -120,6 +122,28 @@ export function InsightSection({
           <Clock className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
           <span>Generated at {formatTimestamp(timestamp)}</span>
         </div>
+
+        {/* Assign follow-up */}
+        {onAssign && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onAssign()
+            }}
+            className={cn(
+              'flex items-center gap-1.5 ml-auto',
+              'text-sm font-medium text-primary',
+              'hover:text-primary/80 hover:underline',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+              'rounded-sm'
+            )}
+            aria-label="Assign follow-up action"
+          >
+            <UserPlus className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
+            <span>Assign</span>
+          </button>
+        )}
       </div>
     </div>
   )

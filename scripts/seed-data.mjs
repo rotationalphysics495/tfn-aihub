@@ -788,6 +788,112 @@ async function seed() {
       downtime_reasons: { "Changeover": 30, "Cleanup": 15 },
       smart_summary_text: 'Solid week start with routine changeovers.'
     },
+
+    // ============ TODAY (daysAgo(0)) - Partial day data for all key assets ============
+    // Grinder 5 — running rough this morning, carryover from yesterday's issues
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000014',
+      report_date: daysAgo(0),
+      oee_percentage: 68.30,
+      actual_output: 890,
+      target_output: 1950,
+      downtime_minutes: 48,
+      waste_count: 42,
+      financial_loss_dollars: 285.00,
+      downtime_reasons: { "Mechanical Failure": 30, "Material Shortage": 18 },
+      smart_summary_text: 'Grinder 5 struggling this morning. Burr assembly vibration returning — may need full replacement. Bean hopper ran dry during shift change.'
+    },
+    // Grinder 1 — solid morning
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000004',
+      report_date: daysAgo(0),
+      oee_percentage: 93.50,
+      actual_output: 1218,
+      target_output: 1950,
+      downtime_minutes: 12,
+      waste_count: 15,
+      financial_loss_dollars: 45.00,
+      downtime_reasons: { "Changeover": 12 },
+      smart_summary_text: 'Grinder 1 running strong this morning. Espresso grind consistency excellent after yesterday\'s new burrs.'
+    },
+    // Grinder 2 — stopped due to safety event
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000005',
+      report_date: daysAgo(0),
+      oee_percentage: 45.20,
+      actual_output: 588,
+      target_output: 1950,
+      downtime_minutes: 105,
+      waste_count: 8,
+      financial_loss_dollars: 420.00,
+      downtime_reasons: { "Safety Stop": 90, "Inspection": 15 },
+      smart_summary_text: 'Grinder 2 offline since vibration alarm at 9:51 AM. Awaiting maintenance assessment — machine locked out per SOP.'
+    },
+    // Roaster 1 — good morning
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000001',
+      report_date: daysAgo(0),
+      oee_percentage: 91.80,
+      actual_output: 87,
+      target_output: 143,
+      downtime_minutes: 15,
+      waste_count: 1,
+      financial_loss_dollars: 62.50,
+      downtime_reasons: { "Changeover": 15 },
+      smart_summary_text: 'Roaster 1 on track. Running Colombian medium roast — first crack timing consistent at 9:42.'
+    },
+    // Roaster 2 — excellent
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000002',
+      report_date: daysAgo(0),
+      oee_percentage: 95.40,
+      actual_output: 91,
+      target_output: 143,
+      downtime_minutes: 8,
+      waste_count: 0,
+      financial_loss_dollars: 33.33,
+      downtime_reasons: { "Cleanup": 8 },
+      smart_summary_text: 'Roaster 2 leading the floor. Dark roast Italian blend batch completing ahead of schedule.'
+    },
+    // Filler Line A — held due to nitrogen pressure issue
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000008',
+      report_date: daysAgo(0),
+      oee_percentage: 52.10,
+      actual_output: 1598,
+      target_output: 4600,
+      downtime_minutes: 135,
+      waste_count: 85,
+      financial_loss_dollars: 562.50,
+      downtime_reasons: { "Pressure Issue": 95, "QA Hold": 40 },
+      smart_summary_text: 'Filler Line A held since nitrogen flush pressure dropped below spec. 42 bags quarantined. Line restarted at 10:30 AM after regulator replacement.'
+    },
+    // Grinder 3 — normal morning
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000006',
+      report_date: daysAgo(0),
+      oee_percentage: 88.70,
+      actual_output: 1155,
+      target_output: 1950,
+      downtime_minutes: 22,
+      waste_count: 20,
+      financial_loss_dollars: 78.00,
+      downtime_reasons: { "Changeover": 15, "Cleanup": 7 },
+      smart_summary_text: 'Grinder 3 operating normally. Switched from French press to drip grind at 8:15 AM.'
+    },
+    // Packaging Line 1 — running well
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000011',
+      report_date: daysAgo(0),
+      oee_percentage: 92.30,
+      actual_output: 3822,
+      target_output: 6200,
+      downtime_minutes: 18,
+      waste_count: 35,
+      financial_loss_dollars: 28.50,
+      downtime_reasons: { "Label Changeover": 18 },
+      smart_summary_text: 'Packaging Line 1 on pace. Running 12oz bags for the Costco order — label changeover at 7:45 AM went smoothly.'
+    },
   ];
 
   // Strip downtime_reasons if column doesn't exist yet
@@ -830,39 +936,71 @@ async function seed() {
   // Epic 5 UAT: Safety events for Grinder 5 and other assets
   console.log('🚨 Inserting safety events...');
   const safetyEvents = [
-    { asset_id: 'a0000001-0000-0000-0000-000000000001', event_timestamp: hoursAgo(72), reason_code: 'Safety Issue', severity: 'medium', description: 'Chaff fire detected in cooling tray. Suppression system activated. No injuries.', is_resolved: true, resolved_at: hoursAgo(71) },
+    { asset_id: 'a0000001-0000-0000-0000-000000000001', event_timestamp: hoursAgo(72), reason_code: 'Chaff Fire', severity: 'high', description: 'Chaff fire detected in cooling tray during dark roast batch. Suppression system activated automatically. No injuries. Root cause: chaff buildup exceeded cleaning interval threshold.', is_resolved: true, resolved_at: hoursAgo(71) },
     // Grinder 5 safety event (key UAT asset)
-    { asset_id: 'a0000001-0000-0000-0000-000000000014', event_timestamp: hoursAgo(48), reason_code: 'Safety Issue', severity: 'medium', description: 'Grinder 5 vibration alarm triggered - potential bearing imbalance detected. Machine stopped for inspection.', is_resolved: true, resolved_at: hoursAgo(46) },
+    { asset_id: 'a0000001-0000-0000-0000-000000000014', event_timestamp: hoursAgo(48), reason_code: 'Vibration Alarm', severity: 'medium', description: 'Grinder 5 vibration exceeded 8.2mm/s threshold — potential bearing imbalance. Machine auto-stopped per SOP. Bearing inspection completed, cleared for operation.', is_resolved: true, resolved_at: hoursAgo(46) },
     // Grinder 2 unresolved safety event
-    { asset_id: 'a0000001-0000-0000-0000-000000000005', event_timestamp: hoursAgo(2), reason_code: 'Safety Issue', severity: 'medium', description: 'Grinder 2 vibration alarm - potential imbalance detected. Machine stopped for inspection. Awaiting maintenance assessment.', is_resolved: false },
-    { asset_id: 'a0000001-0000-0000-0000-000000000011', event_timestamp: hoursAgo(24), reason_code: 'Safety Issue', severity: 'low', description: 'Light curtain triggered on case erector. Safety system worked correctly.', is_resolved: true, resolved_at: hoursAgo(23.5) },
+    { asset_id: 'a0000001-0000-0000-0000-000000000005', event_timestamp: hoursAgo(2), reason_code: 'Vibration Alarm', severity: 'medium', description: 'Grinder 2 vibration at 7.9mm/s — approaching critical threshold. Burr assembly may be worn unevenly. Machine stopped, awaiting maintenance assessment before restart.', is_resolved: false },
+    { asset_id: 'a0000001-0000-0000-0000-000000000011', event_timestamp: hoursAgo(24), reason_code: 'Light Curtain Trip', severity: 'low', description: 'Light curtain triggered on Packaging Line 1 case erector during box jam clearance. Safety interlock engaged correctly. Operator retrained on proper jam clearing procedure.', is_resolved: true, resolved_at: hoursAgo(23.5) },
+    // Filler Line A — nitrogen flush pressure drop
+    { asset_id: 'a0000001-0000-0000-0000-000000000008', event_timestamp: hoursAgo(4), reason_code: 'Pressure Anomaly', severity: 'high', description: 'Nitrogen flush pressure dropped below 12 PSI minimum on Filler Line A. Product integrity risk — 42 bags quarantined for QA inspection. Line held pending pressure regulator check.', is_resolved: false },
   ];
 
   const { error: safetyErr } = await supabase.from('safety_events').insert(safetyEvents);
   if (safetyErr) console.error('  Safety events error:', safetyErr.message);
   else console.log('  ✓ Safety events inserted');
 
-  // 6. Create test user if not exists
-  console.log('👤 Creating test user...');
-  const { data: existingUser } = await supabase.auth.admin.listUsers();
-  const testUserExists = existingUser?.users?.some(u => u.email === 'heimdall@test.com');
+  // 6. Create test users if not exist
+  console.log('👤 Creating test users...');
+  const testUsers = [
+    { email: 'heimdall@test.com', role: 'admin' },
+    { email: 'maria.garcia@test.com', role: 'plant_manager' },
+    { email: 'james.chen@test.com', role: 'supervisor' },
+    { email: 'sarah.johnson@test.com', role: 'supervisor' },
+    { email: 'mike.torres@test.com', role: 'supervisor' },
+  ];
 
-  if (!testUserExists) {
+  const { data: existingUser } = await supabase.auth.admin.listUsers();
+  const existingEmails = new Set(existingUser?.users?.map(u => u.email) || []);
+
+  for (const user of testUsers) {
+    if (existingEmails.has(user.email)) {
+      console.log(`  ✓ ${user.email} already exists`);
+      // Ensure role is set
+      const existing = existingUser?.users?.find(u => u.email === user.email);
+      if (existing) {
+        await supabase.from('user_roles').upsert(
+          { user_id: existing.id, role: user.role },
+          { onConflict: 'user_id' }
+        );
+      }
+      continue;
+    }
+
     const { data: newUser, error: userErr } = await supabase.auth.admin.createUser({
-      email: 'heimdall@test.com',
+      email: user.email,
       password: 'Test1234!@#$',
       email_confirm: true,
     });
-    if (userErr) console.error('  User creation error:', userErr.message);
-    else console.log('  ✓ Test user created: heimdall@test.com');
-  } else {
-    console.log('  ✓ Test user already exists');
+    if (userErr) {
+      console.error(`  ${user.email} error:`, userErr.message);
+    } else {
+      console.log(`  ✓ Created ${user.email} (${user.role})`);
+      // Set role
+      if (newUser?.user) {
+        await supabase.from('user_roles').upsert(
+          { user_id: newUser.user.id, role: user.role },
+          { onConflict: 'user_id' }
+        );
+      }
+    }
   }
 
   console.log('\n✅ Seed complete!');
-  console.log('\nYou can now log in with:');
-  console.log('  Email: heimdall@test.com');
-  console.log('  Password: Test1234!@#$');
+  console.log('\nYou can log in with any of these (password: Test1234!@#$):');
+  for (const user of testUsers) {
+    console.log(`  ${user.email} (${user.role})`);
+  }
 }
 
 seed().catch(console.error);

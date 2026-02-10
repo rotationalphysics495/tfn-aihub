@@ -1,14 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import Link from 'next/link'
 import {
   AlertTriangle,
   Gauge,
   DollarSign,
   ChevronDown,
   ChevronUp,
-  ExternalLink,
   Database,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -273,20 +271,7 @@ export function EvidenceSection({
             </p>
           </div>
 
-          {/* View Details link for drill-down (AC #3) */}
-          <Link
-            href={`/evidence/${evidence.source.recordId}`}
-            className={cn(
-              'inline-flex items-center gap-2',
-              'text-base font-medium text-primary',
-              'hover:underline',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-              'rounded-sm'
-            )}
-          >
-            <span>View Details</span>
-            <ExternalLink className="w-4 h-4" aria-hidden="true" />
-          </Link>
+          {/* View Details link placeholder - drill-down page not yet implemented (AC #3) */}
         </div>
       </div>
 

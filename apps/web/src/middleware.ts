@@ -68,9 +68,10 @@ export async function middleware(request: NextRequest) {
   }
 
   // Story 3.3 AC#9: Redirect root path to morning-report for authenticated users
-  if (request.nextUrl.pathname === '/' && user) {
+  // Redirect unauthenticated users to login
+  if (request.nextUrl.pathname === '/') {
     const url = request.nextUrl.clone()
-    url.pathname = '/morning-report'
+    url.pathname = user ? '/morning-report' : '/login'
     return NextResponse.redirect(url)
   }
 

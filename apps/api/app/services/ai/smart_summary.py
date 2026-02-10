@@ -92,6 +92,38 @@ class SmartSummary(BaseModel):
     updated_at: Optional[datetime] = Field(None, description="Last update timestamp")
 
 
+def _infer_oee_cause(
+    downtime_minutes: int,
+    waste_count: int,
+    actual_output: int,
+    target_output: int,
+    safety_events: list,
+) -> str:
+    """Infer the most likely cause of an OEE miss from available data."""
+    # Safety event on this asset is the strongest signal
+    if safety_events:
+        reasons = [e.get("reason_code", "") for e in safety_events]
+        return f"safety event ({reasons[0]})" if reasons[0] else "safety event"
+
+    causes = []
+    # High downtime is availability loss
+    if downtime_minutes >= 30:
+        causes.append(f"{downtime_minutes} min downtime")
+    # Waste is quality loss
+    if waste_count >= 5:
+        causes.append(f"{waste_count} waste units")
+    # Low throughput vs target is performance loss
+    if target_output > 0 and actual_output > 0:
+        throughput_pct = (actual_output / target_output) * 100
+        if throughput_pct < 85:
+            causes.append(f"throughput at {throughput_pct:.0f}% of target")
+
+    if causes:
+        return "likely " + ", ".join(causes)
+
+    return ""
+
+
 class SmartSummaryService:
     """
     Service for generating and managing Smart Summaries.
@@ -192,79 +224,153 @@ class SmartSummaryService:
         if error_message:
             logger.warning(f"Using fallback summary: {error_message}")
 
-        lines = [
-            "## Executive Summary",
-            "",
-            "**AI summary unavailable - showing key metrics**",
-            "",
-        ]
+        lines: list[str] = []
 
-        # Safety events section
+        # --- Opening summary: how did the facility do? ---
+        total_assets = len(context.daily_summaries)
+        below_target_count = sum(
+            1 for s in context.daily_summaries
+            if (s.get("oee_percentage", 0) or 0) < context.target_oee
+        )
+        at_or_above = total_assets - below_target_count
+        safety_count = sum(
+            1 for e in context.safety_events
+            if not e.get("is_resolved", False)
+        )
+        total_loss = context.total_financial_loss
+
+        # Compute facility-wide average OEE
+        oee_values = [
+            s.get("oee_percentage", 0) or 0
+            for s in context.daily_summaries
+            if s.get("oee_percentage") is not None
+        ]
+        avg_oee = sum(oee_values) / len(oee_values) if oee_values else 0
+
+        total_downtime = sum(
+            s.get("downtime_minutes", 0) or 0 for s in context.daily_summaries
+        )
+
+        if total_assets > 0:
+            # Sentence 1: Overall OEE performance
+            if below_target_count == 0:
+                lines.append(
+                    f"All {total_assets} assets hit OEE targets yesterday "
+                    f"with a facility average of {avg_oee:.0f}%."
+                )
+            else:
+                lines.append(
+                    f"{below_target_count} of {total_assets} assets missed OEE targets "
+                    f"yesterday. Facility average was {avg_oee:.0f}% "
+                    f"against an {context.target_oee:.0f}% target."
+                )
+
+            # Sentence 2: Safety + financial callout
+            parts = []
+            if safety_count > 0:
+                parts.append(
+                    f"{safety_count} unresolved safety "
+                    f"event{'s' if safety_count > 1 else ''}"
+                )
+            if total_loss > 0:
+                parts.append(f"${total_loss:,.0f} in financial losses")
+            if total_downtime > 0:
+                hours = total_downtime / 60
+                parts.append(
+                    f"{hours:.1f} hrs total downtime" if hours >= 1
+                    else f"{total_downtime} min total downtime"
+                )
+
+            if parts:
+                lines.append(f"{', '.join(parts).capitalize()}.")
+            lines.append("")
+        else:
+            lines.append("No production data available for yesterday.")
+            lines.append("")
+
+        # Build a lookup of asset_id -> safety events for cross-referencing
+        safety_by_asset: dict[str, list] = {}
         unresolved_events = [
             e for e in context.safety_events
             if not e.get("is_resolved", False)
         ]
+        for event in unresolved_events:
+            aid = event.get("asset_id", "")
+            safety_by_asset.setdefault(aid, []).append(event)
+
+        # Safety — always first if present
         if unresolved_events:
-            lines.append("## Safety Events (Requires Immediate Attention)")
-            lines.append("")
+            lines.append("**Safety**")
             for event in unresolved_events:
                 asset_name = event.get("asset_name", "Unknown")
                 reason = event.get("reason_code", "Safety Issue")
-                severity = event.get("severity", "critical")
-                lines.append(
-                    f"- **{asset_name}**: {reason} "
-                    f"(Severity: {severity}) [Source: safety_events, {context.target_date}]"
-                )
+                desc = event.get("description", "")
+                severity = event.get("severity", "")
+                bullet = f"- {asset_name} — {reason}"
+                if desc:
+                    bullet += f". {desc}"
+                lines.append(bullet)
             lines.append("")
 
-        # OEE performance section
+        # Productivity — OEE misses with likely cause
         below_target = [
             s for s in context.daily_summaries
             if (s.get("oee_percentage", 0) or 0) < context.target_oee
         ]
         if below_target:
-            lines.append("## OEE Below Target")
-            lines.append("")
-            for summary in sorted(
+            sorted_below = sorted(
                 below_target,
                 key=lambda x: x.get("oee_percentage", 0) or 0
-            )[:5]:
-                asset_name = summary.get("asset_name", "Unknown")
-                oee = summary.get("oee_percentage", 0) or 0
+            )
+            lines.append("**Productivity**")
+            for s in sorted_below[:5]:
+                name = s.get("asset_name", "Unknown")
+                oee = s.get("oee_percentage", 0) or 0
                 gap = context.target_oee - oee
-                lines.append(
-                    f"- **{asset_name}**: OEE {oee:.1f}% "
-                    f"({gap:.1f}% below target) [Asset: {asset_name}, OEE: {oee:.1f}%]"
+                downtime = s.get("downtime_minutes", 0) or 0
+                waste = s.get("waste_count", 0) or 0
+                actual = s.get("actual_output", 0) or 0
+                target = s.get("target_output", 0) or 0
+                asset_id = s.get("asset_id", "")
+
+                # Determine likely cause
+                cause = _infer_oee_cause(
+                    downtime, waste, actual, target,
+                    safety_by_asset.get(asset_id, []),
                 )
+                bullet = f"- {name} — {oee:.0f}% OEE ({gap:.0f}% miss)"
+                if cause:
+                    bullet += f" · {cause}"
+                lines.append(bullet)
             lines.append("")
 
-        # Financial losses section
+        # Financial impact
         total_loss = context.total_financial_loss
         if total_loss > 0:
-            lines.append("## Financial Losses")
-            lines.append("")
-            lines.append(f"Total Financial Impact: **${total_loss:,.2f}**")
-            lines.append("")
-            for summary in sorted(
+            top_losers = sorted(
                 context.daily_summaries,
                 key=lambda x: x.get("financial_loss_dollars", 0) or 0,
-                reverse=True
-            )[:5]:
-                loss = summary.get("financial_loss_dollars", 0) or 0
+                reverse=True,
+            )
+            lines.append(f"**Financial Impact** — ${total_loss:,.0f} total")
+            for s in top_losers[:3]:
+                loss = s.get("financial_loss_dollars", 0) or 0
                 if loss > 0:
-                    asset_name = summary.get("asset_name", "Unknown")
-                    lines.append(
-                        f"- **{asset_name}**: ${loss:,.2f} "
-                        f"[Source: daily_summaries, {context.target_date}]"
-                    )
+                    name = s.get("asset_name", "Unknown")
+                    downtime = s.get("downtime_minutes", 0) or 0
+                    waste = s.get("waste_count", 0) or 0
+                    detail = []
+                    if downtime > 0:
+                        detail.append(f"{downtime} min downtime")
+                    if waste > 0:
+                        detail.append(f"{waste} waste units")
+                    cause_str = f" ({', '.join(detail)})" if detail else ""
+                    lines.append(f"- {name} — ${loss:,.0f}{cause_str}")
             lines.append("")
 
-        # Data sources section
-        lines.append("## Data Sources Referenced")
-        lines.append("")
-        lines.append(f"- daily_summaries ({context.target_date})")
-        lines.append(f"- safety_events ({context.target_date})")
-        lines.append("- cost_centers")
+        # All clear
+        if not lines:
+            lines.append("All systems operating within normal parameters.")
 
         summary_text = "\n".join(lines)
 

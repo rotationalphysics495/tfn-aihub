@@ -132,7 +132,7 @@ class ActionEngine:
         try:
             client = self._get_client()
             response = client.table("assets").select(
-                "id, name, source_id, area, cost_center_id"
+                "id, name, source_id, area"
             ).execute()
 
             self._assets_cache = {}
@@ -143,7 +143,6 @@ class ActionEngine:
                         "name": asset.get("name", "Unknown"),
                         "source_id": asset.get("source_id"),
                         "area": asset.get("area"),
-                        "cost_center_id": asset.get("cost_center_id"),
                     }
 
             self._cache_timestamp = datetime.utcnow()
@@ -169,7 +168,7 @@ class ActionEngine:
         try:
             client = self._get_client()
             response = client.table("shift_targets").select(
-                "id, asset_id, target_output, target_oee, shift, effective_date"
+                "id, asset_id, target_output, shift, effective_date"
             ).execute()
 
             self._shift_targets_cache = {}
@@ -303,14 +302,23 @@ class ActionEngine:
                 except (ValueError, AttributeError):
                     time_str = ""
 
+                # Build descriptive recommendation from event details
+                asset_name = asset_info.get("name", "Unknown")
+                if description:
+                    # Use first sentence of description for actionable context
+                    first_sentence = description.split(". ")[0].rstrip(".")
+                    rec_text = f"Investigate {reason_code.lower()} on {asset_name} — {first_sentence}"
+                else:
+                    rec_text = f"Investigate {reason_code.lower()} on {asset_name}"
+
                 action = ActionItem(
                     id=self._generate_action_id(ActionCategory.SAFETY, asset_id),
                     asset_id=str(asset_id),
-                    asset_name=asset_info.get("name", "Unknown"),
+                    asset_name=asset_name,
                     priority_level=PriorityLevel.CRITICAL,  # AC #2: Safety always critical
                     category=ActionCategory.SAFETY,
                     primary_metric_value=f"Safety Event: {reason_code}",
-                    recommendation_text=f"Investigate {reason_code.lower()} on {asset_info.get('name', 'Unknown')}",
+                    recommendation_text=rec_text,
                     evidence_summary=f"Unresolved safety event{' at ' + time_str if time_str else ''}",
                     evidence_refs=[evidence_ref],
                     created_at=datetime.utcnow(),
@@ -457,14 +465,26 @@ class ActionEngine:
                         )
                     )
 
+                # Build descriptive recommendation with downtime/output context
+                asset_name = asset_info.get("name", "Unknown")
+                downtime_minutes = record.get("downtime_minutes", 0) or 0
+                units_short = max(0, target_output - actual_output) if target_output > 0 else 0
+                detail_parts = []
+                if downtime_minutes > 0:
+                    detail_parts.append(f"{downtime_minutes}min downtime")
+                if units_short > 0:
+                    detail_parts.append(f"{units_short} units short of target")
+                detail_str = f" ({', '.join(detail_parts)})" if detail_parts else ""
+                rec_text = f"Review {asset_name} — OEE {gap:.1f}% below target{detail_str}"
+
                 action = ActionItem(
                     id=self._generate_action_id(ActionCategory.OEE, asset_id),
                     asset_id=str(asset_id),
-                    asset_name=asset_info.get("name", "Unknown"),
+                    asset_name=asset_name,
                     priority_level=priority,
                     category=ActionCategory.OEE,
                     primary_metric_value=f"OEE: {oee_pct:.1f}%",
-                    recommendation_text=f"Review performance on {asset_info.get('name', 'Unknown')} - {gap:.1f}% below target",
+                    recommendation_text=rec_text,
                     evidence_summary=f"OEE {gap:.1f}% below {target_oee:.1f}% target",
                     evidence_refs=evidence_refs,
                     created_at=datetime.utcnow(),
@@ -548,14 +568,24 @@ class ActionEngine:
                     context=f"Downtime: {downtime}min, Waste: {waste} units",
                 )
 
+                # Build descriptive recommendation with loss drivers
+                asset_name = asset_info.get("name", "Unknown")
+                driver_parts = []
+                if downtime > 0:
+                    driver_parts.append(f"{downtime}min downtime")
+                if waste > 0:
+                    driver_parts.append(f"{waste} units waste")
+                driver_str = f" driven by {', '.join(driver_parts)}" if driver_parts else ""
+                rec_text = f"Address ${loss:,.0f} production loss on {asset_name}{driver_str}"
+
                 action = ActionItem(
                     id=self._generate_action_id(ActionCategory.FINANCIAL, asset_id),
                     asset_id=str(asset_id),
-                    asset_name=asset_info.get("name", "Unknown"),
+                    asset_name=asset_name,
                     priority_level=priority,
                     category=ActionCategory.FINANCIAL,
                     primary_metric_value=f"Loss: ${loss:,.2f}",
-                    recommendation_text=f"Reduce losses on {asset_info.get('name', 'Unknown')}",
+                    recommendation_text=rec_text,
                     evidence_summary=f"Financial loss ${loss:,.2f} above ${threshold:,.2f} threshold",
                     evidence_refs=[evidence_ref],
                     created_at=datetime.utcnow(),

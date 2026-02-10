@@ -59,11 +59,11 @@ class Settings(BaseSettings):
 
     # Action Engine Configuration (Story 3.1)
     target_oee_percentage: float = 85.0
-    financial_loss_threshold: float = 1000.0
-    oee_high_gap_threshold: float = 20.0
-    oee_medium_gap_threshold: float = 10.0
-    financial_high_threshold: float = 5000.0
-    financial_medium_threshold: float = 2000.0
+    financial_loss_threshold: float = 150.0
+    oee_high_gap_threshold: float = 15.0
+    oee_medium_gap_threshold: float = 5.0
+    financial_high_threshold: float = 500.0
+    financial_medium_threshold: float = 200.0
 
     # Agent Configuration (Story 5.1)
     llm_provider: str = "openai"  # LLM provider selection (openai/anthropic)

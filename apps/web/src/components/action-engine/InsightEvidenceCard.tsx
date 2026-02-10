@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { InsightSection } from './InsightSection'
 import { EvidenceSection } from './EvidenceSection'
+import { AssignFollowUpDialog } from './AssignFollowUpDialog'
 import { getPriorityBorderColor, getPriorityAccentBg } from './PriorityBadge'
 import type { ActionItem } from './types'
 
@@ -39,57 +40,79 @@ export function InsightEvidenceCard({
   defaultEvidenceExpanded = false,
 }: InsightEvidenceCardProps) {
   const [isHovered, setIsHovered] = useState(false)
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false)
 
   const borderColor = getPriorityBorderColor(item.priority)
   const accentBg = getPriorityAccentBg(item.priority)
 
-  return (
-    <Card
-      mode="retrospective"
-      className={cn(
-        // Base card styling
-        'overflow-hidden transition-all duration-200',
-        // 4px left border with priority color (AC #4)
-        'border-l-4',
-        borderColor,
-        // Priority-based background accent (AC #4)
-        accentBg,
-        // Hover state (AC #6)
-        'hover:shadow-lg',
-        isHovered && 'scale-[1.005]',
-        // Focus visible state for accessibility (AC #7)
-        'focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2',
-        className
-      )}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-      role="article"
-      aria-label={`${item.priority} priority action: ${item.recommendation.summary}`}
-    >
-      <CardContent className="p-0">
-        {/* Two-column grid: side-by-side on md+, stacked on mobile (AC #1) */}
-        <div className="grid grid-cols-1 md:grid-cols-2">
-          {/* Left side: Insight/Recommendation (AC #2) */}
-          <div className="p-4 md:p-6 md:border-r border-border">
-            <InsightSection
-              priority={item.priority}
-              recommendation={item.recommendation}
-              asset={item.asset}
-              financialImpact={item.financialImpact}
-              timestamp={item.timestamp}
-            />
-          </div>
+  // Derive report date from item timestamp (fallback to yesterday)
+  const reportDate = item.timestamp
+    ? item.timestamp.split('T')[0]
+    : new Date(Date.now() - 86400000).toISOString().split('T')[0]
 
-          {/* Right side: Evidence/Supporting Data (AC #3) */}
-          <div className="bg-industrial-50/50 dark:bg-industrial-900/30">
-            <EvidenceSection
-              evidence={item.evidence}
-              defaultExpanded={defaultEvidenceExpanded}
-            />
+  return (
+    <>
+      <Card
+        mode="retrospective"
+        className={cn(
+          // Base card styling
+          'overflow-hidden transition-all duration-200',
+          // 4px left border with priority color (AC #4)
+          'border-l-4',
+          borderColor,
+          // Priority-based background accent (AC #4)
+          accentBg,
+          // Hover state (AC #6)
+          'hover:shadow-lg',
+          isHovered && 'scale-[1.005]',
+          // Focus visible state for accessibility (AC #7)
+          'focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2',
+          className
+        )}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        role="article"
+        aria-label={`${item.priority} priority action: ${item.recommendation.summary}`}
+      >
+        <CardContent className="p-0">
+          {/* Two-column grid: side-by-side on md+, stacked on mobile (AC #1) */}
+          <div className="grid grid-cols-1 md:grid-cols-2">
+            {/* Left side: Insight/Recommendation (AC #2) */}
+            <div className="p-4 md:p-6 md:border-r border-border">
+              <InsightSection
+                priority={item.priority}
+                recommendation={item.recommendation}
+                asset={item.asset}
+                financialImpact={item.financialImpact}
+                timestamp={item.timestamp}
+                onAssign={() => setAssignDialogOpen(true)}
+              />
+            </div>
+
+            {/* Right side: Evidence/Supporting Data (AC #3) */}
+            <div className="bg-industrial-50/50 dark:bg-industrial-900/30">
+              <EvidenceSection
+                evidence={item.evidence}
+                defaultExpanded={defaultEvidenceExpanded}
+              />
+            </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+
+      <AssignFollowUpDialog
+        open={assignDialogOpen}
+        onOpenChange={setAssignDialogOpen}
+        actionItem={{
+          id: item.id,
+          priority: item.priority,
+          recommendationText: item.recommendation.text,
+          assetName: item.asset.name,
+          category: item.priority.toLowerCase(),
+          reportDate,
+        }}
+      />
+    </>
   )
 }
 
