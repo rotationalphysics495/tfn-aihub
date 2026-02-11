@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { CheckCircle2 } from 'lucide-react'
 import { useDailyActions } from '@/hooks/useDailyActions'
 import { useActionAcknowledgment } from '@/hooks/useActionAcknowledgment'
+import { useFollowUps } from '@/hooks/useFollowUps'
 import { ActionCardList } from './ActionCardList'
 import { transformAPIActionItems } from './transformers'
 import { cn } from '@/lib/utils'
@@ -49,6 +50,10 @@ export function InsightEvidenceCardList({ className }: InsightEvidenceCardListPr
     }))
   }, [transformedItems])
 
+  // Follow-up data hook (Story 13.4)
+  const reportDate = data?.report_date ?? null
+  const { followUps, refetch: refetchFollowUps } = useFollowUps({ reportDate })
+
   // Acknowledgment tracking hook
   const {
     acknowledge,
@@ -91,6 +96,8 @@ export function InsightEvidenceCardList({ className }: InsightEvidenceCardListPr
         error={error}
         onRefetch={refetch}
         onAcknowledge={acknowledge}
+        followUps={followUps}
+        onFollowUpAssigned={refetchFollowUps}
       />
     </div>
   )

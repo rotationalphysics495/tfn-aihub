@@ -12,6 +12,7 @@ export { ActionCardList, ActionCardListWithData } from './ActionCardList'
 export { InsightEvidenceCardList } from './InsightEvidenceCardList'
 
 // Subcomponents
+export { AssignmentBadge } from './AssignmentBadge'
 export { InsightSection } from './InsightSection'
 export { EvidenceSection } from './EvidenceSection'
 export { PriorityBadge, getPriorityBorderColor, getPriorityAccentBg } from './PriorityBadge'
@@ -21,6 +22,7 @@ export type { PriorityType } from './PriorityBadge'
 export type {
   ActionItem,
   AcknowledgmentInfo,
+  FollowUpData,
   SafetyEvidence,
   OEEEvidence,
   FinancialEvidence,

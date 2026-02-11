@@ -1,6 +1,6 @@
 # Story 13.4: Assignment Badge on Action Cards
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -161,11 +161,140 @@ function getMostRelevantFollowUp(followUps: FollowUp[]): FollowUp | null {
 ## Dev Agent Record
 
 ### Agent Model Used
+Claude Opus 4.6
 
-<!-- To be filled by dev agent -->
+### Implementation Summary
+Implemented assignment badge display on action cards. Created a `useFollowUps` hook that queries `action_followups` via Supabase client-side, resolves assignee UUIDs to emails via `/api/v1/team/members`, and returns a `Map<string, FollowUpData>` for O(1) lookup. Created `AssignmentBadge` presentational component using Shadcn Badge with color-coded variants (info=blue for assigned, warning=amber for in_progress, success=green for resolved). Threaded follow-up data through the component hierarchy: `InsightEvidenceCardList → ActionCardList → InsightEvidenceCard → InsightSection`. The "Assign" button changes to "Reassign" when a follow-up exists.
 
-### Debug Log References
+### Files Created
+- `apps/web/src/hooks/useFollowUps.ts` - Hook to fetch and process follow-up data from action_followups table
+- `apps/web/src/components/action-engine/AssignmentBadge.tsx` - Presentational badge component with status-based color coding
 
-### Completion Notes List
+### Files Modified
+- `apps/web/src/components/action-engine/types.ts` - Added FollowUpData interface
+- `apps/web/src/components/action-engine/InsightSection.tsx` - Added followUp prop, renders AssignmentBadge, changes Assign→Reassign
+- `apps/web/src/components/action-engine/InsightEvidenceCard.tsx` - Added followUp prop, passes to InsightSection
+- `apps/web/src/components/action-engine/ActionCardList.tsx` - Added followUps Map prop, looks up per item.id
+- `apps/web/src/components/action-engine/InsightEvidenceCardList.tsx` - Calls useFollowUps with reportDate, passes to ActionCardList
+- `apps/web/src/components/action-engine/index.ts` - Added AssignmentBadge and FollowUpData exports
 
-### File List
+### Key Decisions
+- Used Supabase client-side queries consistent with AssignFollowUpDialog pattern (no new API endpoint)
+- Follow-up data passed as separate prop (not embedded in ActionItem) per story anti-patterns
+- Team members cached in useRef for component lifetime to avoid repeated API calls
+- Badge placed between priority row and recommendation text in InsightSection
+- Truncated UUID fallback (first 8 chars + "...") when email resolution fails
+
+### Tests Added
+- `apps/web/src/components/action-engine/__tests__/AssignmentBadge.test.tsx` - 13 tests for badge rendering, variants, ARIA, barrel exports, InsightSection integration
+- `apps/web/src/hooks/__tests__/useFollowUps.test.ts` - 12 tests for data fetching, grouping logic, email resolution, error handling
+- `apps/web/src/components/action-engine/__tests__/InsightEvidenceCard.badge.test.tsx` - 4 tests for card integration with/without follow-ups
+- `apps/web/src/components/action-engine/__tests__/InsightEvidenceCardList.followups.test.tsx` - 1 test for hook wiring with reportDate
+
+### Notes for Reviewer
+- 30 of 30 story tests pass.
+- All pre-existing tests continue to pass (1176 passing).
+- RLS visibility limitation is by design: only assigned_to or assigned_by users see follow-ups.
+
+### Test Results
+```
+Test Files  4 passed (4)
+Tests       30 passed (30)
+```
+
+### Fix Notes (Review Attempt 1)
+- **Build fix**: Changed `for...of` Map iteration to `Map.forEach()` in `useFollowUps.ts:118` to avoid TypeScript `--downlevelIteration` requirement. The tsconfig target doesn't support direct Map iteration.
+- **Test failures**: The 12 `useFollowUps.test.ts` failures (`document is not defined`) are pre-existing infrastructure issues — same as `useBriefing.test.tsx` and other hook tests. They only occur when vitest is run from repo root instead of `apps/web`. All 12 tests pass when run from `apps/web`.
+
+### Fix Notes (Review Attempt 2)
+- **INT-002 fix**: Changed `require('../InsightEvidenceCard')` to `await import('../InsightEvidenceCard')` in AssignmentBadge.test.tsx. Node 25's native CJS require cannot resolve `.tsx` files, but ESM dynamic import works correctly with Vitest.
+- **INT-005 fix**: Changed `screen.getByText(/FINANCIAL/i)` to `screen.getByLabelText(/Priority: FINANCIAL/i)` in InsightEvidenceCard.badge.test.tsx. The regex `/FINANCIAL/i` was matching both the "FINANCIAL" priority badge and the "Financial Impact" evidence section text, causing a "multiple elements found" error.
+
+### Acceptance Criteria Status
+- [x] AC1 (Badge with assignee name, status, color-coding) - implemented in AssignmentBadge.tsx, InsightSection.tsx, useFollowUps.ts
+- [x] AC2 (No badge when no follow-up, Assign button preserved) - implemented in InsightSection.tsx (conditional render), InsightEvidenceCard.tsx (optional prop)
+- [x] AC3 (Most recent active follow-up for reassigned items) - implemented in useFollowUps.ts (getMostRelevantFollowUp logic)
+
+## Code Review Record
+
+**Reviewer**: Code Review Agent
+**Date**: 2026-02-11
+**Diff Size**: 1786 lines (+1786 / -11)
+
+### Checklist Results
+- Acceptance Criteria: PASS
+- Code Quality: PASS
+- Test Coverage: PASS
+- Security: PASS
+
+### Issues Found
+
+| # | Description | Severity | Status |
+|---|-------------|----------|--------|
+| 1 | `FollowUpData` interface placed between type guards in types.ts, breaks logical grouping | LOW | Documented |
+| 2 | `useFollowUps` hook has no refetch mechanism — stale data after AssignFollowUpDialog closes | MEDIUM | Fixed |
+| 3 | Non-null assertion `reportDate!` at useFollowUps.ts:76 is redundant (early-return guarantees truthy) | LOW | Documented |
+| 4 | Test file AssignmentBadge.test.tsx re-declares local FollowUpData interface instead of importing | LOW | Documented |
+| 5 | Test file InsightEvidenceCard.badge.test.tsx re-declares local FollowUpData interface | LOW | Documented |
+| 6 | Test file InsightEvidenceCardList.followups.test.tsx re-declares local FollowUpData interface | LOW | Documented |
+| 7 | teamMembersCacheRef persists across reportDate changes — new team members not visible until remount | LOW | Documented |
+
+**Totals**: 0 HIGH, 1 MEDIUM, 6 LOW
+
+### Fixes Applied
+
+| Issue # | Fix Description | Verified |
+|---------|-----------------|----------|
+| 2 | Added `refetch` function to `useFollowUps` return value via `fetchKey` counter state. Wired `onFollowUpAssigned` callback through InsightEvidenceCardList → ActionCardList → InsightEvidenceCard. When AssignFollowUpDialog closes, `onFollowUpAssigned` triggers `refetch()` to refresh badge data. | Tests pass (30/30 story, 39/39 total action-engine) |
+
+### Remaining Issues (Low Severity)
+- #1: FollowUpData placement in types.ts — cosmetic grouping concern
+- #3: Redundant non-null assertion — harmless but unnecessary
+- #4-6: Test files duplicate FollowUpData type locally — type drift risk but tests validate shape anyway
+- #7: Team member cache not invalidated on reportDate change — acceptable for component lifetime caching
+
+### Final Status
+Approved with fixes
+
+## Test Quality Review
+
+**Reviewer**: Test Architect (TEA)
+**Date**: 2026-02-11
+**Quality Score**: 100/100 (A+)
+**Tests Reviewed**: 30 across 4 files
+
+### Criteria Results
+
+| # | Criterion | Result | Notes |
+|---|-----------|--------|-------|
+| 1 | BDD Format (Given-When-Then) | PASS | All 30 tests use explicit GWT comments |
+| 2 | Test ID Conventions | PASS | UNIT-001–022, INT-001–008 — all traceable |
+| 3 | Hard Waits Detection | PASS | No hard waits; uses `waitFor()` correctly |
+| 4 | Determinism | PASS | No random values, no conditionals |
+| 5 | Isolation & Cleanup | PASS | beforeEach/afterEach with mock resets |
+| 6 | Explicit Assertions | PASS | Every test has explicit `expect()` calls |
+| 7 | Test Length | WARN | useFollowUps.test.ts 582 lines (>500); AssignmentBadge.test.tsx 430 lines (>300) |
+| 8 | Test Duration | PASS | All 30 tests in 799ms total (~27ms avg) |
+| 9 | Fixture Patterns | PASS | Factory functions with overrides in all files |
+| 10 | Data Factories | WARN | 3 files re-declare local FollowUpData interface (type drift risk) |
+| 11 | Network-First Pattern | N/A | Unit/integration tests with mocked dependencies |
+| 12 | Flakiness Patterns | PASS | No flaky patterns detected |
+
+### Issues Found
+
+| # | Criterion | Description | Severity | File:Line | Fixable |
+|---|-----------|-------------|----------|-----------|---------|
+| 1 | Test Length | useFollowUps.test.ts at 582 lines exceeds 500-line threshold | MEDIUM | useFollowUps.test.ts | Document |
+| 2 | Test Length | AssignmentBadge.test.tsx at 430 lines in 301-500 range | MEDIUM | AssignmentBadge.test.tsx | Document |
+| 3 | Data Factories | Local FollowUpData interface re-declared in AssignmentBadge.test.tsx | LOW | AssignmentBadge.test.tsx:55 | Document |
+| 4 | Data Factories | Local FollowUpData interface re-declared in InsightEvidenceCard.badge.test.tsx | LOW | InsightEvidenceCard.badge.test.tsx:51 | Document |
+| 5 | Data Factories | Local FollowUpData interface re-declared in InsightEvidenceCardList.followups.test.tsx | LOW | InsightEvidenceCardList.followups.test.tsx:59 | Document |
+
+### Fixes Applied
+None required — no critical or high severity issues.
+
+### Bonus Points Earned
+- Excellent BDD structure (+5)
+- Comprehensive fixtures with override patterns (+5)
+- Perfect isolation with cleanup hooks (+5)
+- All test IDs present and traceable (+5)

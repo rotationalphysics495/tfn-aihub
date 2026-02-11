@@ -4,7 +4,8 @@ import { useRouter } from 'next/navigation'
 import { CheckCircle2, Circle, Clock, MapPin, UserPlus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PriorityBadge, type PriorityType } from './PriorityBadge'
-import type { Recommendation, AssetReference } from './types'
+import { AssignmentBadge } from './AssignmentBadge'
+import type { Recommendation, AssetReference, FollowUpData } from './types'
 
 /**
  * Insight Section Component (Left side of card)
@@ -30,6 +31,7 @@ interface InsightSectionProps {
   isAcknowledged?: boolean
   acknowledgedAt?: string | null
   onAcknowledge?: () => void
+  followUp?: FollowUpData | null
   className?: string
 }
 
@@ -75,6 +77,7 @@ export function InsightSection({
   isAcknowledged = false,
   acknowledgedAt,
   onAcknowledge,
+  followUp,
   className,
 }: InsightSectionProps) {
   const router = useRouter()
@@ -106,6 +109,9 @@ export function InsightSection({
           </span>
         )}
       </div>
+
+      {/* Assignment badge - shows when a follow-up exists (Story 13.4 AC #1) */}
+      {followUp && <AssignmentBadge followUp={followUp} />}
 
       {/* Recommendation text - readable from 3ft (AC #2, #4 Glanceability) */}
       <h3 className="text-xl md:text-2xl font-semibold text-foreground leading-tight">
@@ -191,10 +197,10 @@ export function InsightSection({
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
               'rounded-sm'
             )}
-            aria-label="Assign follow-up action"
+            aria-label={followUp ? 'Reassign follow-up action' : 'Assign follow-up action'}
           >
             <UserPlus className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
-            <span>Assign</span>
+            <span>{followUp ? 'Reassign' : 'Assign'}</span>
           </button>
         )}
       </div>

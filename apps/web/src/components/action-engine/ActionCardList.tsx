@@ -5,7 +5,7 @@ import { RefreshCw, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { InsightEvidenceCard, InsightEvidenceCardSkeleton } from './InsightEvidenceCard'
-import type { ActionItem } from './types'
+import type { ActionItem, FollowUpData } from './types'
 import type { PriorityType } from './PriorityBadge'
 
 /**
@@ -32,6 +32,8 @@ interface ActionCardListProps {
   error?: string | null
   onRefetch?: () => void
   onAcknowledge?: (actionId: string) => void
+  followUps?: Map<string, FollowUpData>
+  onFollowUpAssigned?: () => void
   className?: string
 }
 
@@ -148,6 +150,8 @@ export function ActionCardList({
   error = null,
   onRefetch,
   onAcknowledge,
+  followUps,
+  onFollowUpAssigned,
   className,
 }: ActionCardListProps) {
   // Sort items by priority (AC #4)
@@ -209,6 +213,8 @@ export function ActionCardList({
             <InsightEvidenceCard
               item={item}
               onAcknowledge={onAcknowledge}
+              followUp={followUps?.get(item.id)}
+              onFollowUpAssigned={onFollowUpAssigned}
             />
           </div>
         ))}

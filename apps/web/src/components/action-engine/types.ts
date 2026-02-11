@@ -131,6 +131,20 @@ export function isOEEEvidence(data: SafetyEvidence | OEEEvidence | FinancialEvid
 }
 
 /**
+ * Follow-up assignment data for action items
+ */
+export interface FollowUpData {
+  id: string
+  action_item_id: string
+  assigned_to: string
+  assignee_email: string
+  status: 'assigned' | 'in_progress' | 'resolved'
+  note: string | null
+  created_at: string
+  updated_at: string
+}
+
+/**
  * Type guard for FinancialEvidence
  */
 export function isFinancialEvidence(data: SafetyEvidence | OEEEvidence | FinancialEvidence): data is FinancialEvidence {

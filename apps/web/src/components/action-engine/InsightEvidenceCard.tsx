@@ -7,7 +7,7 @@ import { InsightSection } from './InsightSection'
 import { EvidenceSection } from './EvidenceSection'
 import { AssignFollowUpDialog } from './AssignFollowUpDialog'
 import { getPriorityBorderColor, getPriorityAccentBg } from './PriorityBadge'
-import type { ActionItem } from './types'
+import type { ActionItem, FollowUpData } from './types'
 
 /**
  * Insight + Evidence Card Component
@@ -33,6 +33,8 @@ interface InsightEvidenceCardProps {
   className?: string
   defaultEvidenceExpanded?: boolean
   onAcknowledge?: (actionId: string) => void
+  followUp?: FollowUpData
+  onFollowUpAssigned?: () => void
 }
 
 export function InsightEvidenceCard({
@@ -40,6 +42,8 @@ export function InsightEvidenceCard({
   className,
   defaultEvidenceExpanded = false,
   onAcknowledge,
+  followUp,
+  onFollowUpAssigned,
 }: InsightEvidenceCardProps) {
   const [isHovered, setIsHovered] = useState(false)
   const [assignDialogOpen, setAssignDialogOpen] = useState(false)
@@ -94,6 +98,7 @@ export function InsightEvidenceCard({
                 isAcknowledged={isItemAcknowledged}
                 acknowledgedAt={item.acknowledgment?.acknowledged_at}
                 onAcknowledge={onAcknowledge ? () => onAcknowledge(item.id) : undefined}
+                followUp={followUp}
               />
             </div>
 
@@ -110,7 +115,10 @@ export function InsightEvidenceCard({
 
       <AssignFollowUpDialog
         open={assignDialogOpen}
-        onOpenChange={setAssignDialogOpen}
+        onOpenChange={(open) => {
+          setAssignDialogOpen(open)
+          if (!open) onFollowUpAssigned?.()
+        }}
         actionItem={{
           id: item.id,
           priority: item.priority,
