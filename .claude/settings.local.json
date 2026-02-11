@@ -64,7 +64,10 @@
       "Bash(git fetch:*)",
       "Bash(set:*)",
       "Bash(/tmp/seed_morning_briefing.py:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(git -C /Users/calebwaack/Documents/GitHub/tfn-aihub log --oneline --all --grep=\"bmad\")",
+      "Bash(git -C /Users/calebwaack/Documents/GitHub/BMAD-METHOD branch:*)",
+      "Bash(git -C /Users/calebwaack/Documents/GitHub/BMAD-METHOD tag --list 'v6.0.0-Beta*')"
     ]
   }
 }
