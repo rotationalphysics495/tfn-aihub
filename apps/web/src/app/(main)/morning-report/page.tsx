@@ -2,7 +2,7 @@ import { SafetyAlertsSection } from '@/components/dashboard'
 import { MorningSummarySection } from '@/components/action-list'
 import { InsightEvidenceCardList } from '@/components/action-engine'
 import { Breadcrumb } from '@/components/navigation'
-import { WorkcenterScorecard } from '@/components/production'
+import { WorkcenterScorecard, ScheduleAttainment } from '@/components/production'
 
 /**
  * Morning Report Page
@@ -46,6 +46,9 @@ export default function MorningReportPage() {
 
         {/* Workcenter Production Scorecard - Story 11.2 */}
         <WorkcenterScorecard />
+
+        {/* Schedule Attainment - Story 12.6 */}
+        <ScheduleAttainment />
 
         {/* Action List - Primary content area - AC #2 */}
         {/* Story 3.4: Insight + Evidence Cards - recommendation + supporting data */}

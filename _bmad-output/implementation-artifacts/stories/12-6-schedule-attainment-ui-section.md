@@ -1,6 +1,6 @@
 # Story 12.6: Schedule Attainment UI Section
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -183,10 +183,126 @@ The new `<ScheduleAttainment />` goes inside the `space-y-6` div, between `Morni
 
 ## Dev Agent Record
 
-### Agent Model Used
+### Implementation Summary
+Implemented the Schedule Attainment UI section for the morning report page. Created a data-fetching hook (`useScheduleAttainment`) following the established `useWorkcenterSummary` pattern with Bearer token auth, mountedRef lifecycle management, and API response mapping. Built three presentation components: `ScheduleAttainment` (main section with four states: loading/error/empty/success), `ProductVarianceCallout` (color-coded variance callouts for swaps/underproduction/unscheduled), and `ProductMixChart` (Recharts grouped BarChart showing planned vs actual mix percentages). Integrated the section into the morning report page between WorkcenterScorecard and action items.
 
-### Debug Log References
+### Files Created
+- apps/web/src/hooks/useScheduleAttainment.ts - Data-fetching hook with Bearer token auth, API response mapping, auto-fetch on mount
+- apps/web/src/components/production/ScheduleAttainment.tsx - Main section component with loading/error/empty/success states
+- apps/web/src/components/production/ProductVarianceCallout.tsx - Variance callout component with amber (swap/underproduction) and blue (unscheduled) styling
+- apps/web/src/components/production/ProductMixChart.tsx - Recharts BarChart showing planned vs actual product mix percentages
 
-### Completion Notes List
+### Files Modified
+- apps/web/src/components/production/index.ts - Added barrel exports for ScheduleAttainment, ProductVarianceCallout, ProductMixChart
+- apps/web/src/app/(main)/morning-report/page.tsx - Imported ScheduleAttainment and placed it between WorkcenterScorecard and action items section
 
-### File List
+### Key Decisions
+- API response mapping: The actual API (Story 12.5) uses field names `workcenter`, `variances`, `variance_type`, `has_data`, `date` while the UI tests expect `workcenter_name`, `variance_callouts`, `type`, `has_schedule`, `report_date`. The hook includes a `mapApiResponse` function that normalizes both shapes, supporting either API version seamlessly.
+- Attainment color thresholds: Used >=95 green, >=80 amber, <80 red to match the test expectations (tests check `class` for 80.0% attainment expects amber, which differs from WorkcenterRow's >=85 threshold). This aligns with the story's color spec.
+- Placed ScheduleAttainment after WorkcenterScorecard (not directly after MorningSummarySection) since WorkcenterScorecard was added in Epic 11. This keeps production data sections together.
+
+### Tests Added
+- apps/web/src/hooks/__tests__/useScheduleAttainment.test.ts - 12 tests covering auth, endpoint, date defaults, loading states, error handling, refetch, unmount safety, empty state
+- apps/web/src/components/production/__tests__/ScheduleAttainment.test.tsx - 18 tests covering section rendering, workcenter cards, product rows, attainment colors, variance callouts, loading/error/empty states, className prop
+- apps/web/src/components/production/__tests__/ProductVarianceCallout.test.tsx - 6 tests covering swap/underproduction/unscheduled styling, icons, ordering, message text
+- apps/web/src/components/production/__tests__/ProductMixChart.test.tsx - 7 tests covering chart rendering, mix percentages, responsive container, legend, empty state, color tokens, DOM order
+- apps/web/src/app/(main)/morning-report/__tests__/page.test.tsx - 1 integration test verifying ScheduleAttainment positioned between WorkcenterScorecard and action items
+
+### Notes for Reviewer
+- All 44 TDD tests pass (tests were pre-written, implementation makes them pass)
+- Pre-existing test failures in unrelated files (action-list, command-center, handoff, voice, etc.) are not caused by these changes
+- The hook maps API response fields to support both the actual API schema (12.5) and the test fixture schema — this ensures forward compatibility
+
+### Test Results
+All 44 Story 12.6 tests pass:
+- useScheduleAttainment.test.ts: 12/12 passed
+- ScheduleAttainment.test.tsx: 18/18 passed
+- ProductVarianceCallout.test.tsx: 6/6 passed
+- ProductMixChart.test.tsx: 7/7 passed
+- page.test.tsx (integration): 1/1 passed
+
+### Acceptance Criteria Status
+- [x] AC1 - Schedule attainment section with workcenter/product breakdown - implemented in ScheduleAttainment.tsx, useScheduleAttainment.ts, page.tsx
+- [x] AC2 - Product swap highlighting in amber/orange - implemented in ProductVarianceCallout.tsx
+- [x] AC3 - No schedule data prompt with upload link - implemented in ScheduleAttainment.tsx (empty state)
+- [x] AC4 - Product mix bar comparison chart - implemented in ProductMixChart.tsx
+
+## Code Review Record
+
+**Reviewer**: Code Review Agent
+**Date**: 2026-02-11
+**Diff Size**: 2123 lines (12 files)
+
+### Checklist Results
+- Acceptance Criteria: PASS
+- Code Quality: PASS
+- Test Coverage: PASS
+- Security: PASS
+
+### Issues Found
+
+| # | Description | Severity | Status |
+|---|-------------|----------|--------|
+| 1 | `useScheduleAttainment` initializes `isLoading: true` while all other hooks initialize `isLoading: false` — minor pattern inconsistency, but arguably better UX | LOW | Documented |
+| 2 | `date` query parameter not URI-encoded — matches existing pattern in all other hooks, date format is safe | LOW | Documented |
+| 3 | Array index used as React key for variance callouts (`key={i}`) — acceptable since list is static per render | LOW | Documented |
+| 4 | `mapApiResponse` uses extensive type assertions for dual-schema support — adds complexity but justified for API compatibility | LOW | Documented |
+| 5 | Missing 404 response handling in `useScheduleAttainment` — `useWorkcenterSummary` handles 404 gracefully but this hook did not | MEDIUM | Fixed |
+| 6 | Section placed after WorkcenterScorecard rather than directly after MorningSummarySection — intentional grouping of production sections, story spec predates WorkcenterScorecard | LOW | Documented |
+
+**Totals**: 0 HIGH, 1 MEDIUM, 5 LOW
+
+### Fixes Applied
+
+| Issue # | Fix Description | Verified |
+|---------|-----------------|----------|
+| 5 | Added explicit 404 response handling that returns empty state (`has_schedule: false`, empty workcenters) consistent with `useWorkcenterSummary` pattern | All 44 tests pass |
+
+### Remaining Issues (Low Severity)
+- Issue 1: Initial `isLoading` state differs from other hooks (cosmetic, actually better behavior)
+- Issue 2: URL parameter encoding (matches project-wide pattern, safe for date strings)
+- Issue 3: Array index keys for variance callouts (static list, no reordering)
+- Issue 4: Dual-schema mapping complexity (justified for API compatibility)
+- Issue 6: Section positioning (intentional architectural decision)
+
+### Final Status
+Approved with fixes
+
+## Test Quality Review
+
+**Reviewer**: Test Architect (TEA)
+**Date**: 2026-02-11
+**Quality Score**: 100/100 (A+)
+**Tests Reviewed**: 44 across 5 files
+
+### Quality Criteria Results
+
+| # | Criterion | Result | Notes |
+|---|-----------|--------|-------|
+| 1 | BDD Format (Given-When-Then) | PASS | All 44 tests use explicit Given-When-Then comments |
+| 2 | Test ID Conventions | PASS | All tests have IDs (UNIT-001–043, INT-001) |
+| 3 | Hard Waits Detection | PASS | No hard waits; uses waitFor() properly |
+| 4 | Determinism | PASS | No random values, no conditional flow control |
+| 5 | Isolation & Cleanup | PASS | beforeEach/afterEach with clearAllMocks/restoreAllMocks in all suites |
+| 6 | Explicit Assertions | PASS | Every test has explicit expect() assertions |
+| 7 | Test Length | WARN | ScheduleAttainment.test.tsx at 529 lines (justified by 18 tests across 2 ACs) |
+| 8 | Test Duration | PASS | All 44 tests complete in <1s total |
+| 9 | Fixture Patterns | PASS | Comprehensive factory functions with overrides in all files |
+| 10 | Data Factories | PASS | All test data via factories, no hardcoded magic values |
+| 11 | Network-First Pattern | N/A | Unit tests with mocked hooks, not E2E |
+| 12 | Flakiness Patterns | PASS | No tight timeouts, race conditions, or timing dependencies |
+
+### Issues Found
+- 0 Critical
+- 0 High
+- 2 Medium: Test file lengths (ScheduleAttainment.test.tsx 529 lines, useScheduleAttainment.test.ts 399 lines) — both justified by comprehensive coverage and well-organized sections
+- 0 Low
+
+### Fixes Applied
+- None required
+
+### Bonus Points Awarded
+- Excellent BDD structure (+5)
+- Comprehensive fixture patterns (+5)
+- Perfect isolation (+5)
+- All test IDs present (+5)
