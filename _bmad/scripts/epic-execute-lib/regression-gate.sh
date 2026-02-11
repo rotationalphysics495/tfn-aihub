@@ -15,6 +15,38 @@
 BASELINE_PASSING_TESTS=0
 BASELINE_COVERAGE=0
 REGRESSION_INITIALIZED=false
+REGRESSION_TEST_TIMEOUT=${REGRESSION_TEST_TIMEOUT:-120}  # seconds
+
+# Run a command with a timeout (portable, no coreutils needed)
+# Usage: run_with_timeout <seconds> <command...>
+# Returns: command output via stdout; exit code 0 on success, 1 on timeout
+run_with_timeout() {
+    local timeout_secs="$1"; shift
+    local output_file
+    output_file=$(mktemp /tmp/bmad-timeout-XXXXXX)
+
+    ( "$@" > "$output_file" 2>&1 ) &
+    local cmd_pid=$!
+
+    ( sleep "$timeout_secs" && kill -TERM "$cmd_pid" 2>/dev/null && sleep 2 && kill -9 "$cmd_pid" 2>/dev/null ) &
+    local watchdog_pid=$!
+
+    wait "$cmd_pid" 2>/dev/null
+    local exit_code=$?
+
+    # Kill watchdog if command finished in time
+    kill "$watchdog_pid" 2>/dev/null
+    wait "$watchdog_pid" 2>/dev/null
+
+    cat "$output_file"
+    rm -f "$output_file"
+
+    # 143 = SIGTERM (timed out)
+    if [ $exit_code -eq 143 ] || [ $exit_code -eq 137 ]; then
+        return 1
+    fi
+    return 0
+}
 
 # =============================================================================
 # Test Count Extraction (Multi-Framework Support)
@@ -126,9 +158,15 @@ init_regression_baseline() {
 
             # Check if there's a test:json script for better parsing
             if grep -q '"test:json"' "$PROJECT_ROOT/package.json" 2>/dev/null; then
-                test_output=$(cd "$PROJECT_ROOT" && npm run test:json 2>&1) || true
+                test_output=$(cd "$PROJECT_ROOT" && run_with_timeout "$REGRESSION_TEST_TIMEOUT" npm run test:json) || {
+                    log_warn "Baseline test:json timed out after ${REGRESSION_TEST_TIMEOUT}s"
+                    test_output=""
+                }
             else
-                test_output=$(cd "$PROJECT_ROOT" && npm test 2>&1) || true
+                test_output=$(cd "$PROJECT_ROOT" && run_with_timeout "$REGRESSION_TEST_TIMEOUT" npm test) || {
+                    log_warn "Baseline npm test timed out after ${REGRESSION_TEST_TIMEOUT}s"
+                    test_output=""
+                }
             fi
 
             BASELINE_PASSING_TESTS=$(extract_test_count "$test_output")
@@ -139,7 +177,7 @@ init_regression_baseline() {
         if grep -q '"coverage"' "$PROJECT_ROOT/package.json" 2>/dev/null; then
             log "Capturing baseline coverage..."
             local coverage_output
-            coverage_output=$(cd "$PROJECT_ROOT" && npm run coverage -- --json 2>/dev/null) || true
+            coverage_output=$(cd "$PROJECT_ROOT" && run_with_timeout "$REGRESSION_TEST_TIMEOUT" npm run coverage -- --json 2>/dev/null) || true
 
             # Try to extract coverage percentage
             if command -v jq >/dev/null 2>&1; then
@@ -152,14 +190,20 @@ init_regression_baseline() {
     elif [ -f "$PROJECT_ROOT/Cargo.toml" ]; then
         # Rust project
         log "Capturing baseline test count (Rust)..."
-        test_output=$(cd "$PROJECT_ROOT" && cargo test 2>&1) || true
+        test_output=$(cd "$PROJECT_ROOT" && run_with_timeout "$REGRESSION_TEST_TIMEOUT" cargo test) || {
+            log_warn "Baseline cargo test timed out after ${REGRESSION_TEST_TIMEOUT}s"
+            test_output=""
+        }
         BASELINE_PASSING_TESTS=$(extract_test_count "$test_output")
         log "Baseline passing tests: $BASELINE_PASSING_TESTS"
 
     elif [ -f "$PROJECT_ROOT/go.mod" ]; then
         # Go project
         log "Capturing baseline test count (Go)..."
-        test_output=$(cd "$PROJECT_ROOT" && go test ./... -v 2>&1) || true
+        test_output=$(cd "$PROJECT_ROOT" && run_with_timeout "$REGRESSION_TEST_TIMEOUT" go test ./... -v) || {
+            log_warn "Baseline go test timed out after ${REGRESSION_TEST_TIMEOUT}s"
+            test_output=""
+        }
         BASELINE_PASSING_TESTS=$(extract_test_count "$test_output")
         log "Baseline passing tests: $BASELINE_PASSING_TESTS"
 
@@ -167,7 +211,10 @@ init_regression_baseline() {
         # Python project
         if command -v pytest >/dev/null 2>&1; then
             log "Capturing baseline test count (Python)..."
-            test_output=$(cd "$PROJECT_ROOT" && pytest -v 2>&1) || true
+            test_output=$(cd "$PROJECT_ROOT" && run_with_timeout "$REGRESSION_TEST_TIMEOUT" pytest -v) || {
+                log_warn "Baseline pytest timed out after ${REGRESSION_TEST_TIMEOUT}s"
+                test_output=""
+            }
             BASELINE_PASSING_TESTS=$(extract_test_count "$test_output")
             log "Baseline passing tests: $BASELINE_PASSING_TESTS"
         fi
@@ -199,23 +246,33 @@ execute_regression_gate() {
     if [ -f "$PROJECT_ROOT/package.json" ]; then
         # Check if there's a test:json script for better parsing
         if grep -q '"test:json"' "$PROJECT_ROOT/package.json" 2>/dev/null; then
-            test_output=$(cd "$PROJECT_ROOT" && npm run test:json 2>&1) || true
+            test_output=$(cd "$PROJECT_ROOT" && run_with_timeout "$REGRESSION_TEST_TIMEOUT" npm run test:json) || {
+                log_warn "Regression gate test:json timed out after ${REGRESSION_TEST_TIMEOUT}s for $story_id"
+            }
         else
-            test_output=$(cd "$PROJECT_ROOT" && npm test 2>&1) || true
+            test_output=$(cd "$PROJECT_ROOT" && run_with_timeout "$REGRESSION_TEST_TIMEOUT" npm test) || {
+                log_warn "Regression gate npm test timed out after ${REGRESSION_TEST_TIMEOUT}s for $story_id"
+            }
         fi
         current_tests=$(extract_test_count "$test_output")
 
     elif [ -f "$PROJECT_ROOT/Cargo.toml" ]; then
-        test_output=$(cd "$PROJECT_ROOT" && cargo test 2>&1) || true
+        test_output=$(cd "$PROJECT_ROOT" && run_with_timeout "$REGRESSION_TEST_TIMEOUT" cargo test) || {
+            log_warn "Regression gate cargo test timed out after ${REGRESSION_TEST_TIMEOUT}s for $story_id"
+        }
         current_tests=$(extract_test_count "$test_output")
 
     elif [ -f "$PROJECT_ROOT/go.mod" ]; then
-        test_output=$(cd "$PROJECT_ROOT" && go test ./... -v 2>&1) || true
+        test_output=$(cd "$PROJECT_ROOT" && run_with_timeout "$REGRESSION_TEST_TIMEOUT" go test ./... -v) || {
+            log_warn "Regression gate go test timed out after ${REGRESSION_TEST_TIMEOUT}s for $story_id"
+        }
         current_tests=$(extract_test_count "$test_output")
 
     elif [ -f "$PROJECT_ROOT/requirements.txt" ] || [ -f "$PROJECT_ROOT/pyproject.toml" ]; then
         if command -v pytest >/dev/null 2>&1; then
-            test_output=$(cd "$PROJECT_ROOT" && pytest -v 2>&1) || true
+            test_output=$(cd "$PROJECT_ROOT" && run_with_timeout "$REGRESSION_TEST_TIMEOUT" pytest -v) || {
+                log_warn "Regression gate pytest timed out after ${REGRESSION_TEST_TIMEOUT}s for $story_id"
+            }
             current_tests=$(extract_test_count "$test_output")
         fi
     fi
