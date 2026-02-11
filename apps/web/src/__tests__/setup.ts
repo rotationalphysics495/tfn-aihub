@@ -1,5 +1,39 @@
 import '@testing-library/react'
 import '@testing-library/jest-dom/vitest'
+import Module from 'node:module'
+
+// Patch Node's require resolution to find .ts/.tsx files when extension is omitted.
+// Vitest handles ESM imports via Vite transform, but CJS require() in tests
+// (e.g., const { fn } = require('../Module')) uses Node's native resolver
+// which only checks .js/.json/.node extensions by default.
+const origResolveFilename = (Module as any)._resolveFilename
+;(Module as any)._resolveFilename = function (
+  request: string,
+  parent: any,
+  isMain: boolean,
+  options: any,
+) {
+  try {
+    return origResolveFilename.call(this, request, parent, isMain, options)
+  } catch (err: any) {
+    if (err?.code === 'MODULE_NOT_FOUND' && !request.startsWith('node:')) {
+      for (const ext of ['.ts', '.tsx']) {
+        try {
+          return origResolveFilename.call(
+            this,
+            request + ext,
+            parent,
+            isMain,
+            options,
+          )
+        } catch {
+          continue
+        }
+      }
+    }
+    throw err
+  }
+}
 
 // Provide jest global shim so @testing-library/react detects vitest fake timers.
 // Without this, waitFor() hangs when vi.useFakeTimers() is active because

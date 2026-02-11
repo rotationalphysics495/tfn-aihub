@@ -320,3 +320,17 @@ class FollowUpResponse(BaseModel):
     report_date: str
     created_at: str
     updated_at: str
+
+
+class FollowUpListItem(FollowUpResponse):
+    """Follow-up item with resolved assignee email for list display."""
+    assigned_to_email: Optional[str] = None
+
+
+class FollowUpListResponse(BaseModel):
+    """Response for the follow-ups list endpoint."""
+    followups: List[FollowUpListItem] = Field(default_factory=list)
+    total_count: int = Field(0, ge=0)
+    counts_by_status: Dict[str, int] = Field(
+        default_factory=lambda: {"assigned": 0, "in_progress": 0, "resolved": 0}
+    )

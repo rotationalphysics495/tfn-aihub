@@ -1,5 +1,5 @@
 import { SafetyAlertsSection } from '@/components/dashboard'
-import { MorningSummarySection } from '@/components/action-list'
+import { MorningSummarySection, MyAssignmentsPanel } from '@/components/action-list'
 import { InsightEvidenceCardList } from '@/components/action-engine'
 import { Breadcrumb } from '@/components/navigation'
 import { WorkcenterScorecard, ScheduleAttainment } from '@/components/production'
@@ -43,6 +43,9 @@ export default function MorningReportPage() {
       <div className="space-y-6">
         {/* Morning Summary Section - Secondary context - AC #6 */}
         <MorningSummarySection />
+
+        {/* My Assignments Panel - Story 13.5 */}
+        <MyAssignmentsPanel />
 
         {/* Workcenter Production Scorecard - Story 11.2 */}
         <WorkcenterScorecard />

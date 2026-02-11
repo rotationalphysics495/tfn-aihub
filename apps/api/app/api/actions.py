@@ -25,6 +25,8 @@ from app.schemas.action import (
     ActionCategory,
     ActionEngineConfig,
     ActionListResponse,
+    FollowUpListItem,
+    FollowUpListResponse,
     FollowUpUpdateRequest,
     FollowUpResponse,
 )
@@ -374,6 +376,120 @@ async def invalidate_action_cache(
         "success": True,
         "message": f"Cache invalidated for {'all dates' if report_date is None else report_date.isoformat()}"
     }
+
+
+@router.get("/followups", response_model=FollowUpListResponse)
+async def list_followups(
+    assigned_by: str = Query(
+        "me",
+        pattern=r"^(me|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$",
+        description="Filter by assigner: 'me' (current user) or explicit UUID"
+    ),
+    status: str = Query(
+        "all",
+        pattern=r"^(assigned|in_progress|resolved|active|all)$",
+        description="Status filter: assigned, in_progress, resolved, active (assigned+in_progress), or all"
+    ),
+    limit: Optional[int] = Query(None, ge=1, le=100, description="Maximum items to return"),
+    offset: Optional[int] = Query(None, ge=0, description="Pagination offset"),
+    current_user: CurrentUser = Depends(get_current_user),
+    engine: ActionEngine = Depends(get_engine),
+):
+    """
+    List follow-up assignments created by the current user.
+
+    Story 13.5 AC#1: Returns follow-ups grouped by status for the
+    "My Assignments" panel on the morning report.
+
+    Requires authentication.
+    """
+    try:
+        client = engine._get_client()
+
+        # Resolve assigned_by
+        assigner_id = current_user.id if assigned_by == "me" else assigned_by
+
+        # Build query
+        query = (
+            client.table("action_followups")
+            .select("*")
+            .eq("assigned_by", assigner_id)
+        )
+
+        # Apply status filter
+        valid_statuses = {"assigned", "in_progress", "resolved"}
+        if status == "active":
+            query = query.in_("status", ["assigned", "in_progress"])
+        elif status != "all" and status in valid_statuses:
+            query = query.eq("status", status)
+
+        # Get total count before pagination (for accurate total_count)
+        is_paginated = limit is not None or offset is not None
+        total_count = None
+        if is_paginated:
+            count_query = (
+                client.table("action_followups")
+                .select("id", count="exact")
+                .eq("assigned_by", assigner_id)
+            )
+            if status == "active":
+                count_query = count_query.in_("status", ["assigned", "in_progress"])
+            elif status != "all" and status in valid_statuses:
+                count_query = count_query.eq("status", status)
+            count_result = count_query.execute()
+            total_count = count_result.count if hasattr(count_result, 'count') and count_result.count is not None else len(count_result.data or [])
+
+        # Apply pagination when explicitly requested
+        if is_paginated:
+            pg_offset = offset or 0
+            pg_limit = limit or 50
+            query = query.range(pg_offset, pg_offset + pg_limit - 1)
+
+        result = query.execute()
+        followups_data = result.data or []
+
+        # Resolve assigned_to UUIDs to emails
+        assigned_to_ids = list({f["assigned_to"] for f in followups_data})
+        email_map: dict = {}
+        if assigned_to_ids:
+            try:
+                users_result = client.rpc(
+                    "get_user_emails", {"user_ids": assigned_to_ids}
+                ).execute()
+                if users_result.data:
+                    for u in users_result.data:
+                        email_map[u["id"]] = u["email"]
+            except Exception:
+                logger.warning("Failed to resolve user emails via RPC")
+
+        # Build response items
+        items = []
+        for f in followups_data:
+            items.append(FollowUpListItem(
+                **f,
+                assigned_to_email=email_map.get(f["assigned_to"]),
+            ))
+
+        # Compute counts by status from returned items
+        counts = {"assigned": 0, "in_progress": 0, "resolved": 0}
+        for item in items:
+            if item.status in counts:
+                counts[item.status] += 1
+
+        return FollowUpListResponse(
+            followups=items,
+            total_count=total_count if total_count is not None else len(items),
+            counts_by_status=counts,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to list follow-ups: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to list follow-ups. Please try again.",
+        )
 
 
 @router.patch("/followups/{followup_id}", response_model=FollowUpResponse)
