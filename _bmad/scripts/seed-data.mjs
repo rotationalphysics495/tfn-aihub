@@ -39,10 +39,13 @@ async function seed() {
 
   // 0. Clear existing data that needs to be refreshed
   console.log('🧹 Clearing existing data...');
+  await supabase.from('production_actuals').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  await supabase.from('production_schedule').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  await supabase.from('products').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   await supabase.from('safety_events').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   await supabase.from('live_snapshots').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   await supabase.from('shift_targets').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-  console.log('  ✓ Cleared safety_events, live_snapshots, and shift_targets');
+  console.log('  ✓ Cleared production_actuals, production_schedule, products, safety_events, live_snapshots, and shift_targets');
 
   // 1. Assets (Epic 5 UAT: 5-8 assets required, including Grinder 5)
   console.log('📦 Inserting assets...');
@@ -1510,6 +1513,287 @@ async function seed() {
   const { error: safetyErr } = await supabase.from('safety_events').insert(safetyEvents);
   if (safetyErr) console.error('  Safety events error:', safetyErr.message);
   else console.log('  ✓ Safety events inserted');
+
+  // 5.5. Products, Schedule & Actuals (Epic 12)
+  console.log('📦 Inserting products...');
+  const products = [
+    { id: 'b0000001-0000-0000-0000-000000000001', name: 'Colombian Single Origin', sku: 'RST-COL-001', product_family: 'Roasting', unit_of_measure: 'lbs' },
+    { id: 'b0000001-0000-0000-0000-000000000002', name: 'Brazilian Santos', sku: 'RST-BRZ-001', product_family: 'Roasting', unit_of_measure: 'lbs' },
+    { id: 'b0000001-0000-0000-0000-000000000003', name: 'Ethiopian Yirgacheffe', sku: 'RST-ETH-001', product_family: 'Roasting', unit_of_measure: 'lbs' },
+    { id: 'b0000001-0000-0000-0000-000000000004', name: 'House Blend', sku: 'RST-HBL-001', product_family: 'Roasting', unit_of_measure: 'lbs' },
+    { id: 'b0000001-0000-0000-0000-000000000005', name: 'Dark Roast Blend', sku: 'RST-DRK-001', product_family: 'Roasting', unit_of_measure: 'lbs' },
+    { id: 'b0000001-0000-0000-0000-000000000006', name: 'Espresso Grind', sku: 'GRN-ESP-001', product_family: 'Grinding', unit_of_measure: 'lbs' },
+    { id: 'b0000001-0000-0000-0000-000000000007', name: 'Medium Grind', sku: 'GRN-MED-001', product_family: 'Grinding', unit_of_measure: 'lbs' },
+    { id: 'b0000001-0000-0000-0000-000000000008', name: 'Coarse Grind', sku: 'GRN-CRS-001', product_family: 'Grinding', unit_of_measure: 'lbs' },
+    { id: 'b0000001-0000-0000-0000-000000000009', name: 'K-Cup', sku: 'FIL-KCP-001', product_family: 'Filling', unit_of_measure: 'units' },
+    { id: 'b0000001-0000-0000-0000-000000000010', name: '12oz Bag', sku: 'FIL-12B-001', product_family: 'Filling', unit_of_measure: 'units' },
+    { id: 'b0000001-0000-0000-0000-000000000011', name: '5lb Bag', sku: 'FIL-5LB-001', product_family: 'Filling', unit_of_measure: 'units' },
+  ];
+
+  const { error: productsErr } = await supabase.from('products').upsert(products, { onConflict: 'id' });
+  if (productsErr) console.error('  Products error:', productsErr.message);
+  else console.log('  ✓ 11 products inserted');
+
+  // 5.6. Production Schedule (Epic 12)
+  // Product-to-asset mapping and daily_summaries actual_output reference:
+  //   Roaster 1 (001): d1=125, d2=135, d3=108, d4=131, d5=125, d6=133, d7=126  target=143
+  //   Roaster 2 (002): d1=145, d2=122, d3=133, d4=129, d5=135, d6=128, d7=130  target=143
+  //   Roaster 3 (003): d1=127, d2=131, d3=123, d4=134, d5=126, d6=130, d7=125  target=143
+  //   Grinder 1 (004): d1=1780, d2=1725, d3=1848, d4=1409, d5=1817, d6=1756, d7=1687  target=1950
+  //   Grinder 2 (005): d1=1960, d2=1862, d3=1760, d4=1802, d5=1835, d6=1790, d7=1823  target=1950
+  //   Grinder 3 (006): d1=1642, d2=1749, d3=1702, d4=1784, d5=1693, d6=1759, d7=1724  target=1950
+  //   Grinder 4 (007): d1=1700, d2=1780, d3=1665, d4=1749, d5=1817, d6=1687, d7=1771  target=1950
+  //   Grinder 5 (014): d1=1608, d2=1722, d3=1498, d4=1778, d5=1669, d6=1743, d7=1698  target=1950
+  //   Filler A (008):  d1=3335, d2=4246, d3=3616, d4=4374, d5=4066, d6=4195, d7=4131  target=4600
+  //   Filler B (009):  d1=4650, d2=4223, d3=4338, d4=4025, d5=4168, d6=4283, d7=4089  target=4600
+  //   Filler C (010):  d1=3200, d2=3540, d3=3728, d4=3472, d5=3620, d6=3760, d7=3492  target=4000
+  console.log('📅 Inserting production schedule...');
+
+  // Asset ID shortcuts
+  const R1 = 'a0000001-0000-0000-0000-000000000001';
+  const R2 = 'a0000001-0000-0000-0000-000000000002';
+  const R3 = 'a0000001-0000-0000-0000-000000000003';
+  const G1 = 'a0000001-0000-0000-0000-000000000004';
+  const G2 = 'a0000001-0000-0000-0000-000000000005';
+  const G3 = 'a0000001-0000-0000-0000-000000000006';
+  const G4 = 'a0000001-0000-0000-0000-000000000007';
+  const G5 = 'a0000001-0000-0000-0000-000000000014';
+  const FA = 'a0000001-0000-0000-0000-000000000008';
+  const FB = 'a0000001-0000-0000-0000-000000000009';
+  const FC = 'a0000001-0000-0000-0000-000000000010';
+
+  // Product ID shortcuts
+  const COL = 'b0000001-0000-0000-0000-000000000001'; // Colombian Single Origin
+  const BRZ = 'b0000001-0000-0000-0000-000000000002'; // Brazilian Santos
+  const ETH = 'b0000001-0000-0000-0000-000000000003'; // Ethiopian Yirgacheffe
+  const HBL = 'b0000001-0000-0000-0000-000000000004'; // House Blend
+  const DRK = 'b0000001-0000-0000-0000-000000000005'; // Dark Roast Blend
+  const ESP = 'b0000001-0000-0000-0000-000000000006'; // Espresso Grind
+  const MED = 'b0000001-0000-0000-0000-000000000007'; // Medium Grind
+  const CRS = 'b0000001-0000-0000-0000-000000000008'; // Coarse Grind
+  const KCP = 'b0000001-0000-0000-0000-000000000009'; // K-Cup
+  const B12 = 'b0000001-0000-0000-0000-000000000010'; // 12oz Bag
+  const B5L = 'b0000001-0000-0000-0000-000000000011'; // 5lb Bag
+
+  // Helper: generate schedule UUID — c{assetIdx 2 digit}{day 1 digit}{shift: 1=Day 2=Night}
+  const schedId = (assetIdx, day, shift) =>
+    `c0000001-0000-0000-0000-${String(assetIdx).padStart(3, '0')}${day}${shift === 'Day' ? '1' : '2'}0000000`;
+
+  // Helper: generate actuals UUID — d{assetIdx 2 digit}{day 1 digit}{shift: 1=Day 2=Night}
+  const actualId = (assetIdx, day, shift) =>
+    `d0000001-0000-0000-0000-${String(assetIdx).padStart(3, '0')}${day}${shift === 'Day' ? '1' : '2'}0000000`;
+
+  // Weekly product rotation per asset (indexed by day 1-7)
+  // Roaster 1: Colombian Mon-Wed, Brazilian Thu-Fri, Colombian Sat-Sun
+  // Roaster 2: Dark Roast Mon-Thu, House Blend Fri-Sun
+  // Roaster 3: Ethiopian Mon-Wed, House Blend Thu-Fri, Ethiopian Sat-Sun
+  // Grinder 1: Espresso Grind all week
+  // Grinder 2: Coarse Grind all week
+  // Grinder 3: Medium Grind Mon-Wed, Espresso Grind Thu-Fri, Medium Grind Sat-Sun
+  // Grinder 4: Medium Grind all week
+  // Grinder 5: Espresso Grind Mon-Wed, Medium Grind Thu-Fri, Espresso Grind Sat-Sun
+  // Filler A: K-Cup Mon-Wed, 12oz Bag Thu-Fri, K-Cup Sat-Sun
+  // Filler B: 12oz Bag all week
+  // Filler C: 5lb Bag Mon-Wed, K-Cup Thu-Fri, 5lb Bag Sat-Sun
+
+  // Asset config: [assetId, assetIdx, target, productFn]
+  // target = daily scheduled total, split ~55%/45% Day/Night
+  const assetConfigs = [
+    { id: R1, idx: 1,  target: 143, productFn: (d) => [1,2,3].includes(d) ? COL : [4,5].includes(d) ? BRZ : COL, prefix: 'RST1' },
+    { id: R2, idx: 2,  target: 143, productFn: (d) => [1,2,3,4].includes(d) ? DRK : HBL, prefix: 'RST2' },
+    { id: R3, idx: 3,  target: 143, productFn: (d) => [1,2,3].includes(d) ? ETH : [4,5].includes(d) ? HBL : ETH, prefix: 'RST3' },
+    { id: G1, idx: 4,  target: 1950, productFn: () => ESP, prefix: 'GRN1' },
+    { id: G2, idx: 5,  target: 1950, productFn: () => CRS, prefix: 'GRN2' },
+    { id: G3, idx: 6,  target: 1950, productFn: (d) => [1,2,3].includes(d) ? MED : [4,5].includes(d) ? ESP : MED, prefix: 'GRN3' },
+    { id: G4, idx: 7,  target: 1950, productFn: () => MED, prefix: 'GRN4' },
+    { id: G5, idx: 14, target: 1950, productFn: (d) => [1,2,3].includes(d) ? ESP : [4,5].includes(d) ? MED : ESP, prefix: 'GRN5' },
+    { id: FA, idx: 8,  target: 4600, productFn: (d) => [1,2,3].includes(d) ? KCP : [4,5].includes(d) ? B12 : KCP, prefix: 'FILA' },
+    { id: FB, idx: 9,  target: 4600, productFn: () => B12, prefix: 'FILB' },
+    { id: FC, idx: 10, target: 4000, productFn: (d) => [1,2,3].includes(d) ? B5L : [4,5].includes(d) ? KCP : B5L, prefix: 'FILC' },
+  ];
+
+  const productionSchedule = [];
+  for (const asset of assetConfigs) {
+    for (let day = 1; day <= 7; day++) {
+      const dayQty = Math.round(asset.target * 0.55);
+      const nightQty = asset.target - dayQty;
+      const product = asset.productFn(day);
+      const dateStr = daysAgo(day);
+      productionSchedule.push({
+        id: schedId(asset.idx, day, 'Day'),
+        asset_id: asset.id,
+        product_id: product,
+        scheduled_quantity: dayQty,
+        scheduled_date: dateStr,
+        shift: 'Day',
+        production_order_ref: `PO-${asset.prefix}-${dateStr}-D`,
+      });
+      productionSchedule.push({
+        id: schedId(asset.idx, day, 'Night'),
+        asset_id: asset.id,
+        product_id: product,
+        scheduled_quantity: nightQty,
+        scheduled_date: dateStr,
+        shift: 'Night',
+        production_order_ref: `PO-${asset.prefix}-${dateStr}-N`,
+      });
+    }
+  }
+
+  const { error: scheduleErr } = await supabase.from('production_schedule').upsert(productionSchedule, { onConflict: 'id' });
+  if (scheduleErr) console.error('  Production schedule error:', scheduleErr.message);
+  else console.log(`  ✓ ${productionSchedule.length} production schedule entries inserted`);
+
+  // 5.7. Production Actuals with Variance Patterns (Epic 12)
+  // Actual_output from daily_summaries per asset/day (must match sums)
+  console.log('📊 Inserting production actuals...');
+  const dailyActuals = {
+    // asset_id -> { day -> actual_output }
+    [R1]: { 1: 125, 2: 135, 3: 108, 4: 131, 5: 125, 6: 133, 7: 126 },
+    [R2]: { 1: 145, 2: 122, 3: 133, 4: 129, 5: 135, 6: 128, 7: 130 },
+    [R3]: { 1: 127, 2: 131, 3: 123, 4: 134, 5: 126, 6: 130, 7: 125 },
+    [G1]: { 1: 1780, 2: 1725, 3: 1848, 4: 1409, 5: 1817, 6: 1756, 7: 1687 },
+    [G2]: { 1: 1960, 2: 1862, 3: 1760, 4: 1802, 5: 1835, 6: 1790, 7: 1823 },
+    [G3]: { 1: 1642, 2: 1749, 3: 1702, 4: 1784, 5: 1693, 6: 1759, 7: 1724 },
+    [G4]: { 1: 1700, 2: 1780, 3: 1665, 4: 1749, 5: 1817, 6: 1687, 7: 1771 },
+    [G5]: { 1: 1608, 2: 1722, 3: 1498, 4: 1778, 5: 1669, 6: 1743, 7: 1698 },
+    [FA]: { 1: 3335, 2: 4246, 3: 3616, 4: 4374, 5: 4066, 6: 4195, 7: 4131 },
+    [FB]: { 1: 4650, 2: 4223, 3: 4338, 4: 4025, 5: 4168, 6: 4283, 7: 4089 },
+    [FC]: { 1: 3200, 2: 3540, 3: 3728, 4: 3472, 5: 3620, 6: 3760, 7: 3492 },
+  };
+
+  // Swap product lookup within same family
+  const roastingProducts = [COL, BRZ, ETH, HBL, DRK];
+  const grindingProducts = [ESP, MED, CRS];
+  const fillingProducts = [KCP, B12, B5L];
+  const swapProduct = (productId) => {
+    let family;
+    if (roastingProducts.includes(productId)) family = roastingProducts;
+    else if (grindingProducts.includes(productId)) family = grindingProducts;
+    else family = fillingProducts;
+    const others = family.filter(p => p !== productId);
+    return others[0]; // deterministic: pick first alternative
+  };
+
+  // Variance scenario definitions — keyed by "assetId:day:shift"
+  // Types: 'on_schedule' (default), 'swap', 'under', 'over'
+  const varianceOverrides = {
+    // AC3: daysAgo(1) Roaster 1 swap — Brazilian instead of Colombian
+    [`${R1}:1:Day`]: 'swap',
+    [`${R1}:1:Night`]: 'swap',
+    // AC3: daysAgo(1) Grinder 5 underproduction (total=1608)
+    [`${G5}:1:Day`]: 'under',
+    [`${G5}:1:Night`]: 'under',
+    // AC3: daysAgo(2) Filler A exceeds K-Cup target
+    [`${FA}:2:Day`]: 'over',
+    [`${FA}:2:Night`]: 'over',
+    // AC3: daysAgo(3) multiple grinder swaps
+    [`${G1}:3:Day`]: 'swap',
+    [`${G1}:3:Night`]: 'swap',
+    [`${G3}:3:Day`]: 'swap',
+    [`${G3}:3:Night`]: 'swap',
+    [`${G5}:3:Day`]: 'swap',
+    [`${G5}:3:Night`]: 'swap',
+    // AC3: shift-level variance — Grinder 4 daysAgo(2): Day on-target, Night underproduced
+    [`${G4}:2:Night`]: 'under',
+    // More underproduction to hit ~25% overall
+    [`${R3}:3:Day`]: 'under',
+    [`${R3}:3:Night`]: 'under',
+    [`${G4}:3:Day`]: 'under',
+    [`${G4}:3:Night`]: 'under',
+    [`${FC}:1:Day`]: 'under',
+    [`${FC}:1:Night`]: 'under',
+    [`${FA}:1:Day`]: 'under',
+    [`${FA}:1:Night`]: 'under',
+    [`${G3}:1:Day`]: 'under',
+    [`${G3}:1:Night`]: 'under',
+    [`${R2}:2:Day`]: 'under',
+    [`${R2}:2:Night`]: 'under',
+    [`${G1}:4:Day`]: 'under',
+    [`${G1}:4:Night`]: 'under',
+    [`${FB}:4:Day`]: 'under',
+    [`${FB}:4:Night`]: 'under',
+    [`${FC}:4:Day`]: 'under',
+    [`${FC}:4:Night`]: 'under',
+    // More swaps to hit ~15%
+    [`${R2}:5:Day`]: 'swap',
+    [`${R2}:5:Night`]: 'swap',
+    [`${R3}:6:Day`]: 'swap',
+    [`${R3}:6:Night`]: 'swap',
+    [`${G2}:7:Day`]: 'swap',
+    [`${G2}:7:Night`]: 'swap',
+    [`${FB}:6:Day`]: 'swap',
+    [`${FB}:6:Night`]: 'swap',
+    [`${FC}:5:Day`]: 'swap',
+    [`${FC}:5:Night`]: 'swap',
+    // Additional underproduction for ~25% coverage
+    [`${R1}:5:Day`]: 'under',
+    [`${R1}:5:Night`]: 'under',
+    [`${R3}:7:Day`]: 'under',
+    [`${R3}:7:Night`]: 'under',
+    [`${G2}:4:Day`]: 'under',
+    [`${G2}:4:Night`]: 'under',
+    [`${G3}:5:Day`]: 'under',
+    [`${G3}:5:Night`]: 'under',
+    [`${G5}:5:Day`]: 'under',
+    [`${G5}:5:Night`]: 'under',
+    [`${FA}:3:Day`]: 'under',
+    [`${FA}:3:Night`]: 'under',
+    [`${FB}:7:Day`]: 'under',
+    [`${FB}:7:Night`]: 'under',
+    [`${R1}:7:Day`]: 'under',
+    [`${R1}:7:Night`]: 'under',
+    [`${G4}:6:Day`]: 'under',
+    [`${G4}:6:Night`]: 'under',
+  };
+
+  const productionActuals = [];
+  for (const asset of assetConfigs) {
+    for (let day = 1; day <= 7; day++) {
+      const totalActual = dailyActuals[asset.id][day];
+      const scheduledProduct = asset.productFn(day);
+
+      // Split total actual between Day (55%) and Night (45%) by default
+      let dayActual = Math.round(totalActual * 0.55);
+      let nightActual = totalActual - dayActual;
+
+      const dayKey = `${asset.id}:${day}:Day`;
+      const nightKey = `${asset.id}:${day}:Night`;
+      const dayVariance = varianceOverrides[dayKey] || 'on_schedule';
+      const nightVariance = varianceOverrides[nightKey] || 'on_schedule';
+
+      // Shift-level variance: Grinder 4 daysAgo(2) — Day on-target, Night underproduced
+      if (asset.id === G4 && day === 2) {
+        // Total actual = 1780, Day gets ~1020 (on-target), Night gets 760 (under)
+        dayActual = 1020;
+        nightActual = 760;
+      }
+
+      const dayProduct = dayVariance === 'swap' ? swapProduct(scheduledProduct) : scheduledProduct;
+      const nightProduct = nightVariance === 'swap' ? swapProduct(scheduledProduct) : scheduledProduct;
+
+      productionActuals.push({
+        id: actualId(asset.idx, day, 'Day'),
+        asset_id: asset.id,
+        product_id: dayProduct,
+        actual_quantity: dayActual,
+        production_date: daysAgo(day),
+        shift: 'Day',
+      });
+      productionActuals.push({
+        id: actualId(asset.idx, day, 'Night'),
+        asset_id: asset.id,
+        product_id: nightProduct,
+        actual_quantity: nightActual,
+        production_date: daysAgo(day),
+        shift: 'Night',
+      });
+    }
+  }
+
+  const { error: actualsErr } = await supabase.from('production_actuals').upsert(productionActuals, { onConflict: 'id' });
+  if (actualsErr) console.error('  Production actuals error:', actualsErr.message);
+  else console.log(`  ✓ ${productionActuals.length} production actuals with variance patterns inserted`);
 
   // 6. Create test users if not exist
   console.log('👤 Creating test users...');
