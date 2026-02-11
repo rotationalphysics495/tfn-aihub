@@ -124,11 +124,11 @@ LIB_DIR="$SCRIPT_DIR/epic-execute-lib"
 [ -f "$LIB_DIR/json-output.sh" ] && source "$LIB_DIR/json-output.sh"
 [ -f "$LIB_DIR/tdd-flow.sh" ] && source "$LIB_DIR/tdd-flow.sh"
 
-STORIES_DIR="$PROJECT_ROOT/docs/stories"
-SPRINT_ARTIFACTS_DIR="$PROJECT_ROOT/docs/sprint-artifacts"
-SPRINTS_DIR="$PROJECT_ROOT/docs/sprints"
-EPICS_DIR="$PROJECT_ROOT/docs/epics"
-UAT_DIR="$PROJECT_ROOT/docs/uat"
+STORIES_DIR="$PROJECT_ROOT/_bmad-output/implementation-artifacts/stories"
+SPRINT_ARTIFACTS_DIR="$PROJECT_ROOT/_bmad-output/implementation-artifacts"
+SPRINTS_DIR="$PROJECT_ROOT/_bmad-output/sprints"
+EPICS_DIR="$PROJECT_ROOT/_bmad-output/planning-artifacts"
+UAT_DIR="$PROJECT_ROOT/_bmad-output/uat"
 LOGS_DIR="$SPRINT_ARTIFACTS_DIR/logs"
 
 # Temporary log file during execution - will be copied to LOGS_DIR on completion
@@ -172,7 +172,7 @@ TEST_QUALITY_STEP="$WORKFLOWS_DIR/epic-execute/steps/step-03b-test-quality.md"
 TRACEABILITY_STEP="$WORKFLOWS_DIR/epic-execute/steps/step-03c-traceability.md"
 
 # Traceability output directory
-TRACEABILITY_DIR="$PROJECT_ROOT/docs/sprint-artifacts/traceability"
+TRACEABILITY_DIR="$PROJECT_ROOT/_bmad-output/implementation-artifacts/traceability"
 
 # Colors for output
 RED='\033[0;31m'
@@ -247,6 +247,32 @@ save_log_to_repo() {
         echo "[$(date '+%Y-%m-%d %H:%M:%S')] [WARN] Failed to save log to $FINAL_LOG_FILE" >> "$LOG_FILE"
         return 1
     fi
+}
+
+# Flush the current log to the repo after each story completes/fails.
+# Unlike save_log_to_repo (which runs once at exit), this overwrites
+# the same file incrementally so the repo always has the latest progress.
+flush_log_to_repo() {
+    # Skip if no log file or it's empty
+    if [ ! -f "$LOG_FILE" ] || [ ! -s "$LOG_FILE" ]; then
+        return 0
+    fi
+
+    # Create logs directory if needed
+    if [ -n "$LOGS_DIR" ]; then
+        mkdir -p "$LOGS_DIR" 2>/dev/null || true
+    else
+        return 0
+    fi
+
+    # Use a stable filename so each flush overwrites the previous snapshot
+    if [ -n "$EPIC_ID" ]; then
+        local flush_file="$LOGS_DIR/epic-${EPIC_ID}-latest.log"
+    else
+        return 0
+    fi
+
+    cp "$LOG_FILE" "$flush_file" 2>/dev/null || true
 }
 
 # =============================================================================
@@ -2988,6 +3014,8 @@ for story_file in "${STORIES[@]}"; do
             if type save_checkpoint >/dev/null 2>&1; then
                 save_checkpoint "$STORY_INDEX" "$story_id" "$COMPLETED" "$FAILED" "$SKIPPED"
             fi
+            # Flush log to repo after story failure
+            flush_log_to_repo
             continue
         fi
     else
@@ -3003,6 +3031,8 @@ for story_file in "${STORIES[@]}"; do
             if type save_checkpoint >/dev/null 2>&1; then
                 save_checkpoint "$STORY_INDEX" "$story_id" "$COMPLETED" "$FAILED" "$SKIPPED"
             fi
+            # Flush log to repo after story failure
+            flush_log_to_repo
             continue
         fi
     fi
@@ -3030,6 +3060,9 @@ for story_file in "${STORIES[@]}"; do
     if type save_checkpoint >/dev/null 2>&1; then
         save_checkpoint "$STORY_INDEX" "$story_id" "$COMPLETED" "$FAILED" "$SKIPPED"
     fi
+
+    # Flush log to repo after each completed story
+    flush_log_to_repo
 done
 
 # =============================================================================

@@ -1,27 +1,55 @@
 # Epic Chain Execution Plan
-# Generated: 2026-01-09 15:13:58
+# Generated: 2026-02-11 05:32:26
 
-epics: [5 6 7]
-total_epics: 3
+epics: [10 11 12 13 14 15 16 17 18 19]
+total_epics: 10
 
 execution_order:
-  - epic: 5
-    file: epic-5.md
+  - epic: 10
+    file: epic-10.md
+    stories: 6
+    dependencies: []
+  - epic: 11
+    file: epic-11.md
+    stories: 6
+    dependencies: []
+  - epic: 12
+    file: epic-12.md
+    stories: 12
+    dependencies: []
+  - epic: 13
+    file: epic-13.md
+    stories: 10
+    dependencies: []
+  - epic: 14
+    file: epic-14.md
+    stories: 12
+    dependencies: []
+  - epic: 15
+    file: epic-15.md
     stories: 8
     dependencies: []
-  - epic: 6
-    file: epic-6.md
-    stories: 4
+  - epic: 16
+    file: epic-16.md
+    stories: 12
     dependencies: []
-  - epic: 7
-    file: epic-7.md
-    stories: 5
+  - epic: 17
+    file: epic-17.md
+    stories: 8
+    dependencies: []
+  - epic: 18
+    file: epic-18.md
+    stories: 10
+    dependencies: []
+  - epic: 19
+    file: epic-19.md
+    stories: 6
     dependencies: []
 
-total_stories: 17
+total_stories: 90
 
 options:
-  dry_run: false
-  skip_done: true
+  dry_run: true
+  skip_done: false
   context_handoff: true
   combined_uat: true
