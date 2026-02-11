@@ -1,6 +1,6 @@
 # Story 11.1: Workcenter Summary API Endpoint
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -211,10 +211,120 @@ except Exception as e:
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.6
 
-### Debug Log References
+### Implementation Summary
 
-### Completion Notes List
+Implemented the Workcenter Summary API endpoint (`GET /workcenter-summary`) that returns production data grouped by workcenter (asset area). The endpoint queries assets, daily_summaries, and shift_targets from Supabase, joins them in Python by asset_id, groups by area, and returns aggregated totals with per-asset breakdowns. Registered a versioned alias at `/api/v1/production` alongside the existing `/api/production` prefix.
 
-### File List
+### Files Created
+- `apps/api/app/schemas/production.py` - Pydantic response models (AssetDetail, WorkcenterEntry, WorkcenterSummaryResponse)
+- `apps/api/tests/api/test_production_workcenter.py` - 14 unit tests covering auth, normal response, empty data, date defaulting, and edge cases
+
+### Files Modified
+- `apps/api/app/api/production.py` - Added GET /workcenter-summary endpoint with date query param, Supabase multi-query logic, Python-side aggregation by area
+- `apps/api/app/main.py` - Added /api/v1/production versioned alias for production router
+
+### Key Decisions
+- Used `table.side_effect` pattern in tests for clean per-table mock setup instead of chained side_effect list
+- Assets with NULL/empty area are silently excluded (not grouped under "Unassigned") to avoid clutter in response
+- The endpoint only shows assets that have daily_summary data for the requested date; assets with only shift_targets but no summary are omitted
+- Workcenter entries are sorted alphabetically by area name for consistent ordering
+
+### Tests Added
+- `apps/api/tests/api/test_production_workcenter.py` - 14 tests:
+  - Auth: requires JWT on both v1 and legacy paths
+  - Normal: grouped workcenters, aggregation math, per-asset breakdown, legacy path
+  - Empty: 200 with empty array and message
+  - Date: defaults to T-1, explicit date respected
+  - Edge cases: zero target attainment, null area exclusion, partial data (summary without target, target without summary), null OEE/downtime
+
+### Notes for Reviewer
+- The endpoint reuses the existing `calculate_percentage()` helper for attainment calculation (returns 100.0 for zero target)
+- The `date` query param uses FastAPI's alias feature (`alias="date"`) so the Python param name is `report_date` to avoid shadowing the built-in
+- Both `/api/production/workcenter-summary` and `/api/v1/production/workcenter-summary` paths are functional
+
+### Test Results
+```
+14 passed in 0.14s (new workcenter tests)
+20 passed in 0.38s (existing production tests — no regressions)
+```
+
+### Acceptance Criteria Status
+- [x] AC#1 - Workcenter-grouped response with aggregations — implemented in `apps/api/app/api/production.py:get_workcenter_summary()` + `apps/api/app/schemas/production.py`
+- [x] AC#2 - Empty data returns 200 with message — implemented in `apps/api/app/api/production.py:get_workcenter_summary()` (empty summaries check)
+- [x] AC#3 - Date defaults to T-1 — implemented in `apps/api/app/api/production.py:get_workcenter_summary()` (Optional[date] with None default)
+
+## Code Review Record
+
+**Reviewer**: Code Review Agent
+**Date**: 2026-02-11
+**Diff Size**: 678 lines (5 files)
+
+### Checklist Results
+- Acceptance Criteria: PASS
+- Code Quality: PASS
+- Test Coverage: PASS
+- Security: PASS
+
+### Issues Found
+
+| # | Description | Severity | Status |
+|---|-------------|----------|--------|
+| 1 | Test file re-declares `mock_verify_jwt` fixture shadowing identical conftest.py version | MEDIUM | Fixed |
+| 2 | No test for Supabase client error handling (500 response path) | MEDIUM | Fixed |
+| 3 | `calculate_percentage(0, 0)` returns 100.0 (pre-existing shared helper behavior) | LOW | Documented |
+| 4 | `summaries_map` silently overwrites duplicate daily_summary records for same asset_id | LOW | Documented |
+| 5 | No test for invalid date format 422 validation (FastAPI handles automatically) | LOW | Documented |
+| 6 | `hit_target` is True when both actual=0 and target=0 (consistent with calculate_percentage) | LOW | Documented |
+
+**Totals**: 0 HIGH, 2 MEDIUM, 4 LOW
+
+### Fixes Applied
+
+| Issue # | Fix Description | Verified |
+|---------|-----------------|----------|
+| 1 | Removed duplicate `mock_verify_jwt` fixture from test file; now uses conftest.py version | 15 tests pass |
+| 2 | Added `test_supabase_error_returns_500` test verifying error handler returns 500 with generic message | 15 tests pass |
+
+### Remaining Issues (Low Severity)
+- Issue 3: `calculate_percentage(0, 0)` returns 100.0 — pre-existing behavior in shared helper, consistent across codebase
+- Issue 4: Duplicate daily_summary records for same asset_id would be last-write-wins — DB unique constraint should prevent this
+- Issue 5: Invalid date format returns 422 automatically via FastAPI query param validation — no explicit test needed
+- Issue 6: `0 >= 0 = True` for hit_target is logically correct (no target was missed) and consistent with attainment calc
+
+### Final Status
+Approved with fixes
+
+## Test Quality Review
+
+**Quality Score**: 100/100 (A+)
+**Tests Reviewed**: 15
+**Reviewer**: Test Architect (TEA)
+**Date**: 2026-02-11
+
+### Criteria Results
+
+| # | Criterion | Rating | Notes |
+|---|-----------|--------|-------|
+| 1 | BDD Format | PASS | Clear AC references in docstrings, class-based grouping by scenario |
+| 2 | Test ID Conventions | PASS | All 15 tests have formal IDs (11-1-UNIT-001 through 015) — fixed |
+| 3 | Hard Waits | PASS | No hard waits — synchronous test client |
+| 4 | Determinism | PASS | No conditionals, no random values |
+| 5 | Isolation & Cleanup | PASS | Context manager mocks, no shared mutable state |
+| 6 | Explicit Assertions | PASS | Every test has explicit assert statements |
+| 7 | Test Length | WARN | 440 lines (>300 threshold) — well-organized, splitting not warranted |
+| 8 | Test Duration | PASS | 15 tests in 0.14s (~9ms/test) |
+| 9 | Fixture Patterns | PASS | Clean fixture architecture with _make_table_mock helper |
+| 10 | Data Factories | WARN | Module-level constants adequate for scope; no formal factories |
+| 11 | Network-First | N/A | Unit tests with mocked HTTP client |
+| 12 | Flakiness Patterns | PASS | Fully deterministic mock-based tests |
+
+### Issues Found
+- 0 Critical
+- 1 High: Missing formal test IDs — **Fixed**
+- 1 Medium: File length 440 lines (documented, well-organized)
+- 1 Low: No formal data factories (documented, adequate for scope)
+
+### Fixes Applied
+- Added formal test IDs (11-1-UNIT-001 through 11-1-UNIT-015) to all test docstrings — verified 15 tests pass

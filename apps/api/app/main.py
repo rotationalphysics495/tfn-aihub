@@ -66,6 +66,8 @@ app.include_router(actions.router, prefix="/api/v1/actions", tags=["Actions V1"]
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(pipelines.router, prefix="/api/pipelines", tags=["Pipelines"])
 app.include_router(production.router, prefix="/api/production", tags=["Production"])
+# Story 11.1: Add /api/v1/production alias for versioned API endpoint (AC#1)
+app.include_router(production.router, prefix="/api/v1/production", tags=["Production V1"])
 app.include_router(oee.router, prefix="/api/oee", tags=["OEE"])
 app.include_router(downtime.router, prefix="/api/v1/downtime", tags=["Downtime"])
 app.include_router(safety.router, prefix="/api/safety", tags=["Safety"])

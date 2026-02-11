@@ -9,8 +9,8 @@ AC: #5 - Real-time Data Binding
 """
 
 import logging
-from datetime import datetime
-from typing import List, Optional
+from datetime import date, datetime, timedelta
+from typing import Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
@@ -18,6 +18,11 @@ from pydantic import BaseModel, Field
 from app.core.security import get_current_user
 from app.core.config import get_settings
 from app.models.user import CurrentUser
+from app.schemas.production import (
+    AssetDetail,
+    WorkcenterEntry,
+    WorkcenterSummaryResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -349,4 +354,147 @@ async def get_asset_areas(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to fetch asset areas"
+        )
+
+
+@router.get(
+    "/workcenter-summary",
+    response_model=WorkcenterSummaryResponse,
+    summary="Get Workcenter Production Summary",
+    description="Retrieve production data grouped by workcenter for a given date.",
+)
+async def get_workcenter_summary(
+    report_date: Optional[date] = Query(
+        None,
+        alias="date",
+        description="Report date (YYYY-MM-DD). Defaults to yesterday (T-1).",
+    ),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> WorkcenterSummaryResponse:
+    """
+    Get production summary grouped by workcenter (area).
+
+    Queries assets, daily_summaries, and shift_targets, then aggregates
+    by asset area to produce per-workcenter totals and per-asset breakdowns.
+
+    Story 11.1 AC#1: Workcenter-grouped response with aggregations
+    Story 11.1 AC#2: Empty data returns 200 with message
+    Story 11.1 AC#3: Date defaults to T-1
+    """
+    try:
+        # AC#3: Default to yesterday if no date provided
+        if report_date is None:
+            report_date = date.today() - timedelta(days=1)
+
+        client = await get_supabase_client()
+
+        # Query 1: Fetch all assets
+        assets_response = client.table("assets").select("id, name, area").execute()
+
+        # Query 2: Fetch daily_summaries for the requested date
+        summaries_response = (
+            client.table("daily_summaries")
+            .select("asset_id, units_produced, oee, downtime_minutes")
+            .eq("date", report_date.isoformat())
+            .execute()
+        )
+
+        # AC#2: If no summary data, return empty with message
+        if not summaries_response.data:
+            return WorkcenterSummaryResponse(
+                workcenters=[],
+                report_date=report_date,
+                message=f"No data available for {report_date.isoformat()}",
+            )
+
+        # Query 3: Fetch all shift_targets
+        targets_response = (
+            client.table("shift_targets")
+            .select("asset_id, target_units")
+            .execute()
+        )
+
+        # Build lookup maps
+        # Assets: id -> {name, area}
+        assets_map: Dict[str, dict] = {}
+        for asset in (assets_response.data or []):
+            area = asset.get("area")
+            if not area:
+                continue  # Skip assets with NULL/empty area
+            assets_map[asset["id"]] = {
+                "name": asset["name"],
+                "area": area,
+            }
+
+        # Summaries: asset_id -> summary data
+        summaries_map: Dict[str, dict] = {}
+        for summary in summaries_response.data:
+            summaries_map[summary["asset_id"]] = summary
+
+        # Targets: asset_id -> total target (sum across all shifts)
+        targets_map: Dict[str, int] = {}
+        for target in (targets_response.data or []):
+            asset_id = target["asset_id"]
+            targets_map[asset_id] = targets_map.get(asset_id, 0) + (target.get("target_units") or 0)
+
+        # Group by workcenter (area)
+        workcenters: Dict[str, List[AssetDetail]] = {}
+        for asset_id, summary in summaries_map.items():
+            asset_info = assets_map.get(asset_id)
+            if not asset_info:
+                continue  # Skip if asset not found or has no area
+
+            area = asset_info["area"]
+            actual = summary.get("units_produced") or 0
+            target = targets_map.get(asset_id, 0)
+            oee_val = summary.get("oee")
+            downtime = summary.get("downtime_minutes")
+
+            asset_detail = AssetDetail(
+                asset_id=asset_id,
+                asset_name=asset_info["name"],
+                actual_output=actual,
+                target_output=target,
+                attainment_pct=calculate_percentage(actual, target),
+                oee=float(oee_val) if oee_val is not None else None,
+                downtime_minutes=int(downtime) if downtime is not None else None,
+                hit_target=actual >= target,
+            )
+
+            if area not in workcenters:
+                workcenters[area] = []
+            workcenters[area].append(asset_detail)
+
+        # Build workcenter entries
+        workcenter_entries: List[WorkcenterEntry] = []
+        for area_name in sorted(workcenters.keys()):
+            asset_details = workcenters[area_name]
+            total_actual = sum(a.actual_output for a in asset_details)
+            total_target = sum(a.target_output for a in asset_details)
+            assets_hit = sum(1 for a in asset_details if a.hit_target)
+            assets_missed = len(asset_details) - assets_hit
+
+            entry = WorkcenterEntry(
+                workcenter=area_name,
+                total_actual=total_actual,
+                total_target=total_target,
+                attainment_pct=calculate_percentage(total_actual, total_target),
+                assets_hit=assets_hit,
+                assets_missed=assets_missed,
+                assets=asset_details,
+            )
+            workcenter_entries.append(entry)
+
+        return WorkcenterSummaryResponse(
+            workcenters=workcenter_entries,
+            report_date=report_date,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching workcenter summary: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch workcenter summary data",
         )
