@@ -154,8 +154,8 @@ class TestFinancialSummaryEndpoint:
 
                 # Mock daily_summaries response
                 mock_client.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [
-                    {"asset_id": "asset-1", "downtime_minutes": 30, "waste": 5, "financial_loss": 200.00},
-                    {"asset_id": "asset-2", "downtime_minutes": 45, "waste": 10, "financial_loss": 350.00},
+                    {"asset_id": "asset-1", "downtime_minutes": 30, "waste_count": 5, "financial_loss": 200.00},
+                    {"asset_id": "asset-2", "downtime_minutes": 45, "waste_count": 10, "financial_loss": 350.00},
                 ]
 
                 mock_instance = MagicMock()
@@ -251,7 +251,7 @@ class TestCostOfLossEndpoint:
                     {
                         "asset_id": "asset-1",
                         "downtime_minutes": 60,
-                        "waste": 10,
+                        "waste_count": 10,
                         "financial_loss": 500.00,
                         "oee_percentage": 75.0,
                         "created_at": "2026-01-05T06:00:00Z",
@@ -367,7 +367,7 @@ class TestCostOfLossEndpoint:
                     {
                         "asset_id": "asset-1",
                         "downtime_minutes": 120,
-                        "waste": 20,
+                        "waste_count": 20,
                         "financial_loss": 800.00,
                         "oee_percentage": 80.0,
                         "created_at": "2026-01-05T06:00:00Z",

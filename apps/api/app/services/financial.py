@@ -349,7 +349,7 @@ class FinancialService:
 
             # Query daily_summaries for the date range
             query = client.table("daily_summaries").select(
-                "asset_id, date, downtime_minutes, waste, financial_loss"
+                "asset_id, date, downtime_minutes, waste_count, financial_loss"
             ).eq("asset_id", asset_id)
 
             if start_date == end_date:
@@ -366,7 +366,7 @@ class FinancialService:
 
             for record in response.data or []:
                 total_downtime += record.get("downtime_minutes") or 0
-                total_waste += record.get("waste") or 0
+                total_waste += record.get("waste_count") or 0
 
             # Calculate financial impact
             hourly_rate, hourly_estimated = self.get_hourly_rate(asset_id)

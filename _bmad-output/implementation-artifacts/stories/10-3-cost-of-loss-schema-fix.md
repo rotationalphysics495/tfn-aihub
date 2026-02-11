@@ -1,6 +1,6 @@
 # Story 10.3: Cost of Loss Schema Fix
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -205,10 +205,121 @@ grep -n '"waste"' apps/api/tests/test_financial_api.py
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.6
+
+### Implementation Summary
+Fixed the `waste` -> `waste_count` column name mismatch in 3 Supabase query locations across 2 Python files, plus updated 4 mock data entries in the test file. The `daily_summaries` table schema defines the column as `waste_count` (per migration 0003_analytical_cache.sql), but the older REST API endpoints from Stories 2.7/2.8 incorrectly referenced it as `waste`. This caused waste-related financial calculations to return $0 (or potentially 500 errors depending on PostgREST config).
+
+### Files Created
+- (none)
+
+### Files Modified
+- `apps/api/app/api/financial.py` - Fixed SELECT string and record.get() in get_financial_summary() (line 307, 335) and get_cost_of_loss() (line 484, 495) to use `waste_count` instead of `waste`
+- `apps/api/app/services/financial.py` - Fixed SELECT string and record.get() in get_financial_impact() (line 352, 369) to use `waste_count` instead of `waste`
+- `apps/api/tests/test_financial_api.py` - Updated 4 mock data dictionary entries from key `"waste"` to `"waste_count"` (lines 157, 158, 254, 370)
+
+### Key Decisions
+- Used `replace_all` for the test file's `"waste":` -> `"waste_count":` replacement since all 4 occurrences were bare column-key references that needed updating
+- Verified the agent data source layer (`supabase.py` line 1138) already uses `waste_count` correctly — no changes needed (AC5)
+- Confirmed pre-existing test failures (test_plant_object_model.py, test_smart_summary.py, test_financial_impact.py input schema) are unrelated to this change
+
+### Tests Added
+- `apps/api/tests/test_10_3_cost_of_loss_schema_fix.py` - 19 tests covering all 5 acceptance criteria (pre-written TDD spec, all passing)
+
+### Notes for Reviewer
+- All 19 story-specific tests pass (test_10_3_cost_of_loss_schema_fix.py)
+- All 20 existing financial API tests pass (test_financial_api.py)
+- All 35 agent cost-of-loss tool tests pass (test_cost_of_loss.py)
+- 2 pre-existing failures in test_financial_impact.py (FinancialImpactInput schema issue, unrelated)
+- Full suite: 1911 passed, 45 failed + 43 errors (all pre-existing)
+
+### Test Results
+```
+test_10_3_cost_of_loss_schema_fix.py: 19 passed in 0.13s
+test_financial_api.py: 20 passed in 0.15s
+test_cost_of_loss.py: 35 passed
+test_financial_impact.py: 2 failed (pre-existing), 53 passed
+Full suite: 1911 passed, 45 failed, 43 errors in 29.75s (all failures pre-existing)
+```
+
+### Acceptance Criteria Status
+- [x] AC1 (Daily Summary Query Uses Correct Column Name) - implemented in `apps/api/app/api/financial.py` lines 484, 495
+- [x] AC2 (Financial Summary Query Uses Correct Column Name) - implemented in `apps/api/app/api/financial.py` lines 307, 335
+- [x] AC3 (Financial Impact Service Uses Correct Column Name) - implemented in `apps/api/app/services/financial.py` lines 352, 369
+- [x] AC4 (Existing Tests Updated To Match Schema) - implemented in `apps/api/tests/test_financial_api.py` lines 157, 158, 254, 370
+- [x] AC5 (Agent Data Source Remains Correct) - verified `apps/api/app/services/agent/data_source/supabase.py` line 1138 already uses `waste_count`, no changes needed
 
 ### Debug Log References
 
 ### Completion Notes List
 
 ### File List
+- apps/api/app/api/financial.py
+- apps/api/app/services/financial.py
+- apps/api/tests/test_financial_api.py
+- apps/api/tests/test_10_3_cost_of_loss_schema_fix.py
+
+## Code Review Record
+
+**Reviewer**: Code Review Agent
+**Date**: 2026-02-11
+**Diff Size**: 1103 lines (+1103, -12)
+
+### Checklist Results
+- Acceptance Criteria: PASS
+- Code Quality: PASS
+- Test Coverage: PASS
+- Security: PASS
+
+### Issues Found
+
+| # | Description | Severity | Status |
+|---|-------------|----------|--------|
+| 1 | Unused `timedelta` import in test file (line 15) | LOW | Documented |
+| 2 | Unused `AsyncMock` import in test file (line 16) | LOW | Documented |
+| 3 | `from decimal import Decimal` inside loop body (pre-existing, not part of this change) | LOW | Documented |
+| 4 | Test helper accesses `_supabase_client` private attribute - couples test to internal implementation | LOW | Documented |
+| 5 | Test file is 1045 lines for a 6-line production fix - high ratio, though coverage is thorough | LOW | Documented |
+
+**Totals**: 0 HIGH, 0 MEDIUM, 5 LOW
+
+### Fixes Applied
+None required — all issues are LOW severity.
+
+### Remaining Issues (Low Severity)
+- Unused imports `timedelta` and `AsyncMock` in test_10_3_cost_of_loss_schema_fix.py
+- Pre-existing `from decimal import Decimal` inside loop bodies in financial.py (not introduced by this change)
+- Test helper couples to private `_supabase_client` attribute (acceptable for unit tests)
+- Large test-to-code ratio (acceptable for schema correctness verification)
+
+### Final Status
+Approved
+
+## Test Quality Review
+
+**Quality Score**: 100/100 (A+)
+**Tests Reviewed**: 19 (test_10_3_cost_of_loss_schema_fix.py) + 20 (test_financial_api.py modifications)
+**Reviewer**: TEA (Test Architect)
+**Date**: 2026-02-11
+
+### Criteria Results
+| # | Criterion | Rating |
+|---|-----------|--------|
+| 1 | BDD Format (Given-When-Then) | PASS - All 19 tests have explicit GWT docstrings |
+| 2 | Test ID Conventions | PASS - UNIT-001 through UNIT-013, INT-001 through INT-006 |
+| 3 | Hard Waits Detection | PASS - No hard waits |
+| 4 | Determinism | PASS - No non-deterministic patterns |
+| 5 | Isolation & Cleanup | PASS - Context managers ensure cleanup |
+| 6 | Explicit Assertions | PASS - 44 assertions with descriptive messages |
+| 7 | Test Length | WARN - 1045 lines (acceptable for 5 ACs, 19 tests) |
+| 8 | Test Duration | PASS - 0.14s total |
+| 9 | Fixture Patterns | PASS - Shared conftest + helper method |
+| 10 | Data Factories | WARN - Inline data (acceptable for schema tests) |
+| 11 | Network-First Pattern | N/A - No E2E tests |
+| 12 | Flakiness Patterns | PASS - No flaky patterns |
+
+### Issues Found
+- 0 Critical, 0 High, 1 Medium, 4 Low
+
+### Fixes Applied
+- Removed unused imports `timedelta`, `AsyncMock`, `call` from test_10_3_cost_of_loss_schema_fix.py (3 LOW issues fixed)
