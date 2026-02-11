@@ -12,6 +12,7 @@ document_output_language: "{config_source}:document_output_language"
 date: system-generated
 planning_artifacts: "{config_source}:planning_artifacts"
 implementation_artifacts: "{config_source}:implementation_artifacts"
+project_context: "**/project-context.md"
 
 installed_path: "{project-root}/_bmad/bmm/workflows/4-implementation/retrospective"
 template: false
@@ -53,5 +54,3 @@ input_file_patterns:
 sprint_status_file: "{implementation_artifacts}/sprint-status.yaml"
 story_directory: "{implementation_artifacts}"
 retrospectives_folder: "{implementation_artifacts}"
-
-standalone: true
