@@ -41,7 +41,8 @@ async function seed() {
   console.log('🧹 Clearing existing data...');
   await supabase.from('safety_events').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   await supabase.from('live_snapshots').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-  console.log('  ✓ Cleared safety_events and live_snapshots');
+  await supabase.from('shift_targets').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  console.log('  ✓ Cleared safety_events, live_snapshots, and shift_targets');
 
   // 1. Assets (Epic 5 UAT: 5-8 assets required, including Grinder 5)
   console.log('📦 Inserting assets...');
@@ -278,13 +279,13 @@ async function seed() {
       asset_id: 'a0000001-0000-0000-0000-000000000005',
       report_date: daysAgo(1),
       oee_percentage: 95.80,
-      actual_output: 1868,
+      actual_output: 1960,
       target_output: 1950,
       downtime_minutes: 0,
       waste_count: 15,
       financial_loss_dollars: 0,
       downtime_reasons: {},
-      smart_summary_text: 'Perfect uptime day! Grinder 2 running flawlessly on French press coarse grind.'
+      smart_summary_text: 'Perfect uptime day! Grinder 2 running flawlessly on French press coarse grind. Exceeded daily target.'
     },
     {
       asset_id: 'a0000001-0000-0000-0000-000000000005',
@@ -536,13 +537,13 @@ async function seed() {
       asset_id: 'a0000001-0000-0000-0000-000000000002',
       report_date: daysAgo(1),
       oee_percentage: 96.10,
-      actual_output: 137,
+      actual_output: 145,
       target_output: 143,
       downtime_minutes: 10,
       waste_count: 1,
       financial_loss_dollars: 41.67,
       downtime_reasons: { "Changeover": 10 },
-      smart_summary_text: 'Best performing roaster yesterday. Dark roast blend running flawlessly.'
+      smart_summary_text: 'Best performing roaster yesterday. Dark roast blend running flawlessly. Exceeded daily target.'
     },
     {
       asset_id: 'a0000001-0000-0000-0000-000000000002',
@@ -615,6 +616,178 @@ async function seed() {
       financial_loss_dollars: 116.67,
       downtime_reasons: { "Changeover": 18, "Cleanup": 10 },
       smart_summary_text: 'Reliable start to the week.'
+    },
+
+    // ============ FILLER LINE B - 7 days ============
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000009',
+      report_date: daysAgo(1),
+      oee_percentage: 89.20,
+      actual_output: 4650,
+      target_output: 4600,
+      downtime_minutes: 42,
+      waste_count: 65,
+      financial_loss_dollars: 87.50,
+      downtime_reasons: { "Changeover": 25, "Cleanup": 17 },
+      smart_summary_text: 'Outstanding day on 2lb bag line. Exceeded daily target. Weight variance within spec.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000009',
+      report_date: daysAgo(2),
+      oee_percentage: 91.80,
+      actual_output: 4223,
+      target_output: 4600,
+      downtime_minutes: 30,
+      waste_count: 50,
+      financial_loss_dollars: 62.50,
+      downtime_reasons: { "Changeover": 20, "Cleanup": 10 },
+      smart_summary_text: 'Steady filling. Degassing valve placement accuracy improved.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000009',
+      report_date: daysAgo(3),
+      oee_percentage: 94.30,
+      actual_output: 4338,
+      target_output: 4600,
+      downtime_minutes: 18,
+      waste_count: 35,
+      financial_loss_dollars: 37.50,
+      downtime_reasons: { "Changeover": 18 },
+      smart_summary_text: 'Outstanding day. Bag sealing quality excellent throughout.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000009',
+      report_date: daysAgo(4),
+      oee_percentage: 87.50,
+      actual_output: 4025,
+      target_output: 4600,
+      downtime_minutes: 48,
+      waste_count: 72,
+      financial_loss_dollars: 100.00,
+      downtime_reasons: { "Film Tension": 30, "Changeover": 18 },
+      smart_summary_text: 'Film tension issues caused periodic stops.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000009',
+      report_date: daysAgo(5),
+      oee_percentage: 90.60,
+      actual_output: 4168,
+      target_output: 4600,
+      downtime_minutes: 35,
+      waste_count: 55,
+      financial_loss_dollars: 72.92,
+      downtime_reasons: { "Changeover": 22, "Cleanup": 13 },
+      smart_summary_text: 'Consistent filling with minor adjustments.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000009',
+      report_date: daysAgo(6),
+      oee_percentage: 93.10,
+      actual_output: 4283,
+      target_output: 4600,
+      downtime_minutes: 22,
+      waste_count: 40,
+      financial_loss_dollars: 45.83,
+      downtime_reasons: { "Cleanup": 22 },
+      smart_summary_text: 'Excellent bag weight consistency.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000009',
+      report_date: daysAgo(7),
+      oee_percentage: 88.90,
+      actual_output: 4089,
+      target_output: 4600,
+      downtime_minutes: 40,
+      waste_count: 60,
+      financial_loss_dollars: 83.33,
+      downtime_reasons: { "Changeover": 25, "Operator Break": 15 },
+      smart_summary_text: 'Good start to the week on 1lb bag line.'
+    },
+
+    // ============ FILLER LINE C - 7 days ============
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000010',
+      report_date: daysAgo(1),
+      oee_percentage: 80.00,
+      actual_output: 3200,
+      target_output: 4000,
+      downtime_minutes: 62,
+      waste_count: 75,
+      financial_loss_dollars: 129.17,
+      downtime_reasons: { "Bag Feed Issue": 40, "Changeover": 22 },
+      smart_summary_text: 'Filler C had bag feed issues on specialty blend line. Throughput reduced.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000010',
+      report_date: daysAgo(2),
+      oee_percentage: 88.50,
+      actual_output: 3540,
+      target_output: 4000,
+      downtime_minutes: 38,
+      waste_count: 55,
+      financial_loss_dollars: 79.17,
+      downtime_reasons: { "Changeover": 25, "Cleanup": 13 },
+      smart_summary_text: 'Good output with minor feed adjustments.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000010',
+      report_date: daysAgo(3),
+      oee_percentage: 93.20,
+      actual_output: 3728,
+      target_output: 4000,
+      downtime_minutes: 20,
+      waste_count: 35,
+      financial_loss_dollars: 41.67,
+      downtime_reasons: { "Changeover": 20 },
+      smart_summary_text: 'Outstanding day. New nozzle configuration working well.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000010',
+      report_date: daysAgo(4),
+      oee_percentage: 86.80,
+      actual_output: 3472,
+      target_output: 4000,
+      downtime_minutes: 45,
+      waste_count: 62,
+      financial_loss_dollars: 93.75,
+      downtime_reasons: { "Bag Feed Issue": 30, "Changeover": 15 },
+      smart_summary_text: 'Bag feed alignment needed adjustment mid-shift.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000010',
+      report_date: daysAgo(5),
+      oee_percentage: 90.50,
+      actual_output: 3620,
+      target_output: 4000,
+      downtime_minutes: 32,
+      waste_count: 48,
+      financial_loss_dollars: 66.67,
+      downtime_reasons: { "Changeover": 22, "Cleanup": 10 },
+      smart_summary_text: 'Steady performance on single-serve pods.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000010',
+      report_date: daysAgo(6),
+      oee_percentage: 94.00,
+      actual_output: 3760,
+      target_output: 4000,
+      downtime_minutes: 15,
+      waste_count: 30,
+      financial_loss_dollars: 31.25,
+      downtime_reasons: { "Cleanup": 15 },
+      smart_summary_text: 'Excellent run. Minimal downtime.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000010',
+      report_date: daysAgo(7),
+      oee_percentage: 87.30,
+      actual_output: 3492,
+      target_output: 4000,
+      downtime_minutes: 42,
+      waste_count: 58,
+      financial_loss_dollars: 87.50,
+      downtime_reasons: { "Bag Feed Issue": 27, "Changeover": 15 },
+      smart_summary_text: 'Some initial startup delays but recovered well.'
     },
 
     // ============ FILLER A - 7 days ============
@@ -789,6 +962,350 @@ async function seed() {
       smart_summary_text: 'Solid week start with routine changeovers.'
     },
 
+    // ============ ROASTER 3 - 7 days ============
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000003',
+      report_date: daysAgo(1),
+      oee_percentage: 89.00,
+      actual_output: 127,
+      target_output: 143,
+      downtime_minutes: 35,
+      waste_count: 4,
+      financial_loss_dollars: 145.83,
+      downtime_reasons: { "Cooling Cycle": 22, "Changeover": 13 },
+      smart_summary_text: 'Roaster 3 performing well on medium roast batch. Minor cooling cycle adjustment.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000003',
+      report_date: daysAgo(2),
+      oee_percentage: 91.50,
+      actual_output: 131,
+      target_output: 143,
+      downtime_minutes: 25,
+      waste_count: 3,
+      financial_loss_dollars: 104.17,
+      downtime_reasons: { "Changeover": 25 },
+      smart_summary_text: 'Consistent performance. Light roast Ethiopian beans processed smoothly.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000003',
+      report_date: daysAgo(3),
+      oee_percentage: 86.20,
+      actual_output: 123,
+      target_output: 143,
+      downtime_minutes: 48,
+      waste_count: 5,
+      financial_loss_dollars: 200.00,
+      downtime_reasons: { "Changeover": 30, "Cleanup": 18 },
+      smart_summary_text: 'Extended changeover for specialty blend caused throughput reduction.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000003',
+      report_date: daysAgo(4),
+      oee_percentage: 93.80,
+      actual_output: 134,
+      target_output: 143,
+      downtime_minutes: 18,
+      waste_count: 2,
+      financial_loss_dollars: 75.00,
+      downtime_reasons: { "Changeover": 18 },
+      smart_summary_text: 'Excellent batch consistency. Dark roast profile running optimally.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000003',
+      report_date: daysAgo(5),
+      oee_percentage: 88.10,
+      actual_output: 126,
+      target_output: 143,
+      downtime_minutes: 40,
+      waste_count: 4,
+      financial_loss_dollars: 166.67,
+      downtime_reasons: { "Material Issue": 25, "Changeover": 15 },
+      smart_summary_text: 'Some first-crack timing variance on new bean lot.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000003',
+      report_date: daysAgo(6),
+      oee_percentage: 90.90,
+      actual_output: 130,
+      target_output: 143,
+      downtime_minutes: 28,
+      waste_count: 3,
+      financial_loss_dollars: 116.67,
+      downtime_reasons: { "Changeover": 18, "Cleanup": 10 },
+      smart_summary_text: 'Steady roasting day. Chaff system operating normally.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000003',
+      report_date: daysAgo(7),
+      oee_percentage: 87.40,
+      actual_output: 125,
+      target_output: 143,
+      downtime_minutes: 42,
+      waste_count: 5,
+      financial_loss_dollars: 175.00,
+      downtime_reasons: { "Cooling System": 30, "Changeover": 12 },
+      smart_summary_text: 'Minor cooling delays on larger batch sizes.'
+    },
+
+    // ============ GRINDER 4 - 7 days ============
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000007',
+      report_date: daysAgo(1),
+      oee_percentage: 87.18,
+      actual_output: 1700,
+      target_output: 1950,
+      downtime_minutes: 50,
+      waste_count: 35,
+      financial_loss_dollars: 145.83,
+      downtime_reasons: { "Feed Rate Issue": 32, "Changeover": 18 },
+      smart_summary_text: 'Grinder 4 running at moderate pace. Feed rate adjustment needed mid-shift.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000007',
+      report_date: daysAgo(2),
+      oee_percentage: 91.30,
+      actual_output: 1780,
+      target_output: 1950,
+      downtime_minutes: 30,
+      waste_count: 22,
+      financial_loss_dollars: 87.50,
+      downtime_reasons: { "Changeover": 20, "Cleanup": 10 },
+      smart_summary_text: 'Good performance on medium grind setting.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000007',
+      report_date: daysAgo(3),
+      oee_percentage: 85.40,
+      actual_output: 1665,
+      target_output: 1950,
+      downtime_minutes: 58,
+      waste_count: 40,
+      financial_loss_dollars: 169.17,
+      downtime_reasons: { "Hopper Feed Issue": 38, "Changeover": 20 },
+      smart_summary_text: 'Hopper feed issues caused intermittent slowdowns.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000007',
+      report_date: daysAgo(4),
+      oee_percentage: 89.70,
+      actual_output: 1749,
+      target_output: 1950,
+      downtime_minutes: 38,
+      waste_count: 28,
+      financial_loss_dollars: 110.83,
+      downtime_reasons: { "Changeover": 25, "Cleanup": 13 },
+      smart_summary_text: 'Steady grinding with minor adjustments.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000007',
+      report_date: daysAgo(5),
+      oee_percentage: 93.20,
+      actual_output: 1817,
+      target_output: 1950,
+      downtime_minutes: 22,
+      waste_count: 18,
+      financial_loss_dollars: 64.17,
+      downtime_reasons: { "Changeover": 22 },
+      smart_summary_text: 'Excellent day. Consistent particle size throughout.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000007',
+      report_date: daysAgo(6),
+      oee_percentage: 86.50,
+      actual_output: 1687,
+      target_output: 1950,
+      downtime_minutes: 52,
+      waste_count: 35,
+      financial_loss_dollars: 151.67,
+      downtime_reasons: { "Material Issue": 35, "Changeover": 17 },
+      smart_summary_text: 'Bean moisture caused grind inconsistency.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000007',
+      report_date: daysAgo(7),
+      oee_percentage: 90.80,
+      actual_output: 1771,
+      target_output: 1950,
+      downtime_minutes: 32,
+      waste_count: 24,
+      financial_loss_dollars: 93.33,
+      downtime_reasons: { "Changeover": 22, "Cleanup": 10 },
+      smart_summary_text: 'Solid start to the week.'
+    },
+
+    // ============ PACKAGING LINE 2 - 7 days ============
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000012',
+      report_date: daysAgo(1),
+      oee_percentage: 88.90,
+      actual_output: 6300,
+      target_output: 6200,
+      downtime_minutes: 45,
+      waste_count: 78,
+      financial_loss_dollars: 71.25,
+      downtime_reasons: { "Label Changeover": 30, "Jam": 15 },
+      smart_summary_text: 'Excellent day on wholesale pack line. Exceeded daily target. Case sealing quality excellent.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000012',
+      report_date: daysAgo(2),
+      oee_percentage: 91.20,
+      actual_output: 5654,
+      target_output: 6200,
+      downtime_minutes: 32,
+      waste_count: 60,
+      financial_loss_dollars: 50.67,
+      downtime_reasons: { "Changeover": 22, "Cleanup": 10 },
+      smart_summary_text: 'Consistent throughput. Shrink wrap tension optimized.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000012',
+      report_date: daysAgo(3),
+      oee_percentage: 93.50,
+      actual_output: 5797,
+      target_output: 6200,
+      downtime_minutes: 20,
+      waste_count: 45,
+      financial_loss_dollars: 31.67,
+      downtime_reasons: { "Changeover": 20 },
+      smart_summary_text: 'Excellent run on bulk case packing.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000012',
+      report_date: daysAgo(4),
+      oee_percentage: 86.80,
+      actual_output: 5382,
+      target_output: 6200,
+      downtime_minutes: 55,
+      waste_count: 85,
+      financial_loss_dollars: 87.08,
+      downtime_reasons: { "Labeler Jam": 35, "Changeover": 20 },
+      smart_summary_text: 'Labeler jam caused extended changeover.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000012',
+      report_date: daysAgo(5),
+      oee_percentage: 90.50,
+      actual_output: 5611,
+      target_output: 6200,
+      downtime_minutes: 35,
+      waste_count: 62,
+      financial_loss_dollars: 55.42,
+      downtime_reasons: { "Changeover": 25, "Cleanup": 10 },
+      smart_summary_text: 'Good recovery from yesterday issues.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000012',
+      report_date: daysAgo(6),
+      oee_percentage: 94.20,
+      actual_output: 5840,
+      target_output: 6200,
+      downtime_minutes: 15,
+      waste_count: 38,
+      financial_loss_dollars: 23.75,
+      downtime_reasons: { "Cleanup": 15 },
+      smart_summary_text: 'Outstanding day. Minimal changeovers needed.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000012',
+      report_date: daysAgo(7),
+      oee_percentage: 87.50,
+      actual_output: 5425,
+      target_output: 6200,
+      downtime_minutes: 48,
+      waste_count: 72,
+      financial_loss_dollars: 76.00,
+      downtime_reasons: { "Changeover": 30, "Label Issue": 18 },
+      smart_summary_text: 'Moderate start to the week.'
+    },
+
+    // ============ PACKAGING LINE 3 - 7 days ============
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000013',
+      report_date: daysAgo(1),
+      oee_percentage: 87.50,
+      actual_output: 4900,
+      target_output: 5600,
+      downtime_minutes: 55,
+      waste_count: 80,
+      financial_loss_dollars: 87.08,
+      downtime_reasons: { "Film Feed": 35, "Changeover": 20 },
+      smart_summary_text: 'Packaging Line 3 running slightly below target. Film feed alignment.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000013',
+      report_date: daysAgo(2),
+      oee_percentage: 90.20,
+      actual_output: 5051,
+      target_output: 5600,
+      downtime_minutes: 38,
+      waste_count: 62,
+      financial_loss_dollars: 60.17,
+      downtime_reasons: { "Changeover": 25, "Cleanup": 13 },
+      smart_summary_text: 'Good performance. Carton sealing quality improved.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000013',
+      report_date: daysAgo(3),
+      oee_percentage: 85.80,
+      actual_output: 4805,
+      target_output: 5600,
+      downtime_minutes: 62,
+      waste_count: 95,
+      financial_loss_dollars: 98.17,
+      downtime_reasons: { "Label Applicator": 40, "Changeover": 22 },
+      smart_summary_text: 'Label applicator needed recalibration mid-shift.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000013',
+      report_date: daysAgo(4),
+      oee_percentage: 91.40,
+      actual_output: 5118,
+      target_output: 5600,
+      downtime_minutes: 30,
+      waste_count: 50,
+      financial_loss_dollars: 47.50,
+      downtime_reasons: { "Changeover": 20, "Cleanup": 10 },
+      smart_summary_text: 'Strong day. Case erector running smoothly.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000013',
+      report_date: daysAgo(5),
+      oee_percentage: 88.60,
+      actual_output: 4962,
+      target_output: 5600,
+      downtime_minutes: 45,
+      waste_count: 70,
+      financial_loss_dollars: 71.25,
+      downtime_reasons: { "Changeover": 28, "Jam": 17 },
+      smart_summary_text: 'Moderate output with some changeover delays.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000013',
+      report_date: daysAgo(6),
+      oee_percentage: 92.80,
+      actual_output: 5197,
+      target_output: 5600,
+      downtime_minutes: 22,
+      waste_count: 42,
+      financial_loss_dollars: 34.83,
+      downtime_reasons: { "Changeover": 22 },
+      smart_summary_text: 'Excellent performance on retail pack line.'
+    },
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000013',
+      report_date: daysAgo(7),
+      oee_percentage: 86.40,
+      actual_output: 4838,
+      target_output: 5600,
+      downtime_minutes: 55,
+      waste_count: 78,
+      financial_loss_dollars: 87.08,
+      downtime_reasons: { "Case Erector": 35, "Changeover": 20 },
+      smart_summary_text: 'Some case erector issues at start of shift.'
+    },
+
     // ============ TODAY (daysAgo(0)) - Partial day data for all key assets ============
     // Grinder 5 — running rough this morning, carryover from yesterday's issues
     {
@@ -903,6 +1420,50 @@ async function seed() {
   const { error: summariesErr } = await supabase.from('daily_summaries').upsert(summariesWithoutReasons, { onConflict: 'asset_id,report_date' });
   if (summariesErr) console.error('  Daily summaries error:', summariesErr.message);
   else console.log('  ✓ Daily summaries inserted (note: downtime_reasons requires manual migration)');
+
+  // 3b. Shift Targets (Story 11.3: Production targets per shift for all 14 assets)
+  console.log('🎯 Inserting shift targets...');
+  const shiftTargets = [
+    // Roasters: each sums to 143 (morning=50, afternoon=48, night=45)
+    { asset_id: 'a0000001-0000-0000-0000-000000000001', target_output: 50, shift: 'morning', effective_date: '2026-01-01' },
+    { asset_id: 'a0000001-0000-0000-0000-000000000001', target_output: 48, shift: 'afternoon', effective_date: '2026-01-01' },
+    { asset_id: 'a0000001-0000-0000-0000-000000000001', target_output: 45, shift: 'night', effective_date: '2026-01-01' },
+    { asset_id: 'a0000001-0000-0000-0000-000000000002', target_output: 50, shift: 'morning', effective_date: '2026-01-01' },
+    { asset_id: 'a0000001-0000-0000-0000-000000000002', target_output: 48, shift: 'afternoon', effective_date: '2026-01-01' },
+    { asset_id: 'a0000001-0000-0000-0000-000000000002', target_output: 45, shift: 'night', effective_date: '2026-01-01' },
+    { asset_id: 'a0000001-0000-0000-0000-000000000003', target_output: 50, shift: 'morning', effective_date: '2026-01-01' },
+    { asset_id: 'a0000001-0000-0000-0000-000000000003', target_output: 48, shift: 'afternoon', effective_date: '2026-01-01' },
+    { asset_id: 'a0000001-0000-0000-0000-000000000003', target_output: 45, shift: 'night', effective_date: '2026-01-01' },
+    // Grinders: each sums to 1950
+    { asset_id: 'a0000001-0000-0000-0000-000000000004', target_output: 1000, shift: 'morning', effective_date: '2026-01-01' },
+    { asset_id: 'a0000001-0000-0000-0000-000000000004', target_output: 950, shift: 'afternoon', effective_date: '2026-01-01' },
+    { asset_id: 'a0000001-0000-0000-0000-000000000005', target_output: 1000, shift: 'morning', effective_date: '2026-01-01' },
+    { asset_id: 'a0000001-0000-0000-0000-000000000005', target_output: 950, shift: 'afternoon', effective_date: '2026-01-01' },
+    { asset_id: 'a0000001-0000-0000-0000-000000000006', target_output: 900, shift: 'morning', effective_date: '2026-01-01' },
+    { asset_id: 'a0000001-0000-0000-0000-000000000006', target_output: 1050, shift: 'afternoon', effective_date: '2026-01-01' },
+    { asset_id: 'a0000001-0000-0000-0000-000000000007', target_output: 850, shift: 'morning', effective_date: '2026-01-01' },
+    { asset_id: 'a0000001-0000-0000-0000-000000000007', target_output: 1100, shift: 'afternoon', effective_date: '2026-01-01' },
+    { asset_id: 'a0000001-0000-0000-0000-000000000014', target_output: 1000, shift: 'morning', effective_date: '2026-01-01' },
+    { asset_id: 'a0000001-0000-0000-0000-000000000014', target_output: 950, shift: 'afternoon', effective_date: '2026-01-01' },
+    // Fillers: A/B sum to 4600, C sums to 4000
+    { asset_id: 'a0000001-0000-0000-0000-000000000008', target_output: 2400, shift: 'morning', effective_date: '2026-01-01' },
+    { asset_id: 'a0000001-0000-0000-0000-000000000008', target_output: 2200, shift: 'afternoon', effective_date: '2026-01-01' },
+    { asset_id: 'a0000001-0000-0000-0000-000000000009', target_output: 2400, shift: 'morning', effective_date: '2026-01-01' },
+    { asset_id: 'a0000001-0000-0000-0000-000000000009', target_output: 2200, shift: 'afternoon', effective_date: '2026-01-01' },
+    { asset_id: 'a0000001-0000-0000-0000-000000000010', target_output: 2000, shift: 'morning', effective_date: '2026-01-01' },
+    { asset_id: 'a0000001-0000-0000-0000-000000000010', target_output: 2000, shift: 'afternoon', effective_date: '2026-01-01' },
+    // Packaging: 1/2 sum to 6200, 3 sums to 5600
+    { asset_id: 'a0000001-0000-0000-0000-000000000011', target_output: 3200, shift: 'morning', effective_date: '2026-01-01' },
+    { asset_id: 'a0000001-0000-0000-0000-000000000011', target_output: 3000, shift: 'afternoon', effective_date: '2026-01-01' },
+    { asset_id: 'a0000001-0000-0000-0000-000000000012', target_output: 3200, shift: 'morning', effective_date: '2026-01-01' },
+    { asset_id: 'a0000001-0000-0000-0000-000000000012', target_output: 3000, shift: 'afternoon', effective_date: '2026-01-01' },
+    { asset_id: 'a0000001-0000-0000-0000-000000000013', target_output: 2800, shift: 'morning', effective_date: '2026-01-01' },
+    { asset_id: 'a0000001-0000-0000-0000-000000000013', target_output: 2800, shift: 'afternoon', effective_date: '2026-01-01' },
+  ];
+
+  const { error: shiftTargetsErr } = await supabase.from('shift_targets').insert(shiftTargets);
+  if (shiftTargetsErr) console.error('  Shift targets error:', shiftTargetsErr.message);
+  else console.log('  ✓ Shift targets inserted for all 14 assets');
 
   // 4. Live Snapshots (Epic 5 UAT: Fresh snapshots for all key assets including Grinder 5)
   console.log('⚡ Inserting live snapshots...');

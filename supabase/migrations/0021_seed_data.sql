@@ -82,34 +82,42 @@ ON CONFLICT DO NOTHING;
 -- Packaging: ~3000-3500 cases per shift
 
 INSERT INTO shift_targets (asset_id, target_output, shift, effective_date) VALUES
-    -- Roaster targets (batches)
-    ('a0000001-0000-0000-0000-000000000001', 48, 'morning', '2026-01-01'),
-    ('a0000001-0000-0000-0000-000000000001', 45, 'afternoon', '2026-01-01'),
-    ('a0000001-0000-0000-0000-000000000001', 40, 'night', '2026-01-01'),
-    ('a0000001-0000-0000-0000-000000000002', 48, 'morning', '2026-01-01'),
-    ('a0000001-0000-0000-0000-000000000002', 45, 'afternoon', '2026-01-01'),
-    ('a0000001-0000-0000-0000-000000000003', 42, 'morning', '2026-01-01'),
-    ('a0000001-0000-0000-0000-000000000003', 42, 'afternoon', '2026-01-01'),
-    -- Grinder targets (lbs processed)
+    -- Roaster targets (batches) - each sums to 143
+    ('a0000001-0000-0000-0000-000000000001', 50, 'morning', '2026-01-01'),
+    ('a0000001-0000-0000-0000-000000000001', 48, 'afternoon', '2026-01-01'),
+    ('a0000001-0000-0000-0000-000000000001', 45, 'night', '2026-01-01'),
+    ('a0000001-0000-0000-0000-000000000002', 50, 'morning', '2026-01-01'),
+    ('a0000001-0000-0000-0000-000000000002', 48, 'afternoon', '2026-01-01'),
+    ('a0000001-0000-0000-0000-000000000002', 45, 'night', '2026-01-01'),
+    ('a0000001-0000-0000-0000-000000000003', 50, 'morning', '2026-01-01'),
+    ('a0000001-0000-0000-0000-000000000003', 48, 'afternoon', '2026-01-01'),
+    ('a0000001-0000-0000-0000-000000000003', 45, 'night', '2026-01-01'),
+    -- Grinder targets (lbs processed) - each sums to 1950
     ('a0000001-0000-0000-0000-000000000004', 1000, 'morning', '2026-01-01'),
     ('a0000001-0000-0000-0000-000000000004', 950, 'afternoon', '2026-01-01'),
     ('a0000001-0000-0000-0000-000000000005', 1000, 'morning', '2026-01-01'),
     ('a0000001-0000-0000-0000-000000000005', 950, 'afternoon', '2026-01-01'),
     ('a0000001-0000-0000-0000-000000000006', 900, 'morning', '2026-01-01'),
+    ('a0000001-0000-0000-0000-000000000006', 1050, 'afternoon', '2026-01-01'),
     ('a0000001-0000-0000-0000-000000000007', 850, 'morning', '2026-01-01'),
-    -- Grinder 5 targets (Epic 5 UAT key asset)
+    ('a0000001-0000-0000-0000-000000000007', 1100, 'afternoon', '2026-01-01'),
+    -- Grinder 5 targets (Epic 5 UAT key asset) - sums to 1950
     ('a0000001-0000-0000-0000-000000000014', 1000, 'morning', '2026-01-01'),
     ('a0000001-0000-0000-0000-000000000014', 950, 'afternoon', '2026-01-01'),
-    -- Filler targets (bags filled)
+    -- Filler targets (bags filled) - A/B sum to 4600, C sums to 4000
     ('a0000001-0000-0000-0000-000000000008', 2400, 'morning', '2026-01-01'),
     ('a0000001-0000-0000-0000-000000000008', 2200, 'afternoon', '2026-01-01'),
     ('a0000001-0000-0000-0000-000000000009', 2400, 'morning', '2026-01-01'),
+    ('a0000001-0000-0000-0000-000000000009', 2200, 'afternoon', '2026-01-01'),
     ('a0000001-0000-0000-0000-000000000010', 2000, 'morning', '2026-01-01'),
-    -- Packaging targets (cases packed)
+    ('a0000001-0000-0000-0000-000000000010', 2000, 'afternoon', '2026-01-01'),
+    -- Packaging targets (cases packed) - 1/2 sum to 6200, 3 sums to 5600
     ('a0000001-0000-0000-0000-000000000011', 3200, 'morning', '2026-01-01'),
     ('a0000001-0000-0000-0000-000000000011', 3000, 'afternoon', '2026-01-01'),
     ('a0000001-0000-0000-0000-000000000012', 3200, 'morning', '2026-01-01'),
-    ('a0000001-0000-0000-0000-000000000013', 2800, 'morning', '2026-01-01')
+    ('a0000001-0000-0000-0000-000000000012', 3000, 'afternoon', '2026-01-01'),
+    ('a0000001-0000-0000-0000-000000000013', 2800, 'morning', '2026-01-01'),
+    ('a0000001-0000-0000-0000-000000000013', 2800, 'afternoon', '2026-01-01')
 ON CONFLICT DO NOTHING;
 
 -- ============================================================================
@@ -117,51 +125,131 @@ ON CONFLICT DO NOTHING;
 -- ============================================================================
 
 INSERT INTO daily_summaries (asset_id, report_date, oee_percentage, actual_output, target_output, downtime_minutes, waste_count, financial_loss_dollars, smart_summary_text) VALUES
-    -- Roaster 1 - Last 7 days (quality-focused narratives)
-    ('a0000001-0000-0000-0000-000000000001', CURRENT_DATE - 1, 87.50, 125, 143, 45, 8, 1450.00, 'Roaster 1 experienced cooling system issues causing extended batch cycle times. 8 batches discarded due to over-roasting. Maintenance investigating root cause.'),
-    ('a0000001-0000-0000-0000-000000000001', CURRENT_DATE - 2, 94.20, 135, 143, 18, 1, 75.00, 'Outstanding roasting day. Colombian single-origin profile nailed consistently. Minimal waste from one overroasted batch.'),
-    ('a0000001-0000-0000-0000-000000000001', CURRENT_DATE - 3, 65.50, 94, 143, 145, 12, 1250.00, 'Drum temperature sensor malfunction caused extended downtime. Calibration team called in. 12 batches below spec discarded. Significant production loss due to equipment failure.'),
+    -- ============ ROASTER 1 - 7 days (target_output=143) ============
+    ('a0000001-0000-0000-0000-000000000001', CURRENT_DATE - 1, 87.50, 125, 143, 45, 8, 187.50, 'Roaster 1 experienced cooling system issues causing extended batch cycle times.'),
+    ('a0000001-0000-0000-0000-000000000001', CURRENT_DATE - 2, 94.20, 135, 143, 18, 1, 75.00, 'Outstanding roasting day. Colombian single-origin profile nailed consistently.'),
+    ('a0000001-0000-0000-0000-000000000001', CURRENT_DATE - 3, 75.80, 108, 143, 95, 8, 395.83, 'Drum temperature sensor malfunction caused extended downtime.'),
     ('a0000001-0000-0000-0000-000000000001', CURRENT_DATE - 4, 91.50, 131, 143, 25, 2, 104.17, 'Strong recovery post-maintenance. Ethiopian Yirgacheffe roast profile optimized.'),
-    ('a0000001-0000-0000-0000-000000000001', CURRENT_DATE - 5, 87.20, 125, 143, 42, 4, 175.00, 'Green bean moisture variance caused adjustments mid-shift. QC approved all batches after profile tweaks.'),
-    ('a0000001-0000-0000-0000-000000000001', CURRENT_DATE - 6, 92.80, 133, 143, 22, 2, 91.67, 'Smooth operation. New Brazilian beans roasting beautifully at current profile settings.'),
-    ('a0000001-0000-0000-0000-000000000001', CURRENT_DATE - 7, 88.40, 126, 143, 38, 5, 158.33, 'Chaff collection system cleaned during shift. Brief stoppage but prevented longer issue.'),
+    ('a0000001-0000-0000-0000-000000000001', CURRENT_DATE - 5, 87.20, 125, 143, 42, 4, 175.00, 'Green bean moisture variance caused adjustments mid-shift.'),
+    ('a0000001-0000-0000-0000-000000000001', CURRENT_DATE - 6, 92.80, 133, 143, 22, 2, 91.67, 'Smooth operation. New Brazilian beans roasting beautifully.'),
+    ('a0000001-0000-0000-0000-000000000001', CURRENT_DATE - 7, 88.40, 126, 143, 38, 5, 158.33, 'Chaff collection system cleaned during shift.'),
 
-    -- Roaster 2 - Last 7 days
-    ('a0000001-0000-0000-0000-000000000002', CURRENT_DATE - 1, 96.10, 137, 143, 10, 1, 41.67, 'Best performing roaster yesterday. Dark roast blend production running flawlessly.'),
-    ('a0000001-0000-0000-0000-000000000002', CURRENT_DATE - 2, 85.30, 122, 143, 55, 6, 229.17, 'Burner ignition issue caused startup delays. Maintenance addressed - monitoring closely.'),
+    -- ============ ROASTER 2 - 7 days (target_output=143) ============
+    ('a0000001-0000-0000-0000-000000000002', CURRENT_DATE - 1, 96.10, 145, 143, 10, 1, 41.67, 'Best performing roaster yesterday. Dark roast blend running flawlessly.'),
+    ('a0000001-0000-0000-0000-000000000002', CURRENT_DATE - 2, 85.30, 122, 143, 55, 6, 229.17, 'Burner ignition issue caused startup delays.'),
     ('a0000001-0000-0000-0000-000000000002', CURRENT_DATE - 3, 93.00, 133, 143, 20, 2, 83.33, 'Consistent performance. Decaf Swiss Water batch processed successfully.'),
+    ('a0000001-0000-0000-0000-000000000002', CURRENT_DATE - 4, 90.50, 129, 143, 30, 3, 125.00, 'Steady roasting with routine maintenance.'),
+    ('a0000001-0000-0000-0000-000000000002', CURRENT_DATE - 5, 94.40, 135, 143, 15, 1, 62.50, 'Outstanding performance on medium roast blend.'),
+    ('a0000001-0000-0000-0000-000000000002', CURRENT_DATE - 6, 89.50, 128, 143, 35, 4, 145.83, 'Good day with extended changeover for new blend.'),
+    ('a0000001-0000-0000-0000-000000000002', CURRENT_DATE - 7, 91.20, 130, 143, 28, 3, 116.67, 'Reliable start to the week.'),
 
-    -- Grinder 1 - Last 7 days (throughput-focused)
-    ('a0000001-0000-0000-0000-000000000004', CURRENT_DATE - 1, 91.20, 1780, 1950, 30, 25, 87.50, 'Grinder 1 running well. Espresso grind consistency excellent per QC samples. Minor burr adjustment completed.'),
-    ('a0000001-0000-0000-0000-000000000004', CURRENT_DATE - 2, 88.50, 1725, 1950, 48, 35, 140.00, 'Slight throughput dip due to harder bean batch from Roaster 3. Adjusted feed rate.'),
-    ('a0000001-0000-0000-0000-000000000004', CURRENT_DATE - 3, 94.80, 1848, 1950, 15, 18, 43.75, 'Outstanding grinding day. Medium roast flowing through at optimal rate.'),
-    ('a0000001-0000-0000-0000-000000000004', CURRENT_DATE - 4, 72.30, 1409, 1950, 125, 65, 1150.00, 'Burr replacement required after detecting uneven particle distribution. Extended downtime for maintenance. Significant throughput loss during critical production period.'),
+    -- ============ ROASTER 3 - 7 days (target_output=143, new asset) ============
+    ('a0000001-0000-0000-0000-000000000003', CURRENT_DATE - 1, 89.00, 127, 143, 35, 4, 145.83, 'Roaster 3 performing well on medium roast batch. Minor cooling cycle adjustment.'),
+    ('a0000001-0000-0000-0000-000000000003', CURRENT_DATE - 2, 91.50, 131, 143, 25, 3, 104.17, 'Consistent performance. Light roast Ethiopian beans processed smoothly.'),
+    ('a0000001-0000-0000-0000-000000000003', CURRENT_DATE - 3, 86.20, 123, 143, 48, 5, 200.00, 'Extended changeover for specialty blend caused throughput reduction.'),
+    ('a0000001-0000-0000-0000-000000000003', CURRENT_DATE - 4, 93.80, 134, 143, 18, 2, 75.00, 'Excellent batch consistency. Dark roast profile running optimally.'),
+    ('a0000001-0000-0000-0000-000000000003', CURRENT_DATE - 5, 88.10, 126, 143, 40, 4, 166.67, 'Some first-crack timing variance on new bean lot.'),
+    ('a0000001-0000-0000-0000-000000000003', CURRENT_DATE - 6, 90.90, 130, 143, 28, 3, 116.67, 'Steady roasting day. Chaff system operating normally.'),
+    ('a0000001-0000-0000-0000-000000000003', CURRENT_DATE - 7, 87.40, 125, 143, 42, 5, 175.00, 'Minor cooling delays on larger batch sizes.'),
+
+    -- ============ GRINDER 1 - 7 days (target_output=1950) ============
+    ('a0000001-0000-0000-0000-000000000004', CURRENT_DATE - 1, 91.20, 1780, 1950, 30, 25, 87.50, 'Grinder 1 running well. Espresso grind consistency excellent.'),
+    ('a0000001-0000-0000-0000-000000000004', CURRENT_DATE - 2, 88.50, 1725, 1950, 48, 35, 140.00, 'Slight throughput dip due to harder bean batch.'),
+    ('a0000001-0000-0000-0000-000000000004', CURRENT_DATE - 3, 94.80, 1848, 1950, 15, 18, 43.75, 'Outstanding grinding day. Medium roast flowing at optimal rate.'),
+    ('a0000001-0000-0000-0000-000000000004', CURRENT_DATE - 4, 72.30, 1409, 1950, 125, 65, 364.58, 'Burr replacement required. Extended downtime for maintenance.'),
     ('a0000001-0000-0000-0000-000000000004', CURRENT_DATE - 5, 93.20, 1817, 1950, 20, 22, 58.33, 'Post-maintenance performance excellent. New burrs producing consistent grind.'),
+    ('a0000001-0000-0000-0000-000000000004', CURRENT_DATE - 6, 90.10, 1756, 1950, 35, 27, 102.08, 'Consistent grinding. Brief pause for shift handover.'),
+    ('a0000001-0000-0000-0000-000000000004', CURRENT_DATE - 7, 86.50, 1687, 1950, 55, 32, 160.42, 'Some issues with bean moisture affecting grind quality.'),
 
-    -- Grinder 2 - Last 7 days
-    ('a0000001-0000-0000-0000-000000000005', CURRENT_DATE - 1, 87.80, 1712, 1950, 52, 38, 151.67, 'Medium grind production. Some clumping detected - humidity control adjusted.'),
+    -- ============ GRINDER 2 - 7 days (target_output=1950) ============
+    ('a0000001-0000-0000-0000-000000000005', CURRENT_DATE - 1, 95.80, 1960, 1950, 0, 15, 0.00, 'Perfect uptime day! Grinder 2 running flawlessly on French press coarse grind.'),
     ('a0000001-0000-0000-0000-000000000005', CURRENT_DATE - 2, 95.50, 1862, 1950, 12, 15, 35.00, 'Top performance. Coarse grind for French press line running smoothly.'),
     ('a0000001-0000-0000-0000-000000000005', CURRENT_DATE - 3, 90.30, 1760, 1950, 35, 28, 102.08, 'Steady performance. Bean hopper sensor calibrated during shift change.'),
+    ('a0000001-0000-0000-0000-000000000005', CURRENT_DATE - 4, 92.40, 1802, 1950, 25, 20, 72.92, 'Smooth operation with single changeover.'),
+    ('a0000001-0000-0000-0000-000000000005', CURRENT_DATE - 5, 94.10, 1835, 1950, 18, 18, 52.50, 'Excellent grinding consistency throughout the shift.'),
+    ('a0000001-0000-0000-0000-000000000005', CURRENT_DATE - 6, 91.80, 1790, 1950, 28, 22, 81.67, 'Reliable performance on dark roast batch.'),
+    ('a0000001-0000-0000-0000-000000000005', CURRENT_DATE - 7, 93.50, 1823, 1950, 20, 19, 58.33, 'Consistent week-opener with quick changeover.'),
 
-    -- Filler Line A - Last 7 days (volume-focused)
-    ('a0000001-0000-0000-0000-000000000008', CURRENT_DATE - 1, 72.50, 3335, 4600, 95, 120, 265.00, 'Filler A experiencing valve sticking issues. Multiple stoppages throughout shift. Maintenance called - awaiting parts for full repair.'),
-    ('a0000001-0000-0000-0000-000000000008', CURRENT_DATE - 2, 92.30, 4246, 4600, 28, 45, 58.33, 'Strong filling performance. New bag stock feeding well through magazine.'),
-    ('a0000001-0000-0000-0000-000000000008', CURRENT_DATE - 3, 78.60, 3616, 4600, 95, 120, 197.92, 'Valve sticking issue caused multiple stoppages. Cleaned and reseated during break.'),
-    ('a0000001-0000-0000-0000-000000000008', CURRENT_DATE - 4, 95.10, 4374, 4600, 15, 35, 31.25, 'Excellent recovery. K-Cup filling mode achieving target weights consistently.'),
+    -- ============ GRINDER 3 - 7 days (target_output=1950) ============
+    ('a0000001-0000-0000-0000-000000000006', CURRENT_DATE - 1, 84.20, 1642, 1950, 62, 38, 180.83, 'Grinder 3 had bearing noise issues requiring adjustment.'),
+    ('a0000001-0000-0000-0000-000000000006', CURRENT_DATE - 2, 89.70, 1749, 1950, 38, 25, 110.83, 'Better day with routine changeovers.'),
+    ('a0000001-0000-0000-0000-000000000006', CURRENT_DATE - 3, 87.30, 1702, 1950, 48, 30, 140.00, 'Bean quality variance caused some adjustments.'),
+    ('a0000001-0000-0000-0000-000000000006', CURRENT_DATE - 4, 91.50, 1784, 1950, 28, 20, 81.67, 'Good throughput on espresso grind setting.'),
+    ('a0000001-0000-0000-0000-000000000006', CURRENT_DATE - 5, 86.80, 1693, 1950, 52, 33, 151.67, 'Burr alignment check required mid-shift.'),
+    ('a0000001-0000-0000-0000-000000000006', CURRENT_DATE - 6, 90.20, 1759, 1950, 35, 24, 102.08, 'Standard operation day.'),
+    ('a0000001-0000-0000-0000-000000000006', CURRENT_DATE - 7, 88.40, 1724, 1950, 45, 28, 131.25, 'Some bean inconsistency from upstream roasting.'),
 
-    -- Filler Line B - Last 7 days
-    ('a0000001-0000-0000-0000-000000000009', CURRENT_DATE - 1, 89.20, 4103, 4600, 42, 65, 87.50, 'Good performance on 2lb bag line. Weight variance within spec.'),
+    -- ============ GRINDER 4 - 7 days (target_output=1950, new asset) ============
+    ('a0000001-0000-0000-0000-000000000007', CURRENT_DATE - 1, 87.18, 1700, 1950, 50, 35, 145.83, 'Grinder 4 running at moderate pace. Feed rate adjustment needed mid-shift.'),
+    ('a0000001-0000-0000-0000-000000000007', CURRENT_DATE - 2, 91.30, 1780, 1950, 30, 22, 87.50, 'Good performance on medium grind setting.'),
+    ('a0000001-0000-0000-0000-000000000007', CURRENT_DATE - 3, 85.40, 1665, 1950, 58, 40, 169.17, 'Hopper feed issues caused intermittent slowdowns.'),
+    ('a0000001-0000-0000-0000-000000000007', CURRENT_DATE - 4, 89.70, 1749, 1950, 38, 28, 110.83, 'Steady grinding with minor adjustments.'),
+    ('a0000001-0000-0000-0000-000000000007', CURRENT_DATE - 5, 93.20, 1817, 1950, 22, 18, 64.17, 'Excellent day. Consistent particle size throughout.'),
+    ('a0000001-0000-0000-0000-000000000007', CURRENT_DATE - 6, 86.50, 1687, 1950, 52, 35, 151.67, 'Bean moisture caused grind inconsistency.'),
+    ('a0000001-0000-0000-0000-000000000007', CURRENT_DATE - 7, 90.80, 1771, 1950, 32, 24, 93.33, 'Solid start to the week.'),
+
+    -- ============ GRINDER 5 - 7 days (target_output=1950) ============
+    ('a0000001-0000-0000-0000-000000000014', CURRENT_DATE - 1, 82.50, 1608, 1950, 72, 35, 210.00, 'Grinder 5 had mechanical issues with burr assembly.'),
+    ('a0000001-0000-0000-0000-000000000014', CURRENT_DATE - 2, 88.30, 1722, 1950, 45, 28, 131.25, 'Running better. Minor mechanical adjustment needed mid-shift.'),
+    ('a0000001-0000-0000-0000-000000000014', CURRENT_DATE - 3, 76.80, 1498, 1950, 98, 45, 285.83, 'Rough day. Burr replacement required after vibration alarm.'),
+    ('a0000001-0000-0000-0000-000000000014', CURRENT_DATE - 4, 91.20, 1778, 1950, 32, 22, 93.33, 'Solid performance. Standard changeover for medium roast batch.'),
+    ('a0000001-0000-0000-0000-000000000014', CURRENT_DATE - 5, 85.60, 1669, 1950, 58, 30, 169.17, 'Bean hopper ran empty twice waiting on roaster output.'),
+    ('a0000001-0000-0000-0000-000000000014', CURRENT_DATE - 6, 89.40, 1743, 1950, 40, 25, 116.67, 'Good day. Multiple changeovers for different grind sizes.'),
+    ('a0000001-0000-0000-0000-000000000014', CURRENT_DATE - 7, 87.10, 1698, 1950, 52, 28, 151.67, 'Steady performance with minor mechanical hiccups.'),
+
+    -- ============ FILLER LINE A - 7 days (target_output=4600) ============
+    ('a0000001-0000-0000-0000-000000000008', CURRENT_DATE - 1, 72.50, 3335, 4600, 95, 120, 197.92, 'Filler A experiencing valve sticking issues. Multiple stoppages.'),
+    ('a0000001-0000-0000-0000-000000000008', CURRENT_DATE - 2, 92.30, 4246, 4600, 28, 45, 58.33, 'Strong filling performance. New bag stock feeding well.'),
+    ('a0000001-0000-0000-0000-000000000008', CURRENT_DATE - 3, 78.60, 3616, 4600, 82, 95, 170.83, 'Valve sticking issue continued. Cleaned and reseated during break.'),
+    ('a0000001-0000-0000-0000-000000000008', CURRENT_DATE - 4, 95.10, 4374, 4600, 15, 35, 31.25, 'Excellent recovery. K-Cup filling mode achieving target weights.'),
+    ('a0000001-0000-0000-0000-000000000008', CURRENT_DATE - 5, 88.40, 4066, 4600, 42, 58, 87.50, 'Some jamming issues with new bag material.'),
+    ('a0000001-0000-0000-0000-000000000008', CURRENT_DATE - 6, 91.20, 4195, 4600, 32, 48, 66.67, 'Solid performance on 2lb bag line.'),
+    ('a0000001-0000-0000-0000-000000000008', CURRENT_DATE - 7, 89.80, 4131, 4600, 38, 52, 79.17, 'Good week opener for filling operations.'),
+
+    -- ============ FILLER LINE B - 7 days (target_output=4600) ============
+    ('a0000001-0000-0000-0000-000000000009', CURRENT_DATE - 1, 89.20, 4650, 4600, 42, 65, 87.50, 'Outstanding day on 2lb bag line. Weight variance within spec. Exceeded daily target.'),
     ('a0000001-0000-0000-0000-000000000009', CURRENT_DATE - 2, 91.80, 4223, 4600, 30, 50, 62.50, 'Steady filling. Degassing valve placement accuracy improved.'),
+    ('a0000001-0000-0000-0000-000000000009', CURRENT_DATE - 3, 94.30, 4338, 4600, 18, 35, 37.50, 'Outstanding day. Bag sealing quality excellent throughout.'),
+    ('a0000001-0000-0000-0000-000000000009', CURRENT_DATE - 4, 87.50, 4025, 4600, 48, 72, 100.00, 'Film tension issues caused periodic stops.'),
+    ('a0000001-0000-0000-0000-000000000009', CURRENT_DATE - 5, 90.60, 4168, 4600, 35, 55, 72.92, 'Consistent filling with minor adjustments.'),
+    ('a0000001-0000-0000-0000-000000000009', CURRENT_DATE - 6, 93.10, 4283, 4600, 22, 40, 45.83, 'Excellent bag weight consistency.'),
+    ('a0000001-0000-0000-0000-000000000009', CURRENT_DATE - 7, 88.90, 4089, 4600, 40, 60, 83.33, 'Good start to the week on 1lb bag line.'),
 
-    -- Packaging Line 1 - Last 7 days (final output-focused)
-    ('a0000001-0000-0000-0000-000000000011', CURRENT_DATE - 1, 86.50, 5362, 6200, 58, 95, 91.83, 'Packaging Line 1 handled mixed SKU run. Label changeover time improved by 15%. Some carton rejects.'),
-    ('a0000001-0000-0000-0000-000000000011', CURRENT_DATE - 2, 94.80, 5878, 6200, 18, 42, 28.50, 'Outstanding day. Holiday blend cases flowing smoothly to palletizer.'),
-    ('a0000001-0000-0000-0000-000000000011', CURRENT_DATE - 3, 79.30, 4917, 6200, 88, 145, 139.17, 'Case erector jam caused significant downtime. Maintenance cleared cardboard buildup.'),
+    -- ============ FILLER LINE C - 7 days (target_output=4000, new asset) ============
+    ('a0000001-0000-0000-0000-000000000010', CURRENT_DATE - 1, 80.00, 3200, 4000, 62, 75, 129.17, 'Filler C had bag feed issues on specialty blend line. Throughput reduced.'),
+    ('a0000001-0000-0000-0000-000000000010', CURRENT_DATE - 2, 88.50, 3540, 4000, 38, 55, 79.17, 'Good output with minor feed adjustments.'),
+    ('a0000001-0000-0000-0000-000000000010', CURRENT_DATE - 3, 93.20, 3728, 4000, 20, 35, 41.67, 'Outstanding day. New nozzle configuration working well.'),
+    ('a0000001-0000-0000-0000-000000000010', CURRENT_DATE - 4, 86.80, 3472, 4000, 45, 62, 93.75, 'Bag feed alignment needed adjustment mid-shift.'),
+    ('a0000001-0000-0000-0000-000000000010', CURRENT_DATE - 5, 90.50, 3620, 4000, 32, 48, 66.67, 'Steady performance on single-serve pods.'),
+    ('a0000001-0000-0000-0000-000000000010', CURRENT_DATE - 6, 94.00, 3760, 4000, 15, 30, 31.25, 'Excellent run. Minimal downtime.'),
+    ('a0000001-0000-0000-0000-000000000010', CURRENT_DATE - 7, 87.30, 3492, 4000, 42, 58, 87.50, 'Some initial startup delays but recovered well.'),
+
+    -- ============ PACKAGING LINE 1 - 7 days (target_output=6200) ============
+    ('a0000001-0000-0000-0000-000000000011', CURRENT_DATE - 1, 89.50, 5549, 6200, 42, 65, 66.50, 'Good day on Packaging Line 1. Minor label changeover delays.'),
+    ('a0000001-0000-0000-0000-000000000011', CURRENT_DATE - 2, 94.80, 5878, 6200, 18, 42, 28.50, 'Outstanding day. Holiday blend cases flowing smoothly.'),
+    ('a0000001-0000-0000-0000-000000000011', CURRENT_DATE - 3, 79.30, 4917, 6200, 88, 145, 139.33, 'Case erector jam caused significant downtime.'),
     ('a0000001-0000-0000-0000-000000000011', CURRENT_DATE - 4, 92.50, 5735, 6200, 25, 55, 39.58, 'Strong recovery. Automated case packing running efficiently.'),
+    ('a0000001-0000-0000-0000-000000000011', CURRENT_DATE - 5, 87.20, 5406, 6200, 52, 78, 82.33, 'Multiple SKU changeovers slowed throughput.'),
+    ('a0000001-0000-0000-0000-000000000011', CURRENT_DATE - 6, 91.80, 5692, 6200, 30, 52, 47.50, 'Consistent packaging output.'),
+    ('a0000001-0000-0000-0000-000000000011', CURRENT_DATE - 7, 88.90, 5512, 6200, 45, 68, 71.25, 'Solid week start with routine changeovers.'),
 
-    -- Packaging Line 2 - Last 7 days
-    ('a0000001-0000-0000-0000-000000000012', CURRENT_DATE - 1, 88.90, 5512, 6200, 45, 78, 71.25, 'Good performance on wholesale pack line. Case sealing quality excellent.'),
-    ('a0000001-0000-0000-0000-000000000012', CURRENT_DATE - 2, 91.20, 5654, 6200, 32, 60, 50.67, 'Consistent throughput. Shrink wrap tension optimized.')
+    -- ============ PACKAGING LINE 2 - 7 days (target_output=6200) ============
+    ('a0000001-0000-0000-0000-000000000012', CURRENT_DATE - 1, 88.90, 6300, 6200, 45, 78, 71.25, 'Excellent day on wholesale pack line. Exceeded daily target. Case sealing quality excellent.'),
+    ('a0000001-0000-0000-0000-000000000012', CURRENT_DATE - 2, 91.20, 5654, 6200, 32, 60, 50.67, 'Consistent throughput. Shrink wrap tension optimized.'),
+    ('a0000001-0000-0000-0000-000000000012', CURRENT_DATE - 3, 93.50, 5797, 6200, 20, 45, 31.67, 'Excellent run on bulk case packing.'),
+    ('a0000001-0000-0000-0000-000000000012', CURRENT_DATE - 4, 86.80, 5382, 6200, 55, 85, 87.08, 'Labeler jam caused extended changeover.'),
+    ('a0000001-0000-0000-0000-000000000012', CURRENT_DATE - 5, 90.50, 5611, 6200, 35, 62, 55.42, 'Good recovery from yesterday issues.'),
+    ('a0000001-0000-0000-0000-000000000012', CURRENT_DATE - 6, 94.20, 5840, 6200, 15, 38, 23.75, 'Outstanding day. Minimal changeovers needed.'),
+    ('a0000001-0000-0000-0000-000000000012', CURRENT_DATE - 7, 87.50, 5425, 6200, 48, 72, 76.00, 'Moderate start to the week.'),
+
+    -- ============ PACKAGING LINE 3 - 7 days (target_output=5600, new asset) ============
+    ('a0000001-0000-0000-0000-000000000013', CURRENT_DATE - 1, 87.50, 4900, 5600, 55, 80, 87.08, 'Packaging Line 3 running slightly below target. Film feed alignment.'),
+    ('a0000001-0000-0000-0000-000000000013', CURRENT_DATE - 2, 90.20, 5051, 5600, 38, 62, 60.17, 'Good performance. Carton sealing quality improved.'),
+    ('a0000001-0000-0000-0000-000000000013', CURRENT_DATE - 3, 85.80, 4805, 5600, 62, 95, 98.17, 'Label applicator needed recalibration mid-shift.'),
+    ('a0000001-0000-0000-0000-000000000013', CURRENT_DATE - 4, 91.40, 5118, 5600, 30, 50, 47.50, 'Strong day. Case erector running smoothly.'),
+    ('a0000001-0000-0000-0000-000000000013', CURRENT_DATE - 5, 88.60, 4962, 5600, 45, 70, 71.25, 'Moderate output with some changeover delays.'),
+    ('a0000001-0000-0000-0000-000000000013', CURRENT_DATE - 6, 92.80, 5197, 5600, 22, 42, 34.83, 'Excellent performance on retail pack line.'),
+    ('a0000001-0000-0000-0000-000000000013', CURRENT_DATE - 7, 86.40, 4838, 5600, 55, 78, 87.08, 'Some case erector issues at start of shift.')
 ON CONFLICT (asset_id, report_date) DO NOTHING;
 
 -- ============================================================================
