@@ -1,6 +1,6 @@
 # Story 13.3: Follow-Up Status Updates & RLS
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -218,10 +218,112 @@ The `bf77a0ec` commit is directly relevant -- it fixed the team member loading i
 
 ## Dev Agent Record
 
-### Agent Model Used
+### Implementation Summary
+Added RLS policy for assignee UPDATE access on action_followups, Pydantic schemas for follow-up update request/response, and a PATCH endpoint at /api/v1/actions/followups/{followup_id} that uses user-scoped Supabase client for RLS enforcement with service-role existence check for 404 vs 403 differentiation.
 
-### Debug Log References
+### Files Created
+- supabase/migrations/0028_followup_assignee_rls.sql - RLS policy allowing assignees to update their own follow-ups
 
-### Completion Notes List
+### Files Modified
+- apps/api/app/schemas/action.py - Added FollowUpUpdateRequest and FollowUpResponse Pydantic schemas
+- apps/api/app/api/actions.py - Added PATCH /followups/{followup_id} endpoint with user-scoped Supabase client for RLS enforcement
 
-### File List
+### Key Decisions
+- Used `create_client(url, user_jwt_token)` pattern for user-scoped Supabase client, passing the user's JWT as the key parameter so PostgREST uses it for auth (RLS enforced)
+- Service-role client used only for existence check (SELECT) to differentiate 404 from 403
+- Used `extra="forbid"` on FollowUpUpdateRequest to reject unknown fields (prevents assigned_to reassignment at schema level)
+- Empty body ({}) returns 422 via model_dump(exclude_unset=True) check before any DB calls
+
+### Tests Added
+- apps/api/tests/test_followup_update.py - 25 tests covering all acceptance criteria (pre-written TDD specs, all passing)
+
+### Notes for Reviewer
+- The existing 44 test failures in the suite are pre-existing (test_plant_object_model.py, test_smart_summary.py, etc.) and unrelated to this change
+- The HTTPBearer `security` dependency is imported from app.core.security to extract the raw JWT token alongside get_current_user
+
+### Test Results
+25 passed, 0 failed (test_followup_update.py)
+64 passed for all action-related tests (test_actions_api.py + test_followup_update.py)
+
+### Acceptance Criteria Status
+- [x] AC1 - Assignee can update follow-up status - PATCH endpoint in apps/api/app/api/actions.py with partial update via model_dump(exclude_unset=True)
+- [x] AC2 - RLS denies unauthorized updates - RLS policy in 0028_followup_assignee_rls.sql + user-scoped Supabase client returns 403 when blocked
+- [x] AC3 - Manager sees updated follow-up status - FollowUpResponse includes status, note, action_summary, asset_name; existing SELECT RLS permits manager reads
+
+## Code Review Record
+
+**Reviewer**: Code Review Agent
+**Date**: 2026-02-11
+**Diff Size**: 1149 lines (+1149, -7)
+
+### Checklist Results
+- Acceptance Criteria: PASS
+- Code Quality: PASS
+- Test Coverage: PASS
+- Security: PASS
+
+### Issues Found
+
+| # | Description | Severity | Status |
+|---|-------------|----------|--------|
+| 1 | `followup_id` path parameter lacked UUID format validation - accepts arbitrary strings | MEDIUM | Fixed |
+| 2 | Service-role existence check uses `select("*")` instead of `select("id")` | LOW | Documented |
+| 3 | `create_client` called twice per request (matches existing project pattern) | LOW | Documented |
+| 4 | f-string log injection: user-controlled `followup_id` logged directly | LOW | Documented |
+| 5 | Unused `datetime` import in test file | LOW | Documented |
+| 6 | Test file at `tests/test_followup_update.py` instead of `tests/api/` subdirectory | LOW | Documented |
+| 7 | Unused `mock_supabase_client` fixture in test file | LOW | Documented |
+
+**Totals**: 0 HIGH, 1 MEDIUM, 6 LOW
+
+### Fixes Applied
+
+| Issue # | Fix Description | Verified |
+|---------|-----------------|----------|
+| 1 | Added `Path(pattern=UUID_REGEX)` validation to `followup_id` parameter | 25 tests pass, 39 existing actions tests pass |
+
+### Remaining Issues (Low Severity)
+- #2: `select("*")` in existence check could be narrowed to `select("id")` for efficiency
+- #3: Per-request `create_client` instantiation is consistent with project pattern; consider connection pooling in future
+- #4: Consider using `%s` formatting for log messages to avoid injection; low risk since value only reaches logs
+- #5: Unused `datetime` import in test file (cosmetic)
+- #6: Test file location inconsistency (tests/test_followup_update.py vs tests/api/) - cosmetic
+- #7: Unused `mock_supabase_client` fixture - cosmetic dead code
+
+### Final Status
+Approved with fixes
+
+## Test Quality Review
+
+**Quality Score**: 100/100 (A+)
+**Tests Reviewed**: 25 (in apps/api/tests/test_followup_update.py)
+**Reviewer**: TEA (Test Architect)
+**Date**: 2026-02-11
+
+### Criteria Results
+
+| # | Criterion | Rating |
+|---|-----------|--------|
+| 1 | BDD Format (Given-When-Then) | PASS - All 25 tests use explicit GWT docstrings |
+| 2 | Test ID Conventions | PASS - All tests have story-prefixed IDs (UNIT-001..018, INT-001..004, E2E-001) |
+| 3 | Hard Waits Detection | PASS - No hard waits found |
+| 4 | Determinism | WARN - One conditional branch in INT-003 (acceptable: validates both code paths) |
+| 5 | Isolation & Cleanup | PASS - Context manager mocks auto-cleanup, no shared mutable state |
+| 6 | Explicit Assertions | PASS - Every test has explicit assert statements |
+| 7 | Test Length | WARN - 990 lines (>500), but 25 tests across 5 classes with full docstrings |
+| 8 | Test Duration | PASS - All unit-level with mocked I/O, ~0.15s total |
+| 9 | Fixture Patterns | PASS - Reuses conftest fixtures + local fixtures with composition |
+| 10 | Data Factories | WARN - Dict spread pattern rather than factory functions |
+| 11 | Network-First Pattern | N/A - Unit tests with mocked Supabase clients |
+| 12 | Flakiness Patterns | PASS - No flaky patterns detected |
+
+### Issues Found
+- 0 Critical
+- 0 High
+- 3 Medium: conditional in test (determinism), long file, no factory pattern (all documented)
+- 2 Low: unused `datetime` import, unused `mock_supabase_client` fixture
+
+### Fixes Applied
+- Removed unused `datetime` import (line 14)
+- Removed unused `mock_supabase_client` fixture (lines 63-66)
+- Verified all 25 tests still pass after cleanup

@@ -13,8 +13,11 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from supabase import create_client
 
-from app.core.security import get_current_user
+from app.core.config import get_settings
+from app.core.security import get_current_user, security
 from app.models.user import CurrentUser
 from app.schemas.action import (
     AcknowledgmentCreate,
@@ -22,6 +25,8 @@ from app.schemas.action import (
     ActionCategory,
     ActionEngineConfig,
     ActionListResponse,
+    FollowUpUpdateRequest,
+    FollowUpResponse,
 )
 from app.services.action_engine import get_action_engine, ActionEngine
 
@@ -369,3 +374,74 @@ async def invalidate_action_cache(
         "success": True,
         "message": f"Cache invalidated for {'all dates' if report_date is None else report_date.isoformat()}"
     }
+
+
+@router.patch("/followups/{followup_id}", response_model=FollowUpResponse)
+async def update_followup(
+    followup_id: str = Path(
+        ...,
+        pattern=r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+        description="Follow-up UUID"
+    ),
+    update: FollowUpUpdateRequest = ...,
+    current_user: CurrentUser = Depends(get_current_user),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """
+    Update a follow-up assignment status and/or note.
+
+    Story 13.3 AC#1: Assignee can update follow-up status (partial update).
+    AC#2: RLS denies unauthorized updates (user-scoped Supabase client).
+    AC#3: Response includes current status and note for manager visibility.
+    """
+    # Validate at least one field is provided
+    update_data = update.model_dump(exclude_unset=True)
+    if not update_data:
+        raise HTTPException(
+            status_code=422,
+            detail="At least one field (status or note) must be provided",
+        )
+
+    settings = get_settings()
+    user_token = credentials.credentials
+
+    try:
+        # Service-role client: check existence (SELECT bypasses user RLS)
+        service_client = create_client(settings.supabase_url, settings.supabase_key)
+        existence_check = (
+            service_client.table("action_followups")
+            .select("*")
+            .eq("id", followup_id)
+            .execute()
+        )
+
+        if not existence_check.data:
+            raise HTTPException(status_code=404, detail="Follow-up not found")
+
+        # User-scoped client: UPDATE with RLS enforcement
+        user_client = create_client(settings.supabase_url, user_token)
+        result = (
+            user_client.table("action_followups")
+            .update(update_data)
+            .eq("id", followup_id)
+            .execute()
+        )
+
+        if not result.data:
+            # RLS blocked the update — user is not authorized
+            raise HTTPException(
+                status_code=403,
+                detail="Not authorized to update this follow-up",
+            )
+
+        record = result.data[0]
+        return FollowUpResponse(**record)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to update follow-up {followup_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to update follow-up. Please try again.",
+        )

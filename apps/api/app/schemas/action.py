@@ -15,7 +15,7 @@ from enum import Enum
 from typing import Dict, List, Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 
 class ActionCategory(str, Enum):
@@ -281,3 +281,42 @@ class ActionEngineConfig(BaseModel):
         ge=0,
         description="Financial loss for 'medium' priority (USD)"
     )
+
+
+class FollowUpUpdateRequest(BaseModel):
+    """Request to update a follow-up assignment status."""
+    status: Optional[str] = Field(
+        None,
+        description="New status: assigned, in_progress, resolved"
+    )
+    note: Optional[str] = Field(
+        None,
+        description="Status update note from assignee"
+    )
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator('status')
+    @classmethod
+    def validate_status(cls, v):
+        if v is not None:
+            allowed = {'assigned', 'in_progress', 'resolved'}
+            if v not in allowed:
+                raise ValueError(f'Status must be one of: {", ".join(sorted(allowed))}')
+        return v
+
+
+class FollowUpResponse(BaseModel):
+    """Response for a follow-up record."""
+    id: str
+    action_item_id: str
+    action_summary: str
+    asset_name: Optional[str] = None
+    category: Optional[str] = None
+    assigned_to: str
+    assigned_by: str
+    status: str
+    note: Optional[str] = None
+    report_date: str
+    created_at: str
+    updated_at: str
