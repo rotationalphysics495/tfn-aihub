@@ -202,6 +202,7 @@ export function transformAPIActionItem(item: APIActionItem): InsightActionItem {
     ),
     financialImpact: item.financial_impact_usd,
     timestamp: item.created_at,
+    acknowledgment: item.acknowledgment ?? null,
   }
 }
 

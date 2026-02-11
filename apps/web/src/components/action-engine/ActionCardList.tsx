@@ -31,6 +31,7 @@ interface ActionCardListProps {
   isLoading?: boolean
   error?: string | null
   onRefetch?: () => void
+  onAcknowledge?: (actionId: string) => void
   className?: string
 }
 
@@ -146,6 +147,7 @@ export function ActionCardList({
   isLoading = false,
   error = null,
   onRefetch,
+  onAcknowledge,
   className,
 }: ActionCardListProps) {
   // Sort items by priority (AC #4)
@@ -204,7 +206,10 @@ export function ActionCardList({
       <div className="space-y-4" role="list" aria-label="Action items">
         {sortedItems.map((item) => (
           <div key={item.id} role="listitem">
-            <InsightEvidenceCard item={item} />
+            <InsightEvidenceCard
+              item={item}
+              onAcknowledge={onAcknowledge}
+            />
           </div>
         ))}
       </div>

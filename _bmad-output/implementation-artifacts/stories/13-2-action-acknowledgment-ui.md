@@ -1,6 +1,6 @@
 # Story 13.2: Action Acknowledgment UI
 
-Status: ready-for-dev
+Status: dev-complete
 
 ## Story
 
@@ -20,35 +20,35 @@ so that **I can track which items I've addressed during my morning review**.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create `useActionAcknowledgment` hook (AC: #1, #2, #3)
-  - [ ] 1.1 Create `apps/web/src/hooks/useActionAcknowledgment.ts`
-  - [ ] 1.2 Implement `POST /api/v1/actions/{action_id}/acknowledge` API call using Bearer token auth pattern
-  - [ ] 1.3 Implement optimistic state update (immediate UI change, rollback on failure)
-  - [ ] 1.4 Implement bulk acknowledgment state fetching for initial page load (GET endpoint that returns acknowledged items for report date)
-  - [ ] 1.5 Handle error states with rollback and user-visible error toast
-- [ ] Task 2: Add acknowledge button to `InsightEvidenceCard` (AC: #1, #2)
-  - [ ] 2.1 Add `CheckCircle2` icon button in the `InsightSection` context row (next to Assign button)
-  - [ ] 2.2 Implement unacknowledged state: outline circle icon, "Mark Reviewed" label
-  - [ ] 2.3 Implement acknowledged state: filled green checkmark, "Reviewed" label with timestamp
-  - [ ] 2.4 Add click handler calling `useActionAcknowledgment.acknowledge(actionId)`
-  - [ ] 2.5 Add `aria-label` and keyboard support for accessibility
-- [ ] Task 3: Add acknowledged visual styling to `InsightEvidenceCard` (AC: #2)
-  - [ ] 3.1 When acknowledged, apply `opacity-60` + muted left-border color to the card
-  - [ ] 3.2 Add a subtle checkmark overlay or badge in the top-right corner
-  - [ ] 3.3 Ensure the acknowledged timestamp displays below the button in `text-sm text-muted-foreground`
-- [ ] Task 4: Persist and restore acknowledged state (AC: #3)
-  - [ ] 4.1 On `InsightEvidenceCardList` mount, call hook to fetch all acknowledgments for current report date
-  - [ ] 4.2 Pass `acknowledgment` data (who, when, note) into each `InsightEvidenceCard` via props
-  - [ ] 4.3 Restore acknowledged visual state on reload from database response
-- [ ] Task 5: "All items reviewed" summary (AC: #4)
-  - [ ] 5.1 Track `acknowledgedCount` vs `totalCount` in `InsightEvidenceCardList`
-  - [ ] 5.2 When `acknowledgedCount === totalCount && totalCount > 0`, render a success banner above the action list
-  - [ ] 5.3 Banner text: "All items reviewed" with green checkmark icon and count (e.g., "5/5 reviewed")
-  - [ ] 5.4 Style with `bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800`
-- [ ] Task 6: Testing (AC: #1-4)
-  - [ ] 6.1 Unit test `useActionAcknowledgment` hook: optimistic update, rollback on error, initial fetch
-  - [ ] 6.2 Component test `InsightEvidenceCard` with acknowledged and unacknowledged states
-  - [ ] 6.3 Component test "All items reviewed" banner rendering logic
+- [x] Task 1: Create `useActionAcknowledgment` hook (AC: #1, #2, #3)
+  - [x] 1.1 Create `apps/web/src/hooks/useActionAcknowledgment.ts`
+  - [x] 1.2 Implement `POST /api/v1/actions/{action_id}/acknowledge` API call using Bearer token auth pattern
+  - [x] 1.3 Implement optimistic state update (immediate UI change, rollback on failure)
+  - [x] 1.4 Implement bulk acknowledgment state fetching for initial page load (GET endpoint that returns acknowledged items for report date)
+  - [x] 1.5 Handle error states with rollback and user-visible error toast
+- [x] Task 2: Add acknowledge button to `InsightEvidenceCard` (AC: #1, #2)
+  - [x] 2.1 Add `CheckCircle2` icon button in the `InsightSection` context row (next to Assign button)
+  - [x] 2.2 Implement unacknowledged state: outline circle icon, "Mark Reviewed" label
+  - [x] 2.3 Implement acknowledged state: filled green checkmark, "Reviewed" label with timestamp
+  - [x] 2.4 Add click handler calling `useActionAcknowledgment.acknowledge(actionId)`
+  - [x] 2.5 Add `aria-label` and keyboard support for accessibility
+- [x] Task 3: Add acknowledged visual styling to `InsightEvidenceCard` (AC: #2)
+  - [x] 3.1 When acknowledged, apply `opacity-60` + muted left-border color to the card
+  - [x] 3.2 Add a subtle checkmark overlay or badge in the top-right corner
+  - [x] 3.3 Ensure the acknowledged timestamp displays below the button in `text-sm text-muted-foreground`
+- [x] Task 4: Persist and restore acknowledged state (AC: #3)
+  - [x] 4.1 On `InsightEvidenceCardList` mount, call hook to fetch all acknowledgments for current report date
+  - [x] 4.2 Pass `acknowledgment` data (who, when, note) into each `InsightEvidenceCard` via props
+  - [x] 4.3 Restore acknowledged visual state on reload from database response
+- [x] Task 5: "All items reviewed" summary (AC: #4)
+  - [x] 5.1 Track `acknowledgedCount` vs `totalCount` in `InsightEvidenceCardList`
+  - [x] 5.2 When `acknowledgedCount === totalCount && totalCount > 0`, render a success banner above the action list
+  - [x] 5.3 Banner text: "All items reviewed" with green checkmark icon and count (e.g., "5/5 reviewed")
+  - [x] 5.4 Style with `bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800`
+- [x] Task 6: Testing (AC: #1-4)
+  - [x] 6.1 Unit test `useActionAcknowledgment` hook: optimistic update, rollback on error, initial fetch
+  - [x] 6.2 Component test `InsightEvidenceCard` with acknowledged and unacknowledged states
+  - [x] 6.3 Component test "All items reviewed" banner rendering logic
 
 ## Dev Notes
 
@@ -202,10 +202,34 @@ If Story 13.1 is not yet implemented, the UI can be built with mocked API respon
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.6 (claude-opus-4-6)
 
 ### Debug Log References
 
+N/A
+
 ### Completion Notes List
 
+- Created `useActionAcknowledgment` hook with optimistic updates, rollback on API failure, in-flight request deduplication, and module-level session token caching for synchronous access
+- Added `AcknowledgmentInfo` interface and `acknowledgment` field to both API-level (`useDailyActions.ts`) and component-level (`types.ts`) ActionItem types
+- Updated transformer (`transformers.ts`) to pass through acknowledgment data from API response to component format
+- Added acknowledge button to `InsightSection.tsx` with Circle/CheckCircle2 icon toggle, sr-only text for accessibility compliance, and UTC timestamp formatting
+- Modified `InsightEvidenceCard.tsx` to apply `opacity-60` and `border-l-muted` styling when acknowledged, and pass acknowledgment props through to InsightSection
+- Updated `ActionCardList.tsx` to accept and forward `onAcknowledge` callback
+- Rewrote `InsightEvidenceCardList.tsx` to integrate `useActionAcknowledgment` hook, merge acknowledgment state into items, and render "All items reviewed" banner
+- All 31 TDD tests pass (10 hook, 13 card, 8 banner/integration)
+
 ### File List
+
+- `apps/web/src/hooks/useActionAcknowledgment.ts` (new)
+- `apps/web/src/hooks/useDailyActions.ts` (modified - added AcknowledgmentInfo interface and acknowledgment field)
+- `apps/web/src/components/action-engine/types.ts` (modified - added AcknowledgmentInfo interface and acknowledgment field)
+- `apps/web/src/components/action-engine/transformers.ts` (modified - acknowledgment passthrough)
+- `apps/web/src/components/action-engine/index.ts` (modified - exported AcknowledgmentInfo type)
+- `apps/web/src/components/action-engine/InsightSection.tsx` (modified - acknowledge button, UTC timestamp formatting)
+- `apps/web/src/components/action-engine/InsightEvidenceCard.tsx` (modified - acknowledgment props, muted styling)
+- `apps/web/src/components/action-engine/ActionCardList.tsx` (modified - onAcknowledge callback passthrough)
+- `apps/web/src/components/action-engine/InsightEvidenceCardList.tsx` (modified - hook integration, banner)
+- `apps/web/src/hooks/__tests__/useActionAcknowledgment.test.ts` (pre-existing test, unmodified)
+- `apps/web/src/components/action-engine/__tests__/InsightEvidenceCard.ack.test.tsx` (pre-existing test, unmodified)
+- `apps/web/src/components/action-engine/__tests__/AllItemsReviewed.test.tsx` (pre-existing test, unmodified)

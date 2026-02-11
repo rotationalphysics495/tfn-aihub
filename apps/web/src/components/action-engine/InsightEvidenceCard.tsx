@@ -32,18 +32,21 @@ interface InsightEvidenceCardProps {
   item: ActionItem
   className?: string
   defaultEvidenceExpanded?: boolean
+  onAcknowledge?: (actionId: string) => void
 }
 
 export function InsightEvidenceCard({
   item,
   className,
   defaultEvidenceExpanded = false,
+  onAcknowledge,
 }: InsightEvidenceCardProps) {
   const [isHovered, setIsHovered] = useState(false)
   const [assignDialogOpen, setAssignDialogOpen] = useState(false)
 
   const borderColor = getPriorityBorderColor(item.priority)
   const accentBg = getPriorityAccentBg(item.priority)
+  const isItemAcknowledged = item.acknowledgment != null
 
   // Derive report date from item timestamp (fallback to yesterday)
   const reportDate = item.timestamp
@@ -59,7 +62,7 @@ export function InsightEvidenceCard({
           'overflow-hidden transition-all duration-200',
           // 4px left border with priority color (AC #4)
           'border-l-4',
-          borderColor,
+          isItemAcknowledged ? 'border-l-muted' : borderColor,
           // Priority-based background accent (AC #4)
           accentBg,
           // Hover state (AC #6)
@@ -67,6 +70,8 @@ export function InsightEvidenceCard({
           isHovered && 'scale-[1.005]',
           // Focus visible state for accessibility (AC #7)
           'focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2',
+          // Acknowledged muted styling
+          isItemAcknowledged && 'opacity-60',
           className
         )}
         onMouseEnter={() => setIsHovered(true)}
@@ -86,6 +91,9 @@ export function InsightEvidenceCard({
                 financialImpact={item.financialImpact}
                 timestamp={item.timestamp}
                 onAssign={() => setAssignDialogOpen(true)}
+                isAcknowledged={isItemAcknowledged}
+                acknowledgedAt={item.acknowledgment?.acknowledged_at}
+                onAcknowledge={onAcknowledge ? () => onAcknowledge(item.id) : undefined}
               />
             </div>
 

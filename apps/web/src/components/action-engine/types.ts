@@ -75,6 +75,15 @@ export interface Recommendation {
 }
 
 /**
+ * Acknowledgment info for an action item
+ */
+export interface AcknowledgmentInfo {
+  user_id: string
+  acknowledged_at: string
+  note: string | null
+}
+
+/**
  * Action Item for Insight + Evidence Cards
  *
  * Main data structure for card components.
@@ -88,6 +97,7 @@ export interface ActionItem {
   evidence: Evidence
   financialImpact: number         // Total $ impact
   timestamp: string               // When insight was generated (ISO string)
+  acknowledgment?: AcknowledgmentInfo | null
 }
 
 /**

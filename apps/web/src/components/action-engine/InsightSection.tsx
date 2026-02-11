@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { Clock, MapPin, UserPlus } from 'lucide-react'
+import { CheckCircle2, Circle, Clock, MapPin, UserPlus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PriorityBadge, type PriorityType } from './PriorityBadge'
 import type { Recommendation, AssetReference } from './types'
@@ -27,6 +27,9 @@ interface InsightSectionProps {
   financialImpact: number
   timestamp: string
   onAssign?: () => void
+  isAcknowledged?: boolean
+  acknowledgedAt?: string | null
+  onAcknowledge?: () => void
   className?: string
 }
 
@@ -51,6 +54,17 @@ function formatTimestamp(isoString: string): string {
   })
 }
 
+// Format acknowledgment timestamp for display (UTC to match server timestamps)
+function formatAcknowledgedTime(isoString: string): string {
+  const date = new Date(isoString)
+  return date.toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: 'UTC',
+  })
+}
+
 export function InsightSection({
   priority,
   recommendation,
@@ -58,6 +72,9 @@ export function InsightSection({
   financialImpact,
   timestamp,
   onAssign,
+  isAcknowledged = false,
+  acknowledgedAt,
+  onAcknowledge,
   className,
 }: InsightSectionProps) {
   const router = useRouter()
@@ -121,6 +138,42 @@ export function InsightSection({
         <div className="flex items-center gap-1.5">
           <Clock className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
           <span>Generated at {formatTimestamp(timestamp)}</span>
+        </div>
+
+        {/* Acknowledge action */}
+        <div className="flex flex-col">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              onAcknowledge?.()
+            }}
+            className={cn(
+              'flex items-center gap-1.5',
+              'text-sm font-medium',
+              'hover:underline',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+              'rounded-sm',
+              isAcknowledged
+                ? 'text-green-600 dark:text-green-400'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            {isAcknowledged ? (
+              <CheckCircle2 className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
+            ) : (
+              <>
+                <span className="sr-only">Mark action as reviewed.</span>
+                <Circle className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
+              </>
+            )}
+            <span>{isAcknowledged ? 'Reviewed' : 'Mark Reviewed'}</span>
+          </button>
+          {isAcknowledged && acknowledgedAt && (
+            <span className="text-sm text-muted-foreground ml-5.5">
+              {formatAcknowledgedTime(acknowledgedAt)}
+            </span>
+          )}
         </div>
 
         {/* Assign follow-up */}

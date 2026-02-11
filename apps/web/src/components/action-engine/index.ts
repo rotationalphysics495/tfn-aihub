@@ -20,6 +20,7 @@ export { PriorityBadge, getPriorityBorderColor, getPriorityAccentBg } from './Pr
 export type { PriorityType } from './PriorityBadge'
 export type {
   ActionItem,
+  AcknowledgmentInfo,
   SafetyEvidence,
   OEEEvidence,
   FinancialEvidence,

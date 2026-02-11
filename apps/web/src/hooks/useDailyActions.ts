@@ -28,6 +28,12 @@ export interface EvidenceRef {
   metric_value?: string
 }
 
+export interface AcknowledgmentInfo {
+  user_id: string
+  acknowledged_at: string
+  note: string | null
+}
+
 export interface ActionItem {
   id: string
   asset_id: string
@@ -44,6 +50,8 @@ export interface ActionItem {
   priority_rank: number
   title: string
   description: string
+  // Acknowledgment state from Story 13.1 enriched response
+  acknowledgment?: AcknowledgmentInfo | null
 }
 
 export interface ActionListResponse {
