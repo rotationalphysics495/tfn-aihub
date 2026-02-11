@@ -33,13 +33,21 @@ interface UseActionAcknowledgmentReturn {
 // Module-level session cache shared across hook instances
 let _sessionToken: string | null = null
 let _sessionPromise: Promise<string | null> | null = null
+const SESSION_TTL_MS = 5 * 60 * 1000 // Re-fetch session after 5 minutes
+let _sessionFetchedAt = 0
 
 function getSessionToken(): Promise<string | null> {
-  if (_sessionToken) return Promise.resolve(_sessionToken)
-  if (_sessionPromise) return _sessionPromise
+  const now = Date.now()
+  if (_sessionToken && now - _sessionFetchedAt < SESSION_TTL_MS) {
+    return Promise.resolve(_sessionToken)
+  }
+  if (_sessionPromise && now - _sessionFetchedAt < SESSION_TTL_MS) {
+    return _sessionPromise
+  }
   const supabase = createClient()
   _sessionPromise = supabase.auth.getSession().then(({ data: { session } }) => {
     _sessionToken = session?.access_token ?? null
+    _sessionFetchedAt = Date.now()
     return _sessionToken
   })
   return _sessionPromise
@@ -62,6 +70,19 @@ export function useActionAcknowledgment({
   const [acknowledgments, setAcknowledgments] = useState<Map<string, AcknowledgmentInfo | null>>(
     () => initialState
   )
+
+  // Re-sync state when items change (e.g., after API refetch)
+  useEffect(() => {
+    setAcknowledgments(prev => {
+      const next = new Map<string, AcknowledgmentInfo | null>()
+      for (const item of items) {
+        // Preserve local optimistic state over server state
+        const localAck = prev.get(item.id)
+        next.set(item.id, localAck !== undefined ? localAck : (item.acknowledgment ?? null))
+      }
+      return next
+    })
+  }, [items])
 
   // Use a ref to track current acknowledgment state for synchronous checks
   const ackRef = useRef(acknowledgments)
@@ -180,9 +201,9 @@ export function useActionAcknowledgment({
 
   const acknowledgedCount = useMemo(() => {
     let count = 0
-    for (const ack of acknowledgments.values()) {
+    Array.from(acknowledgments.values()).forEach(ack => {
       if (ack != null) count++
-    }
+    })
     return count
   }, [acknowledgments])
 

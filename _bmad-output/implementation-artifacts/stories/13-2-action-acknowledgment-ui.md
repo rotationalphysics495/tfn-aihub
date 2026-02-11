@@ -1,6 +1,6 @@
 # Story 13.2: Action Acknowledgment UI
 
-Status: dev-complete
+Status: done
 
 ## Story
 
@@ -208,6 +208,10 @@ Claude Opus 4.6 (claude-opus-4-6)
 
 N/A
 
+### Fix Notes
+
+- **Fix Attempt 1**: Resolved build failure — `MapIterator` from `acknowledgments.values()` is not iterable without `--downlevelIteration` flag. Replaced `for...of` on Map iterator with `Array.from(...).forEach(...)` in `useActionAcknowledgment.ts:183`. Build and all 31 tests pass.
+
 ### Completion Notes List
 
 - Created `useActionAcknowledgment` hook with optimistic updates, rollback on API failure, in-flight request deduplication, and module-level session token caching for synchronous access
@@ -233,3 +237,97 @@ N/A
 - `apps/web/src/hooks/__tests__/useActionAcknowledgment.test.ts` (pre-existing test, unmodified)
 - `apps/web/src/components/action-engine/__tests__/InsightEvidenceCard.ack.test.tsx` (pre-existing test, unmodified)
 - `apps/web/src/components/action-engine/__tests__/AllItemsReviewed.test.tsx` (pre-existing test, unmodified)
+
+## Code Review Record
+
+**Reviewer**: Code Review Agent
+**Date**: 2026-02-11
+**Diff Size**: 8 lines (staged), ~600 lines total implementation
+
+### Checklist Results
+- Acceptance Criteria: PASS (all 4 ACs verified with 31 passing tests)
+- Code Quality: PASS (follows existing patterns, clean component architecture)
+- Test Coverage: PASS (10 hook tests, 13 card tests, 8 banner/integration tests)
+- Security: PASS (Bearer token auth, no XSS vectors, no exposed secrets)
+
+### Issues Found
+
+| # | Description | Severity | Status |
+|---|---|---|---|
+| 1 | Module-level session token cache never invalidated — stale tokens reused after expiry | MEDIUM | Fixed |
+| 2 | Double `.finally()` calling `inFlightRef.current.delete(actionId)` twice in acknowledge function | LOW | Documented |
+| 3 | `acknowledgedCount` allocates intermediate array unnecessarily | LOW | Documented |
+| 4 | Screen reader inconsistency — sr-only span inside button alongside visible text in unacknowledged state | LOW | Documented |
+| 5 | `reportDate` computation in InsightEvidenceCard is pre-existing, only used by AssignFollowUpDialog | LOW | Documented |
+| 6 | Hook state not re-synced when `items` prop changes after mount (stale acknowledgments on refetch) | MEDIUM | Fixed |
+| 7 | Invalid Tailwind class `ml-5.5` — not a standard spacing value, silently ignored | MEDIUM | Fixed |
+
+**Totals**: 0 HIGH, 3 MEDIUM, 4 LOW
+
+### Fixes Applied
+
+| Issue # | Fix Description | Verified |
+|---------|-----------------|----------|
+| 1 | Added 5-minute TTL to session token cache with `_sessionFetchedAt` timestamp; cache is refreshed after TTL expires | 31 tests pass |
+| 6 | Added `useEffect` to re-sync acknowledgment Map when `items` prop changes, preserving local optimistic state over stale server state | 31 tests pass |
+| 7 | Replaced `ml-5.5` with `ml-[22px]` arbitrary value syntax for valid Tailwind CSS | 31 tests pass |
+
+### Remaining Issues (Low Severity)
+
+- Issue #2: Double `.finally()` in acknowledge — harmless but indicates non-ideal control flow. Future cleanup.
+- Issue #3: `Array.from().forEach()` could be simplified. Functional but not performance-critical.
+- Issue #4: sr-only span creates slightly verbose screen reader output. Minor accessibility polish for future sprint.
+
+### Final Status
+Approved with fixes
+
+## Test Quality Review
+
+**Quality Score**: 100/100 (A+)
+**Tests Reviewed**: 31 (across 3 files)
+**Reviewer**: TEA (Test Architect)
+**Date**: 2026-02-11
+
+### Files Reviewed
+
+| File | Lines | Tests | Grade |
+|------|-------|-------|-------|
+| `useActionAcknowledgment.test.ts` | 410 | 10 | A |
+| `InsightEvidenceCard.ack.test.tsx` | 461 | 13 | A |
+| `AllItemsReviewed.test.tsx` | 557 | 8 | A- |
+
+### Criteria Results
+
+| # | Criterion | Result | Notes |
+|---|-----------|--------|-------|
+| 1 | BDD Format | PASS (+5) | All 31 tests use explicit Given-When-Then comments |
+| 2 | Test ID Conventions | PASS (+5) | UNIT-001–029, INT-001–002 all present |
+| 3 | Hard Waits | PASS | No sleep/waitForTimeout/setTimeout in tests |
+| 4 | Determinism | PASS | No conditionals in test flow, no random values |
+| 5 | Isolation & Cleanup | PASS (+5) | beforeEach/afterEach with full mock reset in all files |
+| 6 | Explicit Assertions | PASS | 96 assertions across 31 tests (~3 avg per test) |
+| 7 | Test Length | WARN | 2 files 301-500 lines, 1 file 557 lines |
+| 8 | Test Duration | PASS | 31 tests in 337ms total (~11ms avg) |
+| 9 | Fixture Patterns | PASS (+5) | Factory functions with overrides in all 3 files |
+| 10 | Data Factories | PASS (+5) | createMockActionItem, createMockSession, etc. |
+| 11 | Network-First | N/A | Unit/component tests with mocked fetch |
+| 12 | Flakiness Patterns | PASS | No tight timeouts, race conditions, or retry logic |
+
+### Issues Found
+
+| # | Criterion | Description | Severity | Fixable |
+|---|-----------|-------------|----------|---------|
+| 1 | Test Length | `AllItemsReviewed.test.tsx` at 557 lines exceeds 500-line threshold | MEDIUM | Document |
+| 2 | Test Length | `useActionAcknowledgment.test.ts` (410) and `InsightEvidenceCard.ack.test.tsx` (461) in warning zone | MEDIUM | Document |
+| 3 | Isolation | Module-level session cache (`_sessionToken`) not explicitly reset between tests (latent risk) | MEDIUM | Document |
+
+- 0 Critical
+- 0 High
+- 3 Medium (all documented)
+
+### Fixes Applied
+
+None required — no critical or high issues found.
+
+### Test Quality Status
+APPROVED

@@ -170,7 +170,7 @@ export function InsightSection({
             <span>{isAcknowledged ? 'Reviewed' : 'Mark Reviewed'}</span>
           </button>
           {isAcknowledged && acknowledgedAt && (
-            <span className="text-sm text-muted-foreground ml-5.5">
+            <span className="text-sm text-muted-foreground ml-[22px]">
               {formatAcknowledgedTime(acknowledgedAt)}
             </span>
           )}
