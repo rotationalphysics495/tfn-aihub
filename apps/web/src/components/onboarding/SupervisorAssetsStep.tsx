@@ -90,7 +90,7 @@ export function SupervisorAssetsStep({
           assets: { id: string; name: string; area?: string } | null
         }
 
-        const assignedAssets: SupervisedAsset[] = ((data || []) as AssignmentRow[])
+        const assignedAssets: SupervisedAsset[] = ((data || []) as unknown as AssignmentRow[])
           .filter((d) => d.assets !== null)
           .map((d) => ({
             id: d.assets!.id,

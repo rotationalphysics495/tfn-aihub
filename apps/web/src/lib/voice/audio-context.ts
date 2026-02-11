@@ -42,7 +42,7 @@ class AudioContextManager {
    * Get the current state of the audio context.
    */
   getState(): AudioContextState | null {
-    return this.context?.state || null;
+    return (this.context?.state as AudioContextState) || null;
   }
 
   /**

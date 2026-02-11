@@ -67,7 +67,7 @@ export default function HandoffDetailPage() {
   }, [router, handoffId]);
 
   // Handle acknowledge (placeholder for Story 9.7)
-  const handleAcknowledge = () => {
+  const handleAcknowledge = async (_notes?: string): Promise<void> => {
     // Story 9.7 will implement acknowledgment flow
     // After implementation, call refetch() to update UI
   };

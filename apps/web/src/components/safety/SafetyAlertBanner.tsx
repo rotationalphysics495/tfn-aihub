@@ -29,6 +29,8 @@ export interface SafetyAlert {
   duration_minutes: number | null
   financial_impact: number | null
   acknowledged: boolean
+  acknowledged_at: string | null
+  created_at: string
 }
 
 interface SafetyAlertBannerProps {

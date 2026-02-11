@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { createClient } from '@/lib/supabase/client'
 
 /**
  * Safety Alert Hook
@@ -82,12 +83,20 @@ export function useSafetyAlerts(options: UseSafetyAlertsOptions = {}): UseSafety
     setState(prev => ({ ...prev, isLoading: true, error: null }))
 
     try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        setState(prev => ({ ...prev, isLoading: false, error: 'Authentication required' }))
+        return
+      }
+
       const response = await fetch(`${apiUrl}/api/safety/active`, {
         method: 'GET',
         headers: {
+          'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
       })
 
       if (!response.ok) {
@@ -120,12 +129,19 @@ export function useSafetyAlerts(options: UseSafetyAlertsOptions = {}): UseSafety
   // Acknowledge a safety event
   const acknowledge = useCallback(async (eventId: string): Promise<boolean> => {
     try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        return false
+      }
+
       const response = await fetch(`${apiUrl}/api/safety/acknowledge/${eventId}`, {
         method: 'POST',
         headers: {
+          'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
-        credentials: 'include',
         body: JSON.stringify({}),
       })
 

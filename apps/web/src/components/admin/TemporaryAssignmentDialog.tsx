@@ -272,7 +272,7 @@ export function TemporaryAssignmentBadge({ expiresAt, className }: TemporaryBadg
 
   return (
     <Badge
-      variant={isExpiringSoon ? 'destructive' : 'secondary'}
+      variant={isExpiringSoon ? 'warning' : 'secondary'}
       className={className}
     >
       <Clock className="w-3 h-3 mr-1" />

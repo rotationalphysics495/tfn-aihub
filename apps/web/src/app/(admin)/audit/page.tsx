@@ -12,7 +12,7 @@
  */
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { Suspense, useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { AuditLogTable, type AuditLogEntry } from '@/components/admin/AuditLogTable'
 import { AuditLogFilters, type AuditLogFiltersState } from '@/components/admin/AuditLogFilters'
@@ -29,6 +29,29 @@ interface AuditLogListResponse {
 }
 
 export default function AuditLogPage() {
+  return (
+    <Suspense fallback={
+      <div className="space-y-6">
+        <header>
+          <h1 className="text-2xl font-bold text-slate-900">Audit Log</h1>
+          <p className="text-slate-500 mt-1">Loading...</p>
+        </header>
+        <Card>
+          <CardContent className="py-12">
+            <div className="flex items-center justify-center text-slate-500">
+              <Loader2 className="w-6 h-6 animate-spin mr-2" />
+              <span>Loading audit logs...</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    }>
+      <AuditLogPageContent />
+    </Suspense>
+  )
+}
+
+function AuditLogPageContent() {
   // Router for URL state management
   const router = useRouter()
   const searchParams = useSearchParams()

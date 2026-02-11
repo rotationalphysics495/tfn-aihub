@@ -182,7 +182,7 @@ export function AssignmentPreview({
                   <span className="text-green-500">&rarr;</span>
                   <span>{getAssetName(change.asset_id)}</span>
                   {change.expires_at && (
-                    <Clock className="w-3 h-3 ml-auto text-green-500" title="Temporary" />
+                    <span title="Temporary"><Clock className="w-3 h-3 ml-auto text-green-500" /></span>
                   )}
                 </li>
               ))}

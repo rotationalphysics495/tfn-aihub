@@ -67,7 +67,9 @@
       "Bash(npx tsc:*)",
       "Bash(git -C /Users/calebwaack/Documents/GitHub/tfn-aihub log --oneline --all --grep=\"bmad\")",
       "Bash(git -C /Users/calebwaack/Documents/GitHub/BMAD-METHOD branch:*)",
-      "Bash(git -C /Users/calebwaack/Documents/GitHub/BMAD-METHOD tag --list 'v6.0.0-Beta*')"
+      "Bash(git -C /Users/calebwaack/Documents/GitHub/BMAD-METHOD tag --list 'v6.0.0-Beta*')",
+      "Bash(chmod:*)",
+      "Bash(bash:*)"
     ]
   }
 }
