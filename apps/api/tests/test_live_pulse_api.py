@@ -54,6 +54,10 @@ SAMPLE_COST_CENTERS = [
     },
 ]
 
+# Note: oee_percentage and downtime_reason are included in mock data for backward
+# compatibility with existing tests, but do NOT exist in the actual live_snapshots
+# table schema. In production, the corrected query omits these columns, so
+# snapshot.get("oee_percentage") returns None and OEE defaults to 0.0.
 SAMPLE_LIVE_SNAPSHOTS = [
     {
         "id": "snap-001",

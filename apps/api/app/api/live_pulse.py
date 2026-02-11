@@ -249,9 +249,11 @@ async def get_live_pulse_data(
         # =====================================================================
 
         # Get latest snapshot per asset
+        # Note: oee_percentage lives in daily_summaries, not live_snapshots.
+        # downtime_reason and downtime_minutes do not exist in this table.
         snapshots_response = client.table("live_snapshots").select(
             "id, asset_id, snapshot_timestamp, current_output, target_output, "
-            "oee_percentage, status, financial_loss_dollars, downtime_reason, downtime_minutes"
+            "status, financial_loss_dollars"
         ).order("snapshot_timestamp", desc=True).execute()
 
         # Group by asset, taking latest per asset
