@@ -13,6 +13,7 @@ AC: #9 - Evidence Citations NFR1 Compliance (3.2)
 from datetime import date, datetime
 from enum import Enum
 from typing import Dict, List, Optional
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
@@ -101,6 +102,30 @@ class EvidenceRef(BaseModel):
         return self.value
 
 
+class AcknowledgmentCreate(BaseModel):
+    """Request body for acknowledging an action item."""
+    note: Optional[str] = None
+
+
+class AcknowledgmentResponse(BaseModel):
+    """Response model for an acknowledgment record."""
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: UUID
+    action_item_id: str
+    user_id: str
+    acknowledged_at: datetime
+    note: Optional[str] = None
+    report_date: date
+
+
+class AcknowledgmentInfo(BaseModel):
+    """Lightweight acknowledgment info embedded in ActionItem."""
+    acknowledged_by: str
+    acknowledged_at: datetime
+    note: Optional[str] = None
+
+
 class ActionItem(BaseModel):
     """
     A prioritized action item for the Daily Action List.
@@ -161,6 +186,12 @@ class ActionItem(BaseModel):
         default=0.0,
         ge=0,
         description="Financial impact in USD (for sorting by AC#6)"
+    )
+
+    # Story 13.1 AC#3: Acknowledgment status (per-user overlay, enriched post-cache)
+    acknowledgment: Optional[AcknowledgmentInfo] = Field(
+        default=None,
+        description="Acknowledgment info if this action was acknowledged by the current user"
     )
 
     # Story 3.2 AC#7: Computed fields for alias compatibility

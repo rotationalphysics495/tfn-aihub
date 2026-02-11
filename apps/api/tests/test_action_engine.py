@@ -32,6 +32,7 @@ from app.services.action_engine import (
     ActionEngineError,
 )
 from app.schemas.action import (
+    AcknowledgmentInfo,
     ActionCategory,
     ActionEngineConfig,
     ActionItem,
@@ -1230,3 +1231,293 @@ class TestStory32CacheManagement:
         assert len(action_engine._cost_centers_cache) == 0
         assert len(action_engine._action_list_cache) == 0
         assert action_engine._cache_timestamp is None
+
+
+# =============================================================================
+# Story 13.1 - Action Acknowledgment Backend Tests
+# =============================================================================
+
+
+class TestLoadAcknowledgments:
+    """Tests for _load_acknowledgments() method (Story 13.1 AC#3)."""
+
+    @pytest.mark.asyncio
+    async def test_load_acknowledgments_returns_dict(
+        self, action_engine, mock_supabase_client
+    ):
+        """AC#3: _load_acknowledgments returns dict mapping action_item_id to AcknowledgmentInfo."""
+        action_engine._client = mock_supabase_client
+
+        ack_data = [
+            {
+                "id": str(uuid4()),
+                "action_item_id": "action-safety-abc123",
+                "user_id": "user-uuid-1",
+                "acknowledged_at": "2026-02-10T14:30:00Z",
+                "note": "Reviewed with team",
+                "report_date": "2026-02-09",
+            },
+            {
+                "id": str(uuid4()),
+                "action_item_id": "action-oee-def456",
+                "user_id": "user-uuid-1",
+                "acknowledged_at": "2026-02-10T15:00:00Z",
+                "note": None,
+                "report_date": "2026-02-09",
+            },
+        ]
+        mock_supabase_client.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = ack_data
+
+        target_date = date(2026, 2, 9)
+        result = await action_engine._load_acknowledgments(target_date, "user-uuid-1")
+
+        assert len(result) == 2
+        assert "action-safety-abc123" in result
+        assert "action-oee-def456" in result
+
+        ack_info = result["action-safety-abc123"]
+        assert isinstance(ack_info, AcknowledgmentInfo)
+        assert ack_info.acknowledged_by == "user-uuid-1"
+        assert ack_info.note == "Reviewed with team"
+
+    @pytest.mark.asyncio
+    async def test_load_acknowledgments_returns_empty_when_none(
+        self, action_engine, mock_supabase_client
+    ):
+        """AC#3: Returns empty dict when no acknowledgments exist."""
+        action_engine._client = mock_supabase_client
+
+        mock_supabase_client.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = []
+
+        target_date = date(2026, 2, 9)
+        result = await action_engine._load_acknowledgments(target_date, "user-uuid-1")
+
+        assert result == {}
+
+    @pytest.mark.asyncio
+    async def test_load_acknowledgments_handles_error(
+        self, action_engine, mock_supabase_client
+    ):
+        """AC#3: Returns empty dict on error without raising."""
+        action_engine._client = mock_supabase_client
+
+        mock_supabase_client.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.side_effect = Exception("DB error")
+
+        target_date = date(2026, 2, 9)
+        result = await action_engine._load_acknowledgments(target_date, "user-uuid-1")
+
+        assert result == {}
+
+
+class TestAcknowledgmentEnrichment:
+    """Tests for acknowledgment enrichment in generate_action_list (Story 13.1 AC#3)."""
+
+    @pytest.mark.asyncio
+    async def test_enrichment_when_user_id_provided(
+        self, action_engine, mock_supabase_client, sample_assets
+    ):
+        """AC#3: Actions are enriched with acknowledgment when user_id is provided."""
+        action_engine._client = mock_supabase_client
+        action_engine._assets_cache = sample_assets
+        action_engine._cache_timestamp = datetime.utcnow()
+
+        target_date = date.today() - timedelta(days=1)
+
+        # Pre-populate action list cache
+        cached_response = ActionListResponse(
+            actions=[
+                ActionItem(
+                    id="action-safety-abc123",
+                    asset_id="asset-1",
+                    asset_name="Grinder 5",
+                    priority_level=PriorityLevel.CRITICAL,
+                    category=ActionCategory.SAFETY,
+                    primary_metric_value="Safety Event",
+                    recommendation_text="Investigate",
+                    evidence_summary="Unresolved",
+                    evidence_refs=[],
+                    created_at=datetime.utcnow(),
+                ),
+                ActionItem(
+                    id="action-oee-def456",
+                    asset_id="asset-2",
+                    asset_name="Lathe 3",
+                    priority_level=PriorityLevel.HIGH,
+                    category=ActionCategory.OEE,
+                    primary_metric_value="OEE: 62.5%",
+                    recommendation_text="Review",
+                    evidence_summary="Below target",
+                    evidence_refs=[],
+                    created_at=datetime.utcnow(),
+                ),
+            ],
+            generated_at=datetime.utcnow(),
+            report_date=target_date,
+            total_count=2,
+            counts_by_category={"safety": 1, "oee": 1, "financial": 0},
+        )
+        cache_key = f"{target_date.isoformat()}-all"
+        action_engine._action_list_cache[cache_key] = cached_response
+
+        # Mock acknowledgment load - only first action is acknowledged
+        ack_data = [
+            {
+                "id": str(uuid4()),
+                "action_item_id": "action-safety-abc123",
+                "user_id": "user-uuid-1",
+                "acknowledged_at": "2026-02-10T14:30:00Z",
+                "note": "Done",
+                "report_date": target_date.isoformat(),
+            },
+        ]
+        mock_supabase_client.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = ack_data
+
+        result = await action_engine.generate_action_list(
+            target_date=target_date,
+            use_cache=True,
+            user_id="user-uuid-1",
+        )
+
+        # First action should be enriched
+        assert result.actions[0].acknowledgment is not None
+        assert result.actions[0].acknowledgment.acknowledged_by == "user-uuid-1"
+        assert result.actions[0].acknowledgment.note == "Done"
+
+        # Second action should not be enriched
+        assert result.actions[1].acknowledgment is None
+
+    @pytest.mark.asyncio
+    async def test_no_enrichment_when_user_id_is_none(
+        self, action_engine, mock_supabase_client, sample_assets
+    ):
+        """AC#3: No enrichment when user_id is not provided."""
+        action_engine._client = mock_supabase_client
+        action_engine._assets_cache = sample_assets
+        action_engine._cache_timestamp = datetime.utcnow()
+
+        target_date = date.today() - timedelta(days=1)
+
+        # Pre-populate cache
+        cached_response = ActionListResponse(
+            actions=[
+                ActionItem(
+                    id="action-safety-abc123",
+                    asset_id="asset-1",
+                    asset_name="Grinder 5",
+                    priority_level=PriorityLevel.CRITICAL,
+                    category=ActionCategory.SAFETY,
+                    primary_metric_value="Safety Event",
+                    recommendation_text="Investigate",
+                    evidence_summary="Unresolved",
+                    evidence_refs=[],
+                    created_at=datetime.utcnow(),
+                ),
+            ],
+            generated_at=datetime.utcnow(),
+            report_date=target_date,
+            total_count=1,
+            counts_by_category={"safety": 1, "oee": 0, "financial": 0},
+        )
+        cache_key = f"{target_date.isoformat()}-all"
+        action_engine._action_list_cache[cache_key] = cached_response
+
+        result = await action_engine.generate_action_list(
+            target_date=target_date,
+            use_cache=True,
+            user_id=None,
+        )
+
+        # No enrichment should occur
+        assert result.actions[0].acknowledgment is None
+
+    @pytest.mark.asyncio
+    async def test_enrichment_with_no_acks_returns_null(
+        self, action_engine, mock_supabase_client, sample_assets
+    ):
+        """AC#3: All actions have null acknowledgment when no acks exist for user."""
+        action_engine._client = mock_supabase_client
+        action_engine._assets_cache = sample_assets
+        action_engine._cache_timestamp = datetime.utcnow()
+
+        target_date = date.today() - timedelta(days=1)
+
+        # Pre-populate cache
+        cached_response = ActionListResponse(
+            actions=[
+                ActionItem(
+                    id="action-safety-abc123",
+                    asset_id="asset-1",
+                    asset_name="Grinder 5",
+                    priority_level=PriorityLevel.CRITICAL,
+                    category=ActionCategory.SAFETY,
+                    primary_metric_value="Safety Event",
+                    recommendation_text="Investigate",
+                    evidence_summary="Unresolved",
+                    evidence_refs=[],
+                    created_at=datetime.utcnow(),
+                ),
+            ],
+            generated_at=datetime.utcnow(),
+            report_date=target_date,
+            total_count=1,
+            counts_by_category={"safety": 1, "oee": 0, "financial": 0},
+        )
+        cache_key = f"{target_date.isoformat()}-all"
+        action_engine._action_list_cache[cache_key] = cached_response
+
+        # No acknowledgments exist
+        mock_supabase_client.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value.data = []
+
+        result = await action_engine.generate_action_list(
+            target_date=target_date,
+            use_cache=True,
+            user_id="user-uuid-1",
+        )
+
+        assert result.actions[0].acknowledgment is None
+
+
+class TestActionItemAcknowledgmentField:
+    """Tests for ActionItem.acknowledgment field backward compatibility (Story 13.1)."""
+
+    def test_action_item_default_acknowledgment_is_none(self):
+        """ActionItem.acknowledgment defaults to None for backward compatibility."""
+        action = ActionItem(
+            id="test-id",
+            asset_id="asset-1",
+            asset_name="Grinder 5",
+            priority_level=PriorityLevel.CRITICAL,
+            category=ActionCategory.SAFETY,
+            primary_metric_value="Safety Event",
+            recommendation_text="Investigate",
+            evidence_summary="Unresolved",
+            evidence_refs=[],
+            created_at=datetime.utcnow(),
+        )
+
+        assert action.acknowledgment is None
+
+    def test_action_item_with_acknowledgment(self):
+        """ActionItem can hold AcknowledgmentInfo."""
+        ack = AcknowledgmentInfo(
+            acknowledged_by="user-123",
+            acknowledged_at=datetime(2026, 2, 10, 14, 30, 0),
+            note="Reviewed",
+        )
+        action = ActionItem(
+            id="test-id",
+            asset_id="asset-1",
+            asset_name="Grinder 5",
+            priority_level=PriorityLevel.CRITICAL,
+            category=ActionCategory.SAFETY,
+            primary_metric_value="Safety Event",
+            recommendation_text="Investigate",
+            evidence_summary="Unresolved",
+            evidence_refs=[],
+            created_at=datetime.utcnow(),
+            acknowledgment=ack,
+        )
+
+        assert action.acknowledgment is not None
+        assert action.acknowledgment.acknowledged_by == "user-123"
+        assert action.acknowledgment.note == "Reviewed"

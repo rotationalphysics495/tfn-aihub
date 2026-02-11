@@ -16,6 +16,7 @@ from unittest.mock import patch, MagicMock, AsyncMock
 from uuid import uuid4
 
 from app.schemas.action import (
+    AcknowledgmentInfo,
     ActionCategory,
     ActionItem,
     ActionListResponse,
@@ -675,3 +676,217 @@ class TestStory32ResponseSchemaCompliance:
         valid_categories = {"safety", "oee", "financial"}
         for action in data["actions"]:
             assert action["category"] in valid_categories
+
+
+# =============================================================================
+# Story 13.1 - Action Acknowledgment Backend Tests
+# =============================================================================
+
+
+class TestAcknowledgeEndpoint:
+    """Tests for POST /api/v1/actions/{action_id}/acknowledge endpoint (Story 13.1)."""
+
+    def test_acknowledge_requires_auth(self, client):
+        """AC#4: Endpoint requires authentication."""
+        response = client.post("/api/v1/actions/action-safety-abc123/acknowledge")
+        assert response.status_code in (401, 403)
+
+    def test_acknowledge_creates_new_record(
+        self, client, mock_verify_jwt, mock_action_engine
+    ):
+        """AC#1: Creates a new acknowledgment and returns 201."""
+        mock_client = MagicMock()
+        mock_action_engine._get_client = MagicMock(return_value=mock_client)
+
+        # No existing record (new acknowledgment)
+        mock_client.table.return_value.select.return_value.eq.return_value.eq.return_value.eq.return_value.execute.return_value.data = []
+
+        # Upsert returns the created record
+        mock_client.table.return_value.upsert.return_value.execute.return_value.data = [
+            {
+                "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                "action_item_id": "action-safety-abc123",
+                "user_id": "123e4567-e89b-12d3-a456-426614174000",
+                "acknowledged_at": "2026-02-10T14:30:00Z",
+                "note": "Reviewed with team",
+                "report_date": "2026-02-09",
+            }
+        ]
+
+        response = client.post(
+            "/api/v1/actions/action-safety-abc123/acknowledge?date=2026-02-09",
+            json={"note": "Reviewed with team"},
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["action_item_id"] == "action-safety-abc123"
+        assert data["note"] == "Reviewed with team"
+        assert data["report_date"] == "2026-02-09"
+
+    def test_acknowledge_upsert_returns_200(
+        self, client, mock_verify_jwt, mock_action_engine
+    ):
+        """AC#2: Re-acknowledging returns 200 with updated record."""
+        mock_client = MagicMock()
+        mock_action_engine._get_client = MagicMock(return_value=mock_client)
+
+        # Existing record found (upsert)
+        mock_client.table.return_value.select.return_value.eq.return_value.eq.return_value.eq.return_value.execute.return_value.data = [
+            {"id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"}
+        ]
+
+        # Upsert returns the updated record
+        mock_client.table.return_value.upsert.return_value.execute.return_value.data = [
+            {
+                "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+                "action_item_id": "action-safety-abc123",
+                "user_id": "123e4567-e89b-12d3-a456-426614174000",
+                "acknowledged_at": "2026-02-10T15:00:00Z",
+                "note": "Updated note",
+                "report_date": "2026-02-09",
+            }
+        ]
+
+        response = client.post(
+            "/api/v1/actions/action-safety-abc123/acknowledge?date=2026-02-09",
+            json={"note": "Updated note"},
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["note"] == "Updated note"
+
+    def test_acknowledge_note_is_optional(
+        self, client, mock_verify_jwt, mock_action_engine
+    ):
+        """AC#1: Note field is optional in request body."""
+        mock_client = MagicMock()
+        mock_action_engine._get_client = MagicMock(return_value=mock_client)
+
+        # No existing record
+        mock_client.table.return_value.select.return_value.eq.return_value.eq.return_value.eq.return_value.execute.return_value.data = []
+
+        # Upsert returns record without note
+        mock_client.table.return_value.upsert.return_value.execute.return_value.data = [
+            {
+                "id": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+                "action_item_id": "action-oee-def456",
+                "user_id": "123e4567-e89b-12d3-a456-426614174000",
+                "acknowledged_at": "2026-02-10T14:30:00Z",
+                "note": None,
+                "report_date": "2026-02-09",
+            }
+        ]
+
+        response = client.post(
+            "/api/v1/actions/action-oee-def456/acknowledge?date=2026-02-09",
+            json={},
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["note"] is None
+
+    def test_acknowledge_defaults_report_date_to_t_minus_1(
+        self, client, mock_verify_jwt, mock_action_engine
+    ):
+        """AC#1: report_date defaults to T-1 when not provided."""
+        mock_client = MagicMock()
+        mock_action_engine._get_client = MagicMock(return_value=mock_client)
+
+        yesterday = (date.today() - timedelta(days=1)).isoformat()
+
+        # No existing record
+        mock_client.table.return_value.select.return_value.eq.return_value.eq.return_value.eq.return_value.execute.return_value.data = []
+
+        # Upsert returns record
+        mock_client.table.return_value.upsert.return_value.execute.return_value.data = [
+            {
+                "id": "c3d4e5f6-a7b8-9012-cdef-123456789012",
+                "action_item_id": "action-safety-abc123",
+                "user_id": "123e4567-e89b-12d3-a456-426614174000",
+                "acknowledged_at": "2026-02-10T14:30:00Z",
+                "note": None,
+                "report_date": yesterday,
+            }
+        ]
+
+        response = client.post(
+            "/api/v1/actions/action-safety-abc123/acknowledge",
+            json={},
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["report_date"] == yesterday
+
+    def test_daily_response_includes_acknowledgment_field(
+        self, client, mock_verify_jwt, mock_action_engine
+    ):
+        """AC#3: Daily actions include acknowledgment field (null when not acknowledged)."""
+        target_date = date.today() - timedelta(days=1)
+        sample_response = ActionListResponse(
+            actions=[
+                ActionItem(
+                    id="action-safety-1",
+                    asset_id="asset-1",
+                    asset_name="Grinder 5",
+                    priority_level=PriorityLevel.CRITICAL,
+                    category=ActionCategory.SAFETY,
+                    primary_metric_value="Safety Event: Emergency Stop",
+                    recommendation_text="Investigate emergency stop on Grinder 5",
+                    evidence_summary="Unresolved safety event at 14:30",
+                    evidence_refs=[],
+                    created_at=datetime.utcnow(),
+                    acknowledgment=None,
+                ),
+                ActionItem(
+                    id="action-oee-1",
+                    asset_id="asset-2",
+                    asset_name="Lathe 3",
+                    priority_level=PriorityLevel.HIGH,
+                    category=ActionCategory.OEE,
+                    primary_metric_value="OEE: 62.5%",
+                    recommendation_text="Review performance on Lathe 3",
+                    evidence_summary="OEE 22.5% below target",
+                    evidence_refs=[],
+                    created_at=datetime.utcnow(),
+                    acknowledgment=AcknowledgmentInfo(
+                        acknowledged_by="user-123",
+                        acknowledged_at=datetime.utcnow(),
+                        note="Reviewed",
+                    ),
+                ),
+            ],
+            generated_at=datetime.utcnow(),
+            report_date=target_date,
+            total_count=2,
+            counts_by_category={"safety": 1, "oee": 1, "financial": 0},
+        )
+
+        mock_action_engine.generate_action_list = AsyncMock(
+            return_value=sample_response
+        )
+        mock_action_engine._get_config = MagicMock(return_value=MagicMock())
+
+        response = client.get(
+            "/api/v1/actions/daily",
+            headers={"Authorization": "Bearer test-token"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        actions = data["actions"]
+
+        # First action not acknowledged
+        assert actions[0]["acknowledgment"] is None
+
+        # Second action is acknowledged
+        assert actions[1]["acknowledgment"] is not None
+        assert actions[1]["acknowledgment"]["acknowledged_by"] == "user-123"
+        assert actions[1]["acknowledgment"]["note"] == "Reviewed"

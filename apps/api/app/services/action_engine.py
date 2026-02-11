@@ -25,6 +25,7 @@ from supabase import create_client, Client
 
 from app.core.config import get_settings
 from app.schemas.action import (
+    AcknowledgmentInfo,
     ActionCategory,
     ActionEngineConfig,
     ActionItem,
@@ -224,6 +225,38 @@ class ActionEngine:
 
         except Exception as e:
             logger.error(f"Failed to load cost centers: {e}")
+            return {}
+
+    async def _load_acknowledgments(
+        self, report_date: date, user_id: str
+    ) -> Dict[str, AcknowledgmentInfo]:
+        """
+        Load acknowledgments for a given report date and user.
+
+        Story 13.1 AC#3: Queries action_acknowledgments for enrichment.
+
+        Returns:
+            Dictionary mapping action_item_id to AcknowledgmentInfo
+        """
+        try:
+            client = self._get_client()
+            response = (
+                client.table("action_acknowledgments")
+                .select("*")
+                .eq("report_date", report_date.isoformat())
+                .eq("user_id", user_id)
+                .execute()
+            )
+            return {
+                row["action_item_id"]: AcknowledgmentInfo(
+                    acknowledged_by=row["user_id"],
+                    acknowledged_at=row["acknowledged_at"],
+                    note=row.get("note"),
+                )
+                for row in (response.data or [])
+            }
+        except Exception as e:
+            logger.error(f"Failed to load acknowledgments: {e}")
             return {}
 
     def _generate_action_id(self, category: ActionCategory, asset_id: str) -> str:
@@ -654,6 +687,7 @@ class ActionEngine:
         category_filter: Optional[ActionCategory] = None,
         use_cache: bool = True,
         config_override: Optional[ActionEngineConfig] = None,
+        user_id: Optional[str] = None,
     ) -> ActionListResponse:
         """
         Generate the prioritized daily action list.
@@ -691,6 +725,25 @@ class ActionEngine:
                     total_count=cached.total_count,
                     counts_by_category=cached.counts_by_category,
                 )
+                # Story 13.1 AC#3: Enrich with per-user acknowledgments post-cache
+                if user_id:
+                    ack_map = await self._load_acknowledgments(target_date, user_id)
+                    for action in cached_copy.actions:
+                        action.acknowledgment = ack_map.get(action.id)
+                return cached_copy
+            # Story 13.1 AC#3: Enrich with per-user acknowledgments post-cache
+            # Must create a copy to avoid mutating the shared cache
+            if user_id:
+                cached_copy = ActionListResponse(
+                    actions=list(cached.actions),
+                    generated_at=cached.generated_at,
+                    report_date=cached.report_date,
+                    total_count=cached.total_count,
+                    counts_by_category=cached.counts_by_category,
+                )
+                ack_map = await self._load_acknowledgments(target_date, user_id)
+                for action in cached_copy.actions:
+                    action.acknowledgment = ack_map.get(action.id)
                 return cached_copy
             return cached
 
@@ -751,6 +804,21 @@ class ActionEngine:
             # Cache the full result (AC #9)
             if not category_filter:
                 self._action_list_cache[cache_key] = response
+
+            # Story 13.1 AC#3: Enrich with per-user acknowledgments post-cache
+            # Create a separate copy so cached response stays user-agnostic
+            if user_id:
+                enriched = ActionListResponse(
+                    actions=list(response.actions),
+                    generated_at=response.generated_at,
+                    report_date=response.report_date,
+                    total_count=response.total_count,
+                    counts_by_category=response.counts_by_category,
+                )
+                ack_map = await self._load_acknowledgments(target_date, user_id)
+                for action in enriched.actions:
+                    action.acknowledgment = ack_map.get(action.id)
+                response = enriched
 
             logger.info(
                 f"Generated action list for {target_date}: "

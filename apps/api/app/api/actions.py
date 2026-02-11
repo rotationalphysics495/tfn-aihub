@@ -8,14 +8,17 @@ AC: #8 - API Endpoint for Action List
 """
 
 import logging
-from datetime import date
+from datetime import date, datetime, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from fastapi.responses import JSONResponse
 
 from app.core.security import get_current_user
 from app.models.user import CurrentUser
 from app.schemas.action import (
+    AcknowledgmentCreate,
+    AcknowledgmentResponse,
     ActionCategory,
     ActionEngineConfig,
     ActionListResponse,
@@ -109,13 +112,14 @@ async def get_daily_action_list(
         # Build request-scoped config override (thread-safe, AC #6)
         config_override = _build_config_override(engine, target_oee, financial_threshold)
 
-        # Generate action list
+        # Generate action list (Story 13.1: pass user_id for acknowledgment enrichment)
         response = await engine.generate_action_list(
             target_date=report_date,
             limit=limit,
             category_filter=category_filter,
             use_cache=config_override is None,  # Skip cache when using overrides
             config_override=config_override,
+            user_id=current_user.id,
         )
 
         logger.info(
@@ -242,6 +246,103 @@ async def get_financial_actions(
         use_cache=config_override is None,
         config_override=config_override,
     )
+
+
+@router.post("/{action_id}/acknowledge", response_model=AcknowledgmentResponse)
+async def acknowledge_action(
+    action_id: str = Path(
+        ...,
+        pattern=r"^action-(safety|oee|financial)-[a-z0-9]+$",
+        description="Action item ID (format: action-{category}-{hex12})"
+    ),
+    body: AcknowledgmentCreate = AcknowledgmentCreate(),
+    report_date: Optional[date] = Query(
+        None,
+        alias="date",
+        description="Report date (defaults to T-1/yesterday)"
+    ),
+    current_user: CurrentUser = Depends(get_current_user),
+    engine: ActionEngine = Depends(get_engine),
+):
+    """
+    Acknowledge an action item.
+
+    Story 13.1 AC#1: Creates or updates an acknowledgment record.
+    AC#2: Upsert behavior - returns 201 for new, 200 for updated.
+    AC#4: Requires authentication.
+
+    Args:
+        action_id: The action item ID to acknowledge
+        body: Optional note
+        report_date: Report date (defaults to yesterday)
+    """
+    if report_date is None:
+        report_date = date.today() - timedelta(days=1)
+
+    try:
+        client = engine._get_client()
+
+        # Check if acknowledgment already exists (for 201 vs 200 differentiation)
+        # Note: minor TOCTOU race between SELECT and UPSERT is acceptable —
+        # worst case is a 201 returned instead of 200 on concurrent requests.
+        # Data integrity is guaranteed by the upsert + unique constraint.
+        existing = (
+            client.table("action_acknowledgments")
+            .select("id")
+            .eq("action_item_id", action_id)
+            .eq("user_id", current_user.id)
+            .eq("report_date", report_date.isoformat())
+            .execute()
+        )
+        is_new = not existing.data
+
+        # Upsert the acknowledgment (AC#2)
+        upsert_data = {
+            "action_item_id": action_id,
+            "user_id": current_user.id,
+            "report_date": report_date.isoformat(),
+            "acknowledged_at": datetime.utcnow().isoformat(),
+        }
+        if body.note is not None:
+            upsert_data["note"] = body.note
+
+        result = (
+            client.table("action_acknowledgments")
+            .upsert(upsert_data, on_conflict="action_item_id,user_id,report_date")
+            .execute()
+        )
+
+        if not result.data:
+            raise HTTPException(status_code=500, detail="Failed to create acknowledgment")
+
+        record = result.data[0]
+        response_data = AcknowledgmentResponse(
+            id=record["id"],
+            action_item_id=record["action_item_id"],
+            user_id=record["user_id"],
+            acknowledged_at=record["acknowledged_at"],
+            note=record.get("note"),
+            report_date=record["report_date"],
+        )
+
+        status_code = 201 if is_new else 200
+        logger.info(
+            f"Action {action_id} acknowledged by {current_user.id} "
+            f"({'created' if is_new else 'updated'}) for {report_date}"
+        )
+        return JSONResponse(
+            status_code=status_code,
+            content=response_data.model_dump(mode="json"),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to acknowledge action {action_id}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to acknowledge action item. Please try again."
+        )
 
 
 @router.post("/invalidate-cache")
