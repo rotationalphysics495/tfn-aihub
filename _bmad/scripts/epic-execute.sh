@@ -142,8 +142,8 @@ FINAL_LOG_FILE=""
 
 # Source workflow files from the BMAD-METHOD repository
 BMAD_SRC_DIR="$SCRIPT_DIR/.."
-WORKFLOWS_DIR="$BMAD_SRC_DIR/src/bmm/workflows/4-implementation"
-CORE_TASKS_DIR="$BMAD_SRC_DIR/src/core/tasks"
+WORKFLOWS_DIR="$BMAD_SRC_DIR/bmm/workflows/4-implementation"
+CORE_TASKS_DIR="$BMAD_SRC_DIR/core/tasks"
 
 # Dev Story Workflow
 DEV_WORKFLOW_DIR="$WORKFLOWS_DIR/dev-story"
