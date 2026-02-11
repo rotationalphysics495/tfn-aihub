@@ -1956,7 +1956,7 @@ $build_output
         if grep -q '"test"' "$PROJECT_ROOT/package.json" 2>/dev/null; then
             log "Running tests..."
             local test_output
-            test_output=$(cd "$PROJECT_ROOT" && npm test 2>&1) || {
+            test_output=$(cd "$PROJECT_ROOT" && run_with_timeout "${REGRESSION_TEST_TIMEOUT:-120}" npm test) || {
                 local exit_code=$?
 
                 # Check if there are NEW failures (not just pre-existing baseline failures)

@@ -171,17 +171,18 @@ capture_failure_baseline() {
     local test_output=""
 
     # Run tests and capture output
+    local _timeout="${REGRESSION_TEST_TIMEOUT:-120}"
     if [ -f "$PROJECT_ROOT/package.json" ]; then
         if grep -q '"test"' "$PROJECT_ROOT/package.json" 2>/dev/null; then
-            test_output=$(cd "$PROJECT_ROOT" && npm test 2>&1) || true
+            test_output=$(cd "$PROJECT_ROOT" && run_with_timeout "$_timeout" npm test) || true
         fi
     elif [ -f "$PROJECT_ROOT/Cargo.toml" ]; then
-        test_output=$(cd "$PROJECT_ROOT" && cargo test 2>&1) || true
+        test_output=$(cd "$PROJECT_ROOT" && run_with_timeout "$_timeout" cargo test) || true
     elif [ -f "$PROJECT_ROOT/go.mod" ]; then
-        test_output=$(cd "$PROJECT_ROOT" && go test ./... 2>&1) || true
+        test_output=$(cd "$PROJECT_ROOT" && run_with_timeout "$_timeout" go test ./...) || true
     elif [ -f "$PROJECT_ROOT/requirements.txt" ] || [ -f "$PROJECT_ROOT/pyproject.toml" ]; then
         if command -v pytest >/dev/null 2>&1; then
-            test_output=$(cd "$PROJECT_ROOT" && pytest 2>&1) || true
+            test_output=$(cd "$PROJECT_ROOT" && run_with_timeout "$_timeout" pytest) || true
         fi
     fi
 

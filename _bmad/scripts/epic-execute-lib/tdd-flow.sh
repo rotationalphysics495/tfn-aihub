@@ -367,16 +367,17 @@ execute_test_verification_phase() {
     local test_output=""
     local test_exit_code=0
 
+    local _timeout="${REGRESSION_TEST_TIMEOUT:-120}"
     if [ -f "$PROJECT_ROOT/package.json" ]; then
         # Node.js project
-        test_output=$(cd "$PROJECT_ROOT" && npm test 2>&1) || test_exit_code=$?
+        test_output=$(cd "$PROJECT_ROOT" && run_with_timeout "$_timeout" npm test) || test_exit_code=$?
     elif [ -f "$PROJECT_ROOT/Cargo.toml" ]; then
-        test_output=$(cd "$PROJECT_ROOT" && cargo test 2>&1) || test_exit_code=$?
+        test_output=$(cd "$PROJECT_ROOT" && run_with_timeout "$_timeout" cargo test) || test_exit_code=$?
     elif [ -f "$PROJECT_ROOT/go.mod" ]; then
-        test_output=$(cd "$PROJECT_ROOT" && go test ./... 2>&1) || test_exit_code=$?
+        test_output=$(cd "$PROJECT_ROOT" && run_with_timeout "$_timeout" go test ./...) || test_exit_code=$?
     elif [ -f "$PROJECT_ROOT/requirements.txt" ] || [ -f "$PROJECT_ROOT/pyproject.toml" ]; then
         if command -v pytest >/dev/null 2>&1; then
-            test_output=$(cd "$PROJECT_ROOT" && pytest 2>&1) || test_exit_code=$?
+            test_output=$(cd "$PROJECT_ROOT" && run_with_timeout "$_timeout" pytest) || test_exit_code=$?
         fi
     fi
 
