@@ -22,6 +22,7 @@ import {
   Users,
   FileText,
   UserCog,
+  Upload,
   Sun,
   Moon,
 } from 'lucide-react'
@@ -65,6 +66,7 @@ const navGroups: NavGroup[] = [
     label: 'Settings',
     items: [
       { href: '/settings/preferences', label: 'Preferences', icon: <Settings className="w-5 h-5" /> },
+      { href: '/settings/schedule-upload', label: 'Schedule Upload', icon: <Upload className="w-5 h-5" /> },
     ],
   },
   {
