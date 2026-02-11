@@ -20,7 +20,11 @@ from app.core.config import get_settings
 from app.models.user import CurrentUser
 from app.schemas.production import (
     AssetDetail,
+    ProductAttainment,
+    ScheduleAttainmentResponse,
+    VarianceCallout,
     WorkcenterEntry,
+    WorkcenterScheduleAttainment,
     WorkcenterSummaryResponse,
 )
 
@@ -497,4 +501,250 @@ async def get_workcenter_summary(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to fetch workcenter summary data",
+        )
+
+
+@router.get(
+    "/schedule-attainment",
+    response_model=ScheduleAttainmentResponse,
+    summary="Get Schedule Attainment Data",
+    description="Compare scheduled vs. actual production by product per workcenter.",
+)
+async def get_schedule_attainment(
+    report_date: date = Query(
+        ...,
+        alias="date",
+        description="Date in YYYY-MM-DD format",
+    ),
+    area: Optional[str] = Query(None, description="Filter by plant area"),
+    current_user: CurrentUser = Depends(get_current_user),
+) -> ScheduleAttainmentResponse:
+    """
+    Get schedule attainment with per-workcenter product breakdown and variance callouts.
+
+    Story 12.5 AC#1: Per-workcenter schedule attainment with product breakdown
+    Story 12.5 AC#2: Product swap variance callouts
+    Story 12.5 AC#3: No schedule returns 200 with message
+    Story 12.5 AC#5: Optional area filter
+    """
+    try:
+        date_str = report_date.isoformat()
+        client = await get_supabase_client()
+
+        # Query production_schedule for the requested date
+        schedule_response = (
+            client.table("production_schedule")
+            .select("id, asset_id, product_id, scheduled_quantity, scheduled_date, shift")
+            .eq("scheduled_date", date_str)
+            .execute()
+        )
+
+        # AC#3: No schedule data -> return early with message
+        if not schedule_response.data:
+            return ScheduleAttainmentResponse(
+                date=date_str,
+                workcenters=[],
+                has_data=False,
+                message="No schedule data for this date",
+            )
+
+        # Query production_actuals for the requested date
+        actuals_response = (
+            client.table("production_actuals")
+            .select("id, asset_id, product_id, actual_quantity, production_date, shift")
+            .eq("production_date", date_str)
+            .execute()
+        )
+
+        # Query assets and products for name resolution
+        assets_response = client.table("assets").select("id, name, area").execute()
+        products_response = client.table("products").select("id, name").execute()
+
+        # Build lookup maps
+        assets_map: Dict[str, dict] = {}
+        for asset in (assets_response.data or []):
+            asset_area = asset.get("area")
+            if not asset_area:
+                continue
+            assets_map[asset["id"]] = {
+                "name": asset["name"],
+                "area": asset_area,
+            }
+
+        # AC#5: Apply area filter if specified (case-insensitive)
+        if area:
+            assets_map = {
+                k: v for k, v in assets_map.items()
+                if v.get("area") and v["area"].lower() == area.lower()
+            }
+
+        products_map: Dict[str, str] = {}
+        for product in (products_response.data or []):
+            products_map[product["id"]] = product["name"]
+
+        # Group schedule entries by (asset_id, shift) -> list of entries
+        schedule_by_asset_shift: Dict[tuple, list] = {}
+        for entry in schedule_response.data:
+            key = (entry["asset_id"], entry["shift"])
+            if key not in schedule_by_asset_shift:
+                schedule_by_asset_shift[key] = []
+            schedule_by_asset_shift[key].append(entry)
+
+        # Group actuals entries by (asset_id, shift) -> list of entries
+        actuals_by_asset_shift: Dict[tuple, list] = {}
+        for entry in (actuals_response.data or []):
+            key = (entry["asset_id"], entry["shift"])
+            if key not in actuals_by_asset_shift:
+                actuals_by_asset_shift[key] = []
+            actuals_by_asset_shift[key].append(entry)
+
+        # Collect all (asset_id, shift) pairs from both schedule and actuals
+        all_keys = set(schedule_by_asset_shift.keys()) | set(actuals_by_asset_shift.keys())
+
+        # Group results by workcenter (area)
+        workcenter_data: Dict[str, dict] = {}
+
+        for asset_id, shift in all_keys:
+            # Skip assets not in our filtered assets_map
+            if asset_id not in assets_map:
+                continue
+
+            asset_info = assets_map[asset_id]
+            asset_name = asset_info["name"]
+            wc_name = asset_info["area"]
+
+            if wc_name not in workcenter_data:
+                workcenter_data[wc_name] = {
+                    "products": {},  # product_id -> {scheduled, actual}
+                    "variances": [],
+                    "total_scheduled": 0,
+                    "total_actual": 0,
+                }
+
+            wc = workcenter_data[wc_name]
+
+            sched_entries = schedule_by_asset_shift.get((asset_id, shift), [])
+            actual_entries = actuals_by_asset_shift.get((asset_id, shift), [])
+
+            # Build product_id sets for this (asset, shift)
+            sched_product_ids = {e["product_id"] for e in sched_entries}
+            actual_product_ids = {e["product_id"] for e in actual_entries}
+
+            # Build lookup for scheduled quantities by product_id
+            sched_by_product: Dict[str, int] = {}
+            for e in sched_entries:
+                pid = e["product_id"]
+                sched_by_product[pid] = sched_by_product.get(pid, 0) + (e.get("scheduled_quantity") or 0)
+
+            # Build lookup for actual quantities by product_id
+            actual_by_product: Dict[str, int] = {}
+            for e in actual_entries:
+                pid = e["product_id"]
+                actual_by_product[pid] = actual_by_product.get(pid, 0) + (e.get("actual_quantity") or 0)
+
+            # Detect swaps: scheduled products not in actuals AND actual products not in schedule
+            # on the same (asset, shift)
+            missing_products = sched_product_ids - actual_product_ids
+            unscheduled_products = actual_product_ids - sched_product_ids
+
+            # Generate swap callouts when both missing and unscheduled exist on same (asset, shift)
+            if missing_products and unscheduled_products:
+                for missing_pid in missing_products:
+                    scheduled_product_name = products_map.get(missing_pid, missing_pid)
+                    scheduled_qty = sched_by_product.get(missing_pid, 0)
+                    for unsched_pid in unscheduled_products:
+                        actual_product_name = products_map.get(unsched_pid, unsched_pid)
+                        wc["variances"].append(VarianceCallout(
+                            asset_name=asset_name,
+                            message=(
+                                f"{asset_name} ran {actual_product_name} instead of "
+                                f"scheduled {scheduled_product_name} — "
+                                f"{scheduled_qty} units of {scheduled_product_name} still needed"
+                            ),
+                            variance_type="swap",
+                        ))
+
+            # Generate missing callouts for scheduled products with no actual at all
+            # (only if not already covered by swap)
+            if missing_products and not unscheduled_products:
+                for missing_pid in missing_products:
+                    scheduled_product_name = products_map.get(missing_pid, missing_pid)
+                    wc["variances"].append(VarianceCallout(
+                        asset_name=asset_name,
+                        message=f"Scheduled {scheduled_product_name} but no production recorded",
+                        variance_type="missing",
+                    ))
+
+            # Generate unscheduled callouts for actual products with no schedule
+            # (only if not already covered by swap)
+            if unscheduled_products and not missing_products:
+                for unsched_pid in unscheduled_products:
+                    actual_product_name = products_map.get(unsched_pid, unsched_pid)
+                    wc["variances"].append(VarianceCallout(
+                        asset_name=asset_name,
+                        message=f"Produced {actual_product_name} but not scheduled",
+                        variance_type="unscheduled",
+                    ))
+
+            # Accumulate product attainment data
+            # Scheduled products
+            for pid, sched_qty in sched_by_product.items():
+                actual_qty = actual_by_product.get(pid, 0)
+                if pid not in wc["products"]:
+                    wc["products"][pid] = {"scheduled": 0, "actual": 0}
+                wc["products"][pid]["scheduled"] += sched_qty
+                wc["products"][pid]["actual"] += actual_qty
+                wc["total_scheduled"] += sched_qty
+                wc["total_actual"] += actual_qty
+
+            # Unscheduled products (actual only, not in schedule for this asset/shift)
+            for pid in unscheduled_products:
+                actual_qty = actual_by_product.get(pid, 0)
+                if pid not in wc["products"]:
+                    wc["products"][pid] = {"scheduled": 0, "actual": 0}
+                wc["products"][pid]["actual"] += actual_qty
+                wc["total_actual"] += actual_qty
+
+        # Build response workcenter entries
+        workcenter_entries: List[WorkcenterScheduleAttainment] = []
+        for wc_name in sorted(workcenter_data.keys()):
+            wc = workcenter_data[wc_name]
+
+            product_list: List[ProductAttainment] = []
+            for pid, qty_data in wc["products"].items():
+                sched_qty = qty_data["scheduled"]
+                actual_qty = qty_data["actual"]
+                att_pct = calculate_percentage(actual_qty, sched_qty)
+                product_list.append(ProductAttainment(
+                    product_name=products_map.get(pid, pid),
+                    product_id=pid,
+                    scheduled_quantity=sched_qty,
+                    actual_quantity=actual_qty,
+                    attainment_pct=att_pct,
+                ))
+
+            total_sched = wc["total_scheduled"]
+            total_act = wc["total_actual"]
+            overall_pct = calculate_percentage(total_act, total_sched)
+
+            workcenter_entries.append(WorkcenterScheduleAttainment(
+                workcenter=wc_name,
+                products=product_list,
+                variances=wc["variances"],
+                overall_attainment_pct=overall_pct,
+            ))
+
+        return ScheduleAttainmentResponse(
+            date=date_str,
+            workcenters=workcenter_entries,
+            has_data=True,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching schedule attainment: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch schedule attainment data",
         )

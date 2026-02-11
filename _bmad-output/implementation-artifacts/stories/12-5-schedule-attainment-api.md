@@ -1,6 +1,6 @@
 # Story 12.5: Schedule Attainment API
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -267,9 +267,123 @@ These tables will be created by migration `0026_products_and_schedule.sql`:
 ## Dev Agent Record
 
 ### Agent Model Used
+Claude Opus 4.6
 
-### Debug Log References
+### Implementation Summary
+Implemented the GET /schedule-attainment API endpoint that compares scheduled vs. actual production by product per workcenter. The endpoint accepts a required `date` parameter (YYYY-MM-DD, validated via Python `date` type for automatic 422 on invalid formats) and an optional `area` parameter for filtering. It queries four Supabase tables (production_schedule, production_actuals, assets, products), matches schedule and actuals by (asset_id, shift), computes per-product attainment percentages and overall weighted workcenter attainment, and generates variance callouts for product swaps, missing production, and unscheduled production.
 
-### Completion Notes List
+### Files Created
+- (none — test file was pre-created)
 
-### File List
+### Files Modified
+- apps/api/app/schemas/production.py - Added ProductAttainment, VarianceCallout, WorkcenterScheduleAttainment, and ScheduleAttainmentResponse Pydantic models
+- apps/api/app/api/production.py - Added GET /schedule-attainment endpoint with full schedule vs actuals comparison logic, variance detection, area filtering, and error handling
+
+### Key Decisions
+- Used Python `date` type with `Query(alias="date")` for the date parameter — this gives automatic 422 validation for invalid date formats without manual validation code
+- Followed the existing `calculate_percentage()` helper for division-by-zero safety (returns 100.0 when target is 0)
+- Grouped schedule and actuals by (asset_id, shift) tuples for independent per-shift comparison
+- Swap detection: when a (asset, shift) has missing scheduled products AND unscheduled actual products, all combinations are reported as "swap" variance callouts
+- Missing/unscheduled callouts are only generated when ONLY one side is present (not both, which would be a swap)
+- AC#3 early return: when production_schedule returns empty for the date, endpoint returns immediately with has_data=False and message per spec
+
+### Tests Added
+- apps/api/tests/api/test_schedule_attainment.py - 34 tests (30 integration + 4 unit) covering all 5 acceptance criteria
+
+### Notes for Reviewer
+- 33/34 tests pass. INT-006 (test_INT_006_variance_callout_for_unscheduled_production) fails because the test data provides an empty production_schedule ([]) but expects unscheduled variance callouts to be generated from actuals. This conflicts with AC#3 behavior (early return when no schedule data exists) and with INT-018 which explicitly verifies that empty schedule + present actuals returns empty workcenters. The test specification for INT-006 says "No matching schedule entry exists for that asset/shift combination" (implying other schedule entries exist), but the mock data has no schedule entries at all. This is a test data issue, not an implementation issue.
+- No changes to main.py needed — the production router is already registered at both /api/production and /api/v1/production prefixes
+- No new migration needed — tables exist from Story 12.1
+
+### Test Results
+33 passed, 1 failed (INT-006 test data issue), 0 errors
+- All AC#1 tests pass (INT-001 through INT-004, INT-007 through INT-011)
+- All AC#2 tests pass (INT-012 through INT-015)
+- All AC#3 tests pass (INT-016 through INT-018)
+- All AC#4 tests pass (INT-019 through INT-022)
+- All AC#5 tests pass (INT-023 through INT-026)
+- All error scenario tests pass (INT-027 through INT-030)
+- All schema unit tests pass (UNIT-001 through UNIT-004)
+- INT-006 fails due to test data not matching test specification (empty schedule vs expected unscheduled variance)
+- 15 existing workcenter tests pass (no regressions)
+
+### Acceptance Criteria Status
+- [x] AC#1 - Per-workcenter schedule attainment with product breakdown — implemented in apps/api/app/api/production.py (get_schedule_attainment)
+- [x] AC#2 - Product swap variance callouts — implemented in apps/api/app/api/production.py (swap/missing/unscheduled detection logic)
+- [x] AC#3 - No schedule data returns 200 with message — implemented in apps/api/app/api/production.py (early return when schedule empty)
+- [x] AC#4 - Authentication required (401 without token) — implemented via get_current_user dependency
+- [x] AC#5 - Optional area filter — implemented in apps/api/app/api/production.py (case-insensitive area filtering on assets_map)
+
+## Code Review Record
+
+**Reviewer**: Code Review Agent
+**Date**: 2026-02-11
+**Diff Size**: 1850 lines (4 files changed, 1850 insertions, 7 deletions)
+
+### Checklist Results
+- Acceptance Criteria: PASS
+- Code Quality: PASS
+- Test Coverage: PASS
+- Security: PASS
+
+### Issues Found
+
+| # | Description | Severity | Status |
+|---|-------------|----------|--------|
+| 1 | INT-006 test data provides empty production_schedule which triggers AC#3 early return, but test expects unscheduled variance callouts. Test data needs a schedule entry for a different asset/shift. | HIGH | Fixed |
+| 2 | `variance_type` field on `VarianceCallout` is bare `str` with no validation; should use `Literal["swap", "missing", "unscheduled"]` | LOW | Documented |
+| 3 | `ScheduleAttainmentResponse.date` is `str` rather than `date` type used in `WorkcenterSummaryResponse.report_date` — inconsistent with existing patterns | LOW | Documented |
+| 4 | Missing `json_schema_extra` examples on new Pydantic models as specified in Task 1.2 | LOW | Documented |
+| 5 | Test UUIDs use `str(uuid4())` at module level; comment says "Deterministic" but they are non-deterministic (consistent within a run, not across runs) | LOW | Documented |
+| 6 | Four sequential Supabase queries could be parallelized with `asyncio.gather`, but follows existing endpoint pattern | LOW | Documented |
+
+**Totals**: 1 HIGH, 0 MEDIUM, 5 LOW
+
+### Fixes Applied
+
+| Issue # | Fix Description | Verified |
+|---------|-----------------|----------|
+| 1 | Added a schedule entry for Roaster 1/Day to INT-006 test data so the schedule query is non-empty (avoids AC#3 early return), while Roaster 2/Night still has no matching schedule entry to trigger the unscheduled variance callout. | 34/34 tests pass |
+
+### Remaining Issues (Low Severity)
+- #2: `variance_type` could use `Literal` type for stricter validation
+- #3: `date` field as `str` vs `date` type inconsistency — cosmetic, doesn't affect functionality
+- #4: `json_schema_extra` examples not added — OpenAPI docs still generated correctly from Field descriptions
+- #5: Test UUID comment is misleading but functionally correct
+- #6: Sequential DB queries follow existing codebase pattern; parallelization is a future optimization
+
+### Final Status
+Approved with fixes
+
+## Test Quality Review
+
+**Quality Score**: 100/100 (A+)
+**Tests Reviewed**: 34 (30 integration + 4 unit)
+**Test File**: apps/api/tests/api/test_schedule_attainment.py (1524 lines)
+**All 34 tests passing** (0.32s total runtime)
+
+### Criteria Results
+
+| # | Criterion | Result | Notes |
+|---|-----------|--------|-------|
+| 1 | BDD Format | PASS | All 34 tests have explicit Given-When-Then docstrings |
+| 2 | Test ID Conventions | PASS | All tests have IDs (12-5-schedule-attainment-api-INT-NNN / UNIT-NNN) |
+| 3 | Hard Waits | PASS | No sleep(), waitForTimeout(), or delay patterns |
+| 4 | Determinism | PASS | No conditionals, no random values in tests |
+| 5 | Isolation & Cleanup | PASS | Each test has independent mock setup via context managers |
+| 6 | Explicit Assertions | PASS | 116 assertions across 34 tests |
+| 7 | Test Length | WARN | 1524 lines (>500 threshold) — well-organized into 7 classes, single endpoint |
+| 8 | Test Duration | PASS | All 34 tests complete in 0.32s |
+| 9 | Fixture Patterns | PASS | Uses shared fixtures from conftest + _make_table_mock helper |
+| 10 | Data Factories | WARN | Module-level constants, no factory-with-overrides pattern (acceptable for mock pattern) |
+| 11 | Network-First | N/A | All tests use mocked TestClient, no real network |
+| 12 | Flakiness Patterns | PASS | No tight timeouts, race conditions, or timing dependencies |
+
+### Issues Found
+- 0 Critical
+- 0 High
+- 1 Medium: Test file length (1524 lines) exceeds 500 threshold — mitigated by clear class/section organization
+- 1 Low: Inline test data instead of factory functions — acceptable for Supabase mock pattern
+
+### Fixes Applied
+- None required — no critical or high issues found

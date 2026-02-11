@@ -44,3 +44,44 @@ class WorkcenterSummaryResponse(BaseModel):
     workcenters: List[WorkcenterEntry] = Field(default_factory=list)
     report_date: date = Field(..., description="The date for this summary")
     message: Optional[str] = Field(None, description="Status message (e.g., no data available)")
+
+
+# =============================================================================
+# Schedule Attainment Models (Story 12.5)
+# =============================================================================
+
+
+class ProductAttainment(BaseModel):
+    """Per-product attainment detail within a workcenter."""
+
+    product_name: str = Field(..., description="Product name")
+    product_id: str = Field(..., description="Product UUID")
+    scheduled_quantity: int = Field(0, description="Scheduled quantity")
+    actual_quantity: int = Field(0, description="Actual quantity produced")
+    attainment_pct: float = Field(0.0, description="Attainment percentage")
+
+
+class VarianceCallout(BaseModel):
+    """Variance callout for schedule deviations."""
+
+    asset_name: str = Field(..., description="Asset that had the variance")
+    message: str = Field(..., description="Human-readable variance description")
+    variance_type: str = Field(..., description="swap, missing, or unscheduled")
+
+
+class WorkcenterScheduleAttainment(BaseModel):
+    """Schedule attainment data for one workcenter."""
+
+    workcenter: str = Field(..., description="Workcenter/area name")
+    products: List[ProductAttainment] = Field(default_factory=list)
+    variances: List[VarianceCallout] = Field(default_factory=list)
+    overall_attainment_pct: float = Field(0.0, description="Overall workcenter attainment %")
+
+
+class ScheduleAttainmentResponse(BaseModel):
+    """Response model for schedule attainment endpoint."""
+
+    date: str = Field(..., description="Report date (YYYY-MM-DD)")
+    workcenters: List[WorkcenterScheduleAttainment] = Field(default_factory=list)
+    message: Optional[str] = Field(None, description="Status message (e.g., no data)")
+    has_data: bool = Field(True, description="Whether schedule data exists for this date")
