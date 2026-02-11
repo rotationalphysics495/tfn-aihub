@@ -2,6 +2,7 @@ import { SafetyAlertsSection } from '@/components/dashboard'
 import { MorningSummarySection } from '@/components/action-list'
 import { InsightEvidenceCardList } from '@/components/action-engine'
 import { Breadcrumb } from '@/components/navigation'
+import { WorkcenterScorecard } from '@/components/production'
 
 /**
  * Morning Report Page
@@ -42,6 +43,9 @@ export default function MorningReportPage() {
       <div className="space-y-6">
         {/* Morning Summary Section - Secondary context - AC #6 */}
         <MorningSummarySection />
+
+        {/* Workcenter Production Scorecard - Story 11.2 */}
+        <WorkcenterScorecard />
 
         {/* Action List - Primary content area - AC #2 */}
         {/* Story 3.4: Insight + Evidence Cards - recommendation + supporting data */}

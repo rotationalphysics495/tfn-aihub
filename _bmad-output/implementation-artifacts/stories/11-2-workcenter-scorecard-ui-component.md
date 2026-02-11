@@ -1,6 +1,6 @@
 # Story 11.2: Workcenter Scorecard UI Component
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -22,34 +22,34 @@ so that **I can absorb the whole plant's performance in 5 seconds**.
 
 ## Tasks / Subtasks
 
-- [ ] Task 1: Create `useWorkcenterSummary` data fetching hook (AC: #1, #3)
-  - [ ] 1.1 Define TypeScript interfaces for workcenter summary response matching the API contract from Story 11.1
-  - [ ] 1.2 Implement hook with Bearer token auth pattern (follow `useDailyActions` pattern exactly)
-  - [ ] 1.3 Add loading, error, and empty state handling
-  - [ ] 1.4 Default date to T-1 (yesterday) when no date parameter provided
-- [ ] Task 2: Create `WorkcenterScorecard.tsx` main container component (AC: #1, #3)
-  - [ ] 2.1 Implement container with loading skeleton, error state with retry, and empty state
-  - [ ] 2.2 Render list of `WorkcenterRow` components from API data
-  - [ ] 2.3 Add section header "Production Scorecard" with appropriate styling
-- [ ] Task 3: Create `WorkcenterRow.tsx` expandable row component (AC: #1, #2)
-  - [ ] 3.1 Display workcenter name, actual/target output, attainment %, and asset hit/miss count
-  - [ ] 3.2 Implement attainment color coding: green >= 95%, yellow 85-94%, red < 85%
-  - [ ] 3.3 Add click/expand toggle to reveal `AssetDetailTable`
-  - [ ] 3.4 Use Shadcn Card component with Collapsible pattern (see Dev Notes for implementation without Shadcn Collapsible)
-- [ ] Task 4: Create `AssetDetailTable.tsx` expanded detail component (AC: #2)
-  - [ ] 4.1 Display table with columns: asset name, actual vs. target, OEE %, downtime minutes
-  - [ ] 4.2 Color-code each asset row: green if actual >= target, red if missed
-  - [ ] 4.3 Format numbers for readability (use `toLocaleString()` for comma separation)
-- [ ] Task 5: Create barrel export `index.ts` for production scorecard components (AC: all)
-  - [ ] 5.1 Export all new components from `components/production/index.ts` (update existing barrel)
-- [ ] Task 6: Integrate scorecard into morning report page (AC: #1)
-  - [ ] 6.1 Import `WorkcenterScorecard` into `apps/web/src/app/(main)/morning-report/page.tsx`
-  - [ ] 6.2 Position scorecard between `MorningSummarySection` and the action items section
-  - [ ] 6.3 Ensure scorecard renders as a client component wrapper if needed (page is server component)
-- [ ] Task 7: Ensure glanceability and responsive design (AC: #4)
-  - [ ] 7.1 Use large font sizes for key numbers (text-2xl minimum for attainment %)
-  - [ ] 7.2 Test responsive layout on tablet-size viewports
-  - [ ] 7.3 Ensure touch-friendly expand/collapse targets (min 44px tap target)
+- [x] Task 1: Create `useWorkcenterSummary` data fetching hook (AC: #1, #3)
+  - [x] 1.1 Define TypeScript interfaces for workcenter summary response matching the API contract from Story 11.1
+  - [x] 1.2 Implement hook with Bearer token auth pattern (follow `useDailyActions` pattern exactly)
+  - [x] 1.3 Add loading, error, and empty state handling
+  - [x] 1.4 Default date to T-1 (yesterday) when no date parameter provided
+- [x] Task 2: Create `WorkcenterScorecard.tsx` main container component (AC: #1, #3)
+  - [x] 2.1 Implement container with loading skeleton, error state with retry, and empty state
+  - [x] 2.2 Render list of `WorkcenterRow` components from API data
+  - [x] 2.3 Add section header "Production Scorecard" with appropriate styling
+- [x] Task 3: Create `WorkcenterRow.tsx` expandable row component (AC: #1, #2)
+  - [x] 3.1 Display workcenter name, actual/target output, attainment %, and asset hit/miss count
+  - [x] 3.2 Implement attainment color coding: green >= 95%, yellow 85-94%, red < 85%
+  - [x] 3.3 Add click/expand toggle to reveal `AssetDetailTable`
+  - [x] 3.4 Use simple React state toggle (Option A from Dev Notes - no new dependency needed)
+- [x] Task 4: Create `AssetDetailTable.tsx` expanded detail component (AC: #2)
+  - [x] 4.1 Display table with columns: asset name, actual vs. target, OEE %, downtime minutes
+  - [x] 4.2 Color-code each asset row: green if actual >= target, red if missed
+  - [x] 4.3 Format numbers for readability (use `toLocaleString()` for comma separation)
+- [x] Task 5: Create barrel export `index.ts` for production scorecard components (AC: all)
+  - [x] 5.1 Export all new components from `components/production/index.ts` (update existing barrel)
+- [x] Task 6: Integrate scorecard into morning report page (AC: #1)
+  - [x] 6.1 Import `WorkcenterScorecard` into `apps/web/src/app/(main)/morning-report/page.tsx`
+  - [x] 6.2 Position scorecard between `MorningSummarySection` and the action items section
+  - [x] 6.3 Ensure scorecard renders as a client component wrapper if needed (page is server component)
+- [x] Task 7: Ensure glanceability and responsive design (AC: #4)
+  - [x] 7.1 Use large font sizes for key numbers (text-3xl for attainment %)
+  - [x] 7.2 Test responsive layout on tablet-size viewports
+  - [x] 7.3 Ensure touch-friendly expand/collapse targets (min 44px tap target)
 
 ## Dev Notes
 
@@ -227,10 +227,144 @@ Consider extracting or reusing `formatNumber` from `ThroughputCard.tsx` if possi
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.6
 
-### Debug Log References
+### Implementation Summary
 
-### Completion Notes List
+Implemented the Workcenter Scorecard UI component for the morning report page. The scorecard displays one expandable row per workcenter showing production attainment with color-coded performance indicators (green/yellow/red). Each row can be expanded to reveal per-asset detail tables with hit/miss color coding. The component includes loading skeleton, error state with retry, and empty state handling.
 
-### File List
+### Files Created
+- `apps/web/src/hooks/useWorkcenterSummary.ts` - Data fetching hook with Bearer token auth, T-1 date default, 404-as-empty-state handling, mountedRef cleanup
+- `apps/web/src/components/production/AssetDetailTable.tsx` - Per-asset breakdown table with green/red row coloring based on target attainment
+- `apps/web/src/components/production/WorkcenterRow.tsx` - Expandable workcenter row with attainment color coding, glanceable typography (text-3xl), 44px touch targets
+- `apps/web/src/components/production/WorkcenterScorecard.tsx` - Container component with loading/error/empty/success states following ActionListContainer pattern
+
+### Files Modified
+- `apps/web/src/components/production/index.ts` - Added barrel exports for WorkcenterScorecard, WorkcenterRow, AssetDetailTable
+- `apps/web/src/app/(main)/morning-report/page.tsx` - Added WorkcenterScorecard between MorningSummarySection and action items section
+
+### Key Decisions
+- Used Option A (simple React state toggle) for expand/collapse instead of installing Shadcn Collapsible - simpler, no new dependency
+- Used `actual >= target` comparison for asset row hit/miss coloring (matching test expectations for green/red backgrounds)
+- Used `\u2014` (em dash) as fallback for null OEE and downtime_minutes values
+- Matched test interface exactly: `workcenter_name`, `attainment_percentage`, `assets_on_target`, `total_assets` field names
+- 404 responses treated as empty state with synthetic empty WorkcenterSummaryResponse (not error)
+
+### Tests Added
+- `apps/web/src/components/production/__tests__/WorkcenterScorecard.test.tsx` - 42 tests covering all 4 ACs (rendering, color coding, expand/collapse, empty state, loading, error, glanceability, page integration)
+- `apps/web/src/hooks/__tests__/useWorkcenterSummary.test.ts` - 10 tests covering auth, date defaulting, error handling (401/404/500/network), refetch, unmount cleanup
+
+### Notes for Reviewer
+- All 52 tests pass (42 component + 10 hook)
+- Tests must be run from `apps/web/` directory (vitest config resolves `@/` alias from there)
+- The hook interface matches the story's API contract types (with nullable oee/downtime_minutes for AssetDetail)
+- No new npm dependencies added
+
+### Test Results
+```
+ ✓ src/components/production/__tests__/WorkcenterScorecard.test.tsx  (42 tests) 186ms
+ ✓ src/hooks/__tests__/useWorkcenterSummary.test.ts  (10 tests) 495ms
+
+ Test Files  2 passed (2)
+      Tests  52 passed (52)
+```
+
+### Acceptance Criteria Status
+- [x] AC1 - Scorecard renders one row per workcenter with name, actual/target, attainment %, asset count, color coding - implemented in WorkcenterScorecard.tsx, WorkcenterRow.tsx
+- [x] AC2 - Click/expand shows per-asset breakdown with name, actual/target, OEE %, downtime, green/red row coloring - implemented in WorkcenterRow.tsx, AssetDetailTable.tsx
+- [x] AC3 - Empty state when no data, uses API message or default fallback - implemented in WorkcenterScorecard.tsx, useWorkcenterSummary.ts (404 handling)
+- [x] AC4 - Glanceability: text-3xl font-bold tabular-nums for attainment, text-lg font-semibold for names, 44px touch targets - implemented in WorkcenterRow.tsx
+
+## Code Review Record
+
+**Reviewer**: Code Review Agent
+**Date**: 2026-02-11
+**Diff Size**: 1751 lines (9 files changed)
+
+### Checklist Results
+- Acceptance Criteria: PASS
+- Code Quality: PASS
+- Test Coverage: PASS
+- Security: PASS
+
+### Issues Found
+
+| # | Description | Severity | Status |
+|---|-------------|----------|--------|
+| 1 | Redundant `role="button"` on native `<button>` element in WorkcenterRow.tsx:29 — violates WCAG best practice (implicit role is sufficient) | MEDIUM | Fixed |
+| 2 | `workcenter_name` used as React list key in WorkcenterScorecard.tsx:99 — potential collision if duplicate names exist in data | LOW | Documented |
+| 3 | `asset_name` used as React list key in AssetDetailTable.tsx:27 — same collision risk as #2 | LOW | Documented |
+| 4 | `Content-Type: application/json` header on GET request is semantically unnecessary (no body) — matches existing project convention | LOW | Documented |
+| 5 | `isLoading` initializes as `false` with `autoFetch: true`, brief flash possible before fetch starts — matches canonical `useDailyActions` pattern | LOW | Documented |
+
+**Totals**: 0 HIGH, 1 MEDIUM, 4 LOW
+
+### Fixes Applied
+
+| Issue # | Fix Description | Verified |
+|---------|-----------------|----------|
+| 1 | Removed redundant `role="button"` from native `<button>` element in WorkcenterRow.tsx | Tests pass (52/52) |
+
+### Remaining Issues (Low Severity)
+- Issues #2-3: List key collision risk is theoretical — API data is expected to have unique names. Could add index-based keys in a future cleanup.
+- Issue #4: Content-Type on GET is harmless and matches project convention. No action needed.
+- Issue #5: Initial isLoading state matches canonical hook pattern. Would require codebase-wide refactor to change.
+
+### Review Notes
+- All 52 tests pass (42 component + 10 hook)
+- Auth pattern correctly follows `useDailyActions.ts` canonical pattern (Bearer token via Supabase session)
+- Color coding thresholds match spec: green >= 95%, yellow 85-94%, red < 85%
+- Color tokens (`success-green-dark`, `warning-amber-dark`, `safety-red`, `success-green-light`, `safety-red-light`) all exist in project Tailwind config
+- Component follows existing container pattern (loading -> error -> empty -> success) from ActionListContainer.tsx
+- Page integration correctly positions scorecard between MorningSummarySection and action items
+- No new dependencies added
+- No security issues found (no user input injection vectors, proper auth handling)
+
+### Final Status
+Approved with fixes
+
+## Test Quality Review
+
+**Reviewer**: Test Architect (TEA)
+**Date**: 2026-02-11
+**Quality Score**: 100/100 (A+)
+**Tests Reviewed**: 52 (42 component + 10 hook)
+
+### Files Reviewed
+- `apps/web/src/components/production/__tests__/WorkcenterScorecard.test.tsx` (42 tests, 908 lines)
+- `apps/web/src/hooks/__tests__/useWorkcenterSummary.test.ts` (10 tests, 342 lines)
+
+### Criteria Results
+
+| Criterion | WorkcenterScorecard.test.tsx | useWorkcenterSummary.test.ts |
+|-----------|-----|------|
+| BDD Format (Given-When-Then) | PASS | PASS |
+| Test ID Conventions | PASS (UNIT-001–041, INT-001) | PASS (UNIT-042–051) |
+| Hard Waits Detection | PASS (none) | PASS (none) |
+| Determinism | PASS | PASS |
+| Isolation & Cleanup | PASS | PASS |
+| Explicit Assertions | PASS | PASS |
+| Test Length | WARN (908 lines) | PASS (342 lines) |
+| Test Duration | PASS (179ms total) | PASS (488ms total) |
+| Fixture Patterns | PASS (excellent) | PASS |
+| Data Factories | PASS (5 factories with overrides) | PASS (3 factories with overrides) |
+| Network-First Pattern | N/A (unit tests) | N/A (mocked fetch) |
+| Flakiness Patterns | PASS (none detected) | PASS (none detected) |
+
+### Issues Found
+- 0 Critical
+- 0 High
+- 1 Medium: WorkcenterScorecard.test.tsx exceeds 500-line threshold (908 lines) — well-organized into 5 describe blocks by AC, splitting would reduce cohesion
+- 1 Low: Misleading "No assertion needed" comment in UNIT-051 despite assertion being present (useWorkcenterSummary.test.ts:337)
+
+### Fixes Applied
+- None required (no critical or high issues)
+
+### Quality Highlights
+- Excellent BDD structure with explicit Given-When-Then comments on every test
+- Comprehensive factory pattern: 8 factory functions across both files with Partial override support
+- Perfect test isolation: beforeEach/afterEach cleanup, no shared mutable state
+- Complete test ID traceability: 52 tests with sequential UNIT-NNN IDs
+- Thorough boundary testing: color thresholds at 84.9%, 85.0%, 95.0%, 100.0%, 112.5%
+- Null handling tested: OEE and downtime_minutes null cases covered
+- All 52 tests pass deterministically in <1s total
