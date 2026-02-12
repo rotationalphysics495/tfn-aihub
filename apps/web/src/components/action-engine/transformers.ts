@@ -97,8 +97,9 @@ function transformEvidence(
   createdAt: string,
   financialImpact: number
 ): Evidence {
-  // Get source info from evidence refs
-  const primaryRef = evidenceRefs[0] || {
+  // Get source info from evidence refs (guard against missing data)
+  const refs = evidenceRefs ?? []
+  const primaryRef = refs[0] || {
     table: 'daily_summaries',
     record_id: 'unknown',
   }
@@ -172,11 +173,13 @@ function transformEvidence(
  * Transform API ActionItem to Insight + Evidence ActionItem
  */
 export function transformAPIActionItem(item: APIActionItem): InsightActionItem {
-  const priority = mapCategoryToPriority(item.category)
+  const category = item.category ?? 'oee'
+  const priority = mapCategoryToPriority(category)
+  const financialImpact = item.financial_impact_usd ?? 0
   const priorityScore = mapPriorityLevelToScore(
-    item.priority_level,
-    item.category,
-    item.financial_impact_usd
+    item.priority_level ?? 'medium',
+    category,
+    financialImpact
   )
 
   return {
@@ -184,25 +187,25 @@ export function transformAPIActionItem(item: APIActionItem): InsightActionItem {
     priority,
     priorityScore,
     recommendation: {
-      text: item.recommendation_text || item.title,
-      summary: item.evidence_summary || item.description,
+      text: item.recommendation_text || item.title || '',
+      summary: item.evidence_summary || item.description || '',
     },
     asset: {
-      id: item.asset_id,
-      name: item.asset_name,
+      id: item.asset_id ?? '',
+      name: item.asset_name ?? '',
       area: '', // Would come from asset lookup
     },
     evidence: transformEvidence(
-      item.category,
+      category,
       item.evidence_refs,
-      item.primary_metric_value,
-      item.evidence_summary,
-      item.asset_name,
-      item.created_at,
-      item.financial_impact_usd
+      item.primary_metric_value ?? '',
+      item.evidence_summary ?? '',
+      item.asset_name ?? '',
+      item.created_at ?? new Date().toISOString(),
+      financialImpact
     ),
-    financialImpact: item.financial_impact_usd,
-    timestamp: item.created_at,
+    financialImpact,
+    timestamp: item.created_at ?? new Date().toISOString(),
     acknowledgment: item.acknowledgment ?? null,
     trendData: item.trend_data ? {
       metricHistory: Array.isArray(item.trend_data.metric_values)

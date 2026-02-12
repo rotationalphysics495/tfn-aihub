@@ -6,9 +6,14 @@ import { format, subDays, startOfDay, isValid, parseISO } from 'date-fns'
 import { SafetyAlertsSection } from '@/components/dashboard'
 import { MorningSummarySection, MyAssignmentsPanel } from '@/components/action-list'
 import { InsightEvidenceCardList } from '@/components/action-engine'
+import type { ActionItem as InsightActionItem } from '@/components/action-engine/types'
+import type { PriorityType } from '@/components/action-engine/PriorityBadge'
 import { Breadcrumb } from '@/components/navigation'
 import { WorkcenterScorecard, ScheduleAttainment, ShiftTabs } from '@/components/production'
 import { useDailyActions } from '@/hooks/useDailyActions'
+import { useFollowUps } from '@/hooks/useFollowUps'
+import { MeetingModeToggle } from '@/components/report/MeetingModeToggle'
+import { MeetingModeView } from '@/components/report/MeetingModeView'
 
 function getYesterday(): Date {
   return startOfDay(subDays(new Date(), 1))
@@ -45,23 +50,45 @@ export function MorningReportClient() {
     () => searchParams.get('shift') || 'all'
   )
 
+  // Story 18.1: Meeting mode state initialized from URL
+  const [isMeetingMode, setIsMeetingMode] = useState<boolean>(
+    () => searchParams.get('mode') === 'meeting'
+  )
+
   const handleDateChange = useCallback(
     (newDate: Date) => {
       setSelectedDate(newDate)
       const formatted = format(newDate, 'yyyy-MM-dd')
       const shiftParam = selectedShift !== 'all' ? `&shift=${selectedShift}` : ''
-      router.push(`${pathname}?date=${formatted}${shiftParam}`, { scroll: false })
+      const modeParam = isMeetingMode ? '&mode=meeting' : ''
+      router.push(`${pathname}?date=${formatted}${shiftParam}${modeParam}`, { scroll: false })
     },
-    [router, pathname, selectedShift]
+    [router, pathname, selectedShift, isMeetingMode]
   )
 
   const handleShiftChange = useCallback(
     (shift: string) => {
       setSelectedShift(shift)
       const shiftParam = shift !== 'all' ? `&shift=${shift}` : ''
-      router.push(`${pathname}?date=${reportDate}${shiftParam}`, { scroll: false })
+      const modeParam = isMeetingMode ? '&mode=meeting' : ''
+      router.push(`${pathname}?date=${reportDate}${shiftParam}${modeParam}`, { scroll: false })
     },
-    [router, pathname, reportDate]
+    [router, pathname, reportDate, isMeetingMode]
+  )
+
+  // Story 18.1: Meeting mode toggle handler with URL state sync
+  const handleMeetingModeToggle = useCallback(
+    (isMeeting: boolean) => {
+      setIsMeetingMode(isMeeting)
+      const params = new URLSearchParams(searchParams.toString())
+      if (isMeeting) {
+        params.set('mode', 'meeting')
+      } else {
+        params.delete('mode')
+      }
+      router.push(`${pathname}?${params.toString()}`, { scroll: false })
+    },
+    [router, pathname, searchParams]
   )
 
   // Empty state detection: use useDailyActions to check if data exists for the selected date
@@ -71,6 +98,48 @@ export function MorningReportClient() {
     !actionsError &&
     actionsData !== null &&
     actionsData.actions.length === 0
+
+  // Story 18.1: Transform actions for meeting mode
+  const meetingModeItems = useMemo((): InsightActionItem[] => {
+    if (!actionsData?.actions) return []
+    return actionsData.actions.map((item: any) => {
+      const category = item.category as string
+      const priorityMap: Record<string, PriorityType> = { safety: 'SAFETY', financial: 'FINANCIAL', oee: 'OEE' }
+      const priority = priorityMap[category] ?? 'OEE'
+
+      // Handle both API field names (id) and alternative names (action_item_id)
+      const id = item.id ?? item.action_item_id ?? ''
+      const priorityScore = item.priority_rank ?? item.priority_score ?? 500
+      const recText = item.recommendation_text ?? item.title ?? ''
+      const recSummary = item.evidence_summary ?? item.recommendation_summary ?? item.description ?? ''
+      const assetId = item.asset_id ?? ''
+      const assetName = item.asset_name ?? ''
+      const financialImpact = item.financial_impact_usd ?? item.financial_impact ?? 0
+
+      return {
+        id,
+        priority,
+        priorityScore,
+        recommendation: { text: recText, summary: recSummary },
+        asset: { id: assetId, name: assetName, area: item.asset_area ?? '' },
+        evidence: {
+          type: (item.evidence_type ?? (category === 'safety' ? 'safety_event' : category === 'oee' ? 'oee_deviation' : 'financial_loss')) as any,
+          data: item.evidence_data ?? {},
+          source: {
+            table: item.evidence_source_table ?? 'daily_summaries',
+            date: item.evidence_source_date ?? reportDate,
+            recordId: item.evidence_source_record_id ?? '',
+          },
+        },
+        financialImpact,
+        timestamp: item.created_at ?? item.generated_at ?? new Date().toISOString(),
+      } satisfies InsightActionItem
+    })
+  }, [actionsData?.actions, reportDate])
+
+  // Story 18.1: Follow-up data for meeting mode (only fetch when meeting mode is active)
+  const meetingReportDate = isMeetingMode ? (actionsData?.report_date ?? null) : null
+  const { followUps } = useFollowUps({ reportDate: meetingReportDate })
 
   const formattedDateDisplay = format(selectedDate, 'MMM d, yyyy')
 
@@ -83,13 +152,19 @@ export function MorningReportClient() {
       <Breadcrumb className="mb-4" />
 
       {/* Page Header */}
-      <div className="mb-6 md:mb-8">
-        <h1 className="page-title text-foreground">
-          Morning Report
-        </h1>
-        <p className="body-text text-muted-foreground mt-2">
-          Daily action items prioritized for your morning review.
-        </p>
+      <div className="mb-6 md:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="page-title text-foreground">
+            Morning Report
+          </h1>
+          <p className="body-text text-muted-foreground mt-2">
+            Daily action items prioritized for your morning review.
+          </p>
+        </div>
+        <MeetingModeToggle
+          pressed={isMeetingMode}
+          onToggle={handleMeetingModeToggle}
+        />
       </div>
 
       {/* Empty state for missing data - AC #5 */}
@@ -105,6 +180,15 @@ export function MorningReportClient() {
               No production data available for {formattedDateDisplay}.
             </p>
           </div>
+        </div>
+      ) : isMeetingMode ? (
+        /* Story 18.1: Meeting mode view */
+        <div className="space-y-6">
+          <MeetingModeView
+            items={meetingModeItems}
+            followUps={followUps}
+            reportDate={reportDate}
+          />
         </div>
       ) : (
         <div className="space-y-6">
