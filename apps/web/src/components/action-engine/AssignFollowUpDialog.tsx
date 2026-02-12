@@ -109,20 +109,28 @@ export function AssignFollowUpDialog({
         return
       }
 
-      const { error: insertError } = await supabase
-        .from('action_followups')
-        .insert({
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${apiUrl}/api/v1/followups`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           action_item_id: actionItem.id,
           action_summary: actionItem.recommendationText,
           asset_name: actionItem.assetName,
           category: actionItem.category.toLowerCase(),
           assigned_to: selectedUserId,
-          assigned_by: session.user.id,
           note: note.trim() || null,
           report_date: actionItem.reportDate,
-        })
+        }),
+      })
 
-      if (insertError) throw insertError
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.detail || `Failed to assign follow-up (${response.status})`)
+      }
 
       setSubmitted(true)
       // Auto-close after success

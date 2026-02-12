@@ -91,6 +91,17 @@ class Settings(BaseSettings):
     elevenlabs_voice_id: str = ""  # Default voice ID
     elevenlabs_timeout: int = 10  # Request timeout in seconds
 
+    # SMTP Email Configuration (Story 15.2)
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = ""
+    smtp_use_tls: bool = True
+
+    # Application URL for constructing links (Story 15.2)
+    app_base_url: str = "http://localhost:3000"
+
     @property
     def mssql_connection_string(self) -> str:
         """Build MSSQL connection string with proper URL encoding for special characters."""
@@ -147,6 +158,17 @@ class Settings(BaseSettings):
     def elevenlabs_configured(self) -> bool:
         """Check if ElevenLabs TTS is properly configured (Story 8.1 AC#1)."""
         return bool(self.elevenlabs_api_key)
+
+    @property
+    def smtp_configured(self) -> bool:
+        """Check if SMTP email is properly configured (Story 15.2 AC#2)."""
+        return all([
+            self.smtp_host,
+            self.smtp_port,
+            self.smtp_user,
+            self.smtp_password,
+            self.smtp_from,
+        ])
 
 
 @lru_cache()

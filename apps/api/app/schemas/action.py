@@ -326,6 +326,27 @@ class ActionEngineConfig(BaseModel):
     )
 
 
+class FollowUpCreateRequest(BaseModel):
+    """Request to create a follow-up assignment (Story 15.2)."""
+    action_item_id: str = Field(..., description="Source action item ID")
+    action_summary: str = Field(..., description="Summary of the action")
+    asset_name: str = Field(..., description="Asset name")
+    category: str = Field(..., description="Category: safety, oee, financial")
+    assigned_to: str = Field(..., description="UUID of the assignee")
+    report_date: str = Field(..., description="Report date (YYYY-MM-DD)")
+    note: Optional[str] = Field(None, description="Optional note for the assignee")
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator('category')
+    @classmethod
+    def validate_category(cls, v):
+        allowed = {'safety', 'oee', 'financial'}
+        if v not in allowed:
+            raise ValueError(f'Category must be one of: {", ".join(sorted(allowed))}')
+        return v
+
+
 class FollowUpUpdateRequest(BaseModel):
     """Request to update a follow-up assignment status."""
     status: Optional[str] = Field(

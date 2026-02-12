@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import health, assets, summaries, actions, auth, pipelines, production, oee, downtime, safety, financial, live_pulse, memory, chat, asset_history, citations, agent, cache, voice, briefing, preferences, handoff, admin, team, schedule
+from app.api import health, assets, summaries, actions, auth, pipelines, production, oee, downtime, safety, financial, live_pulse, memory, chat, asset_history, citations, agent, cache, voice, briefing, preferences, handoff, admin, team, schedule, followups
 from app.core.database import initialize_database, shutdown_database
 from app.services.scheduler import get_scheduler
 from app.services.pipelines.live_pulse import run_live_pulse_poll
@@ -103,6 +103,8 @@ app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 app.include_router(team.router, prefix="/api/v1/team", tags=["Team"])
 # Story 12.3: Schedule Upload API for CSV/Excel schedule file upload and confirmation
 app.include_router(schedule.router, prefix="/api/v1/schedule", tags=["Schedule"])
+# Story 15.2: Follow-Ups API for creating follow-ups with email notifications
+app.include_router(followups.router, prefix="/api/v1/followups", tags=["Follow-Ups"])
 
 
 @app.get("/")
