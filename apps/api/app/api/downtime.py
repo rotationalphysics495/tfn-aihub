@@ -15,6 +15,7 @@ import logging
 from datetime import date, datetime, timedelta
 from typing import List, Optional
 
+from cachetools import TTLCache
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
@@ -35,6 +36,14 @@ from app.services.downtime_analysis import DowntimeAnalysisService
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+# Pareto endpoint cache: 15-minute TTL (daily tier)
+_pareto_cache: TTLCache = TTLCache(maxsize=100, ttl=900)
+
+
+def _pareto_cache_key(date_val, asset_id, area, start_date, end_date, source, user_id):
+    """Build a cache key for Pareto endpoint responses."""
+    return f"pareto:{date_val}:{asset_id}:{area}:{start_date}:{end_date}:{source}:{user_id}"
 
 
 # =============================================================================
@@ -204,6 +213,11 @@ async def get_downtime_events(
     description="Calculate Pareto distribution of downtime by reason code."
 )
 async def get_downtime_pareto(
+    date_param: Optional[date] = Query(
+        None,
+        alias="date",
+        description="Single date for downtime_events query (defaults to yesterday). When provided, takes precedence over start_date/end_date."
+    ),
     start_date: Optional[date] = Query(
         None,
         description="Start date for query range (defaults to yesterday)"
@@ -235,61 +249,120 @@ async def get_downtime_pareto(
     - Cumulative percentage
     - Financial impact per reason
     - 80% threshold indicator (Pareto principle)
+    - Planned vs. unplanned downtime split
+
+    When a `date` parameter is provided, the endpoint first queries the
+    `downtime_events` table for granular reason code data. If no events
+    are found, it falls back to the existing `daily_summaries` behavior.
 
     Results are sorted by descending downtime duration.
 
     Query Parameters:
-        - start_date: Start of date range (default: yesterday)
+        - date: Single date for downtime_events query (default: yesterday)
+        - start_date: Start of date range (for daily_summaries fallback)
         - end_date: End of date range
         - asset_id: Filter by specific asset
         - area: Filter by plant area
         - source: 'yesterday' or 'live'
 
     Returns:
-        ParetoResponse with items sorted by duration and 80% threshold index
+        ParetoResponse with items sorted by duration, 80% threshold index,
+        and planned/unplanned minute totals
     """
     try:
+        # Check cache first
+        cache_key = _pareto_cache_key(date_param, asset_id, area, start_date, end_date, source, current_user.id)
+        if cache_key in _pareto_cache:
+            return _pareto_cache[cache_key]
+
         client = await get_supabase_client()
         service = DowntimeAnalysisService(client)
 
-        data_source = parse_data_source(source)
+        # Determine the effective date for downtime_events query
+        effective_date = date_param if date_param else (date.today() - timedelta(days=1))
 
-        # Get raw data
-        if data_source == DataSource.LIVE_SNAPSHOTS:
-            raw_records = await service.get_downtime_from_live_snapshots(
-                asset_id=asset_id,
-                area=area,
+        # Try downtime_events table first
+        events_records = await service.get_downtime_from_events_table(
+            event_date=effective_date,
+            asset_id=asset_id,
+            area=area,
+        )
+
+        if events_records:
+            # Use downtime_events path
+            events = await service.transform_downtime_events_records(events_records)
+
+            pareto_items, threshold_80_index = service.calculate_pareto(events)
+
+            total_downtime_minutes = sum(e.duration_minutes for e in events)
+            total_financial_impact = round(sum(e.financial_impact for e in events), 2)
+            total_events = len(events)
+
+            # Compute planned/unplanned from the raw events
+            planned_minutes = sum(
+                e.duration_minutes for e in events if e.is_planned
+            )
+            unplanned_minutes = sum(
+                e.duration_minutes for e in events if not e.is_planned
+            )
+
+            last_updated = f"{effective_date.isoformat()}T06:00:00Z"
+
+            result = ParetoResponse(
+                items=pareto_items,
+                total_downtime_minutes=total_downtime_minutes,
+                total_financial_impact=total_financial_impact,
+                total_events=total_events,
+                data_source=DataSource.DOWNTIME_EVENTS.value,
+                last_updated=last_updated,
+                threshold_80_index=threshold_80_index,
+                planned_minutes=planned_minutes,
+                unplanned_minutes=unplanned_minutes,
             )
         else:
-            raw_records = await service.get_downtime_from_daily_summaries(
-                start_date=start_date,
-                end_date=end_date,
-                asset_id=asset_id,
-                area=area,
+            # Fallback to existing daily_summaries / live_snapshots path
+            data_source = parse_data_source(source)
+
+            if data_source == DataSource.LIVE_SNAPSHOTS:
+                raw_records = await service.get_downtime_from_live_snapshots(
+                    asset_id=asset_id,
+                    area=area,
+                )
+            else:
+                fallback_start = start_date if start_date else effective_date
+                fallback_end = end_date if end_date else fallback_start
+                raw_records = await service.get_downtime_from_daily_summaries(
+                    start_date=fallback_start,
+                    end_date=fallback_end,
+                    asset_id=asset_id,
+                    area=area,
+                )
+
+            events = await service.transform_to_downtime_events(raw_records, data_source)
+
+            pareto_items, threshold_80_index = service.calculate_pareto(events)
+
+            total_downtime_minutes = sum(e.duration_minutes for e in events)
+            total_financial_impact = round(sum(e.financial_impact for e in events), 2)
+            total_events = len(events)
+
+            last_updated = get_last_updated(data_source, raw_records)
+
+            result = ParetoResponse(
+                items=pareto_items,
+                total_downtime_minutes=total_downtime_minutes,
+                total_financial_impact=total_financial_impact,
+                total_events=total_events,
+                data_source=data_source.value,
+                last_updated=last_updated,
+                threshold_80_index=threshold_80_index,
+                planned_minutes=0,
+                unplanned_minutes=0,
             )
 
-        # Transform to downtime events
-        events = await service.transform_to_downtime_events(raw_records, data_source)
-
-        # Calculate Pareto distribution
-        pareto_items, threshold_80_index = service.calculate_pareto(events)
-
-        # Calculate totals
-        total_downtime_minutes = sum(e.duration_minutes for e in events)
-        total_financial_impact = round(sum(e.financial_impact for e in events), 2)
-        total_events = len(events)
-
-        last_updated = get_last_updated(data_source, raw_records)
-
-        return ParetoResponse(
-            items=pareto_items,
-            total_downtime_minutes=total_downtime_minutes,
-            total_financial_impact=total_financial_impact,
-            total_events=total_events,
-            data_source=data_source.value,
-            last_updated=last_updated,
-            threshold_80_index=threshold_80_index,
-        )
+        # Store in cache
+        _pareto_cache[cache_key] = result
+        return result
 
     except HTTPException:
         raise

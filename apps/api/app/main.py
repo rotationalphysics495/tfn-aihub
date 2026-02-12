@@ -15,6 +15,10 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler for startup and shutdown events."""
+    # Startup: Clear endpoint caches
+    from app.api.downtime import _pareto_cache
+    _pareto_cache.clear()
+
     # Startup: Initialize database connections
     initialize_database()
 

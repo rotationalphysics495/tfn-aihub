@@ -191,7 +191,7 @@ class DowntimeAnalysisService:
         response = query.execute()
         records = response.data or []
 
-        # If area filter, we need to filter after fetching assets
+        # Post-fetch filter by area using assets_map
         if area:
             assets_map = await self.get_assets_map()
             records = [
@@ -201,6 +201,101 @@ class DowntimeAnalysisService:
             ]
 
         return records
+
+    async def get_downtime_from_events_table(
+        self,
+        event_date: Optional[date] = None,
+        asset_id: Optional[str] = None,
+        area: Optional[str] = None,
+    ) -> List[dict]:
+        """
+        Query downtime_events table for granular reason code data.
+
+        Args:
+            event_date: Date to query (defaults to yesterday)
+            asset_id: Optional asset filter
+            area: Optional area filter (post-fetch filtering via assets_map)
+
+        Returns:
+            List of downtime_events records
+        """
+        if event_date is None:
+            event_date = date.today() - timedelta(days=1)
+
+        query = self.client.table("downtime_events").select("*")
+        query = query.eq("event_date", event_date.isoformat())
+
+        if asset_id:
+            query = query.eq("asset_id", asset_id)
+
+        response = query.execute()
+        records = response.data or []
+
+        # Filter by area if specified (requires asset lookup)
+        if area:
+            assets_map = await self.get_assets_map()
+            records = [
+                r for r in records
+                if r.get("asset_id") in assets_map and
+                assets_map[r["asset_id"]].get("area", "").lower() == area.lower()
+            ]
+
+        return records
+
+    async def transform_downtime_events_records(
+        self,
+        records: List[dict],
+    ) -> List[DowntimeEvent]:
+        """
+        Transform raw downtime_events table records into DowntimeEvent models.
+
+        Args:
+            records: Raw records from downtime_events table
+
+        Returns:
+            List of DowntimeEvent objects with financial impact calculated
+        """
+        assets_map = await self.get_assets_map()
+        cost_centers_map = await self.get_cost_centers_map()
+        events = []
+
+        for record in records:
+            asset_id = record.get("asset_id")
+            if not asset_id or asset_id not in assets_map:
+                continue
+
+            asset_info = assets_map[asset_id]
+            duration_minutes = record.get("duration_minutes", 0) or 0
+
+            if duration_minutes <= 0:
+                continue
+
+            reason_code = record.get("reason_code", "Unspecified") or "Unspecified"
+            is_planned = record.get("is_planned", False)
+            event_date = record.get("event_date", date.today().isoformat())
+
+            cost_center_id = asset_info.get("cost_center_id")
+            financial_impact = self.calculate_financial_impact(
+                duration_minutes, cost_center_id, cost_centers_map
+            )
+
+            is_safety = self.is_safety_related(reason_code)
+
+            event = DowntimeEvent(
+                id=record.get("id"),
+                asset_id=asset_id,
+                asset_name=asset_info["name"],
+                area=asset_info.get("area"),
+                reason_code=reason_code,
+                duration_minutes=duration_minutes,
+                event_timestamp=f"{event_date}T00:00:00Z",
+                financial_impact=financial_impact,
+                is_safety_related=is_safety,
+                is_planned=is_planned,
+            )
+            events.append(event)
+
+        return events
 
     async def get_downtime_from_live_snapshots(
         self,
@@ -385,6 +480,8 @@ class DowntimeAnalysisService:
                 "financial_impact": 0.0,
                 "event_count": 0,
                 "is_safety_related": False,
+                "planned_minutes": 0,
+                "unplanned_minutes": 0,
             }
         )
 
@@ -395,6 +492,10 @@ class DowntimeAnalysisService:
             aggregates[key]["event_count"] += 1
             if event.is_safety_related:
                 aggregates[key]["is_safety_related"] = True
+            if getattr(event, "is_planned", False):
+                aggregates[key]["planned_minutes"] += event.duration_minutes
+            else:
+                aggregates[key]["unplanned_minutes"] += event.duration_minutes
 
         # Calculate total downtime for percentages
         total_minutes = sum(agg["total_minutes"] for agg in aggregates.values())
@@ -414,6 +515,7 @@ class DowntimeAnalysisService:
                     financial_impact=round(agg["financial_impact"], 2),
                     event_count=agg["event_count"],
                     is_safety_related=agg["is_safety_related"],
+                    is_planned=agg["planned_minutes"] > agg["unplanned_minutes"],
                 )
             )
 

@@ -18,6 +18,7 @@ class DataSource(str, Enum):
     """Data source for downtime analysis."""
     DAILY_SUMMARIES = "daily_summaries"
     LIVE_SNAPSHOTS = "live_snapshots"
+    DOWNTIME_EVENTS = "downtime_events"
 
 
 class SeverityLevel(str, Enum):
@@ -63,6 +64,7 @@ class DowntimeEvent(BaseModel):
     end_timestamp: Optional[str] = Field(None, description="Event end timestamp (ISO format)")
     financial_impact: float = Field(0.0, ge=0, description="Financial impact in dollars")
     is_safety_related: bool = Field(False, description="Whether this is a safety-related event")
+    is_planned: bool = Field(False, description="Whether this is planned downtime")
     severity: Optional[str] = Field(None, description="Safety severity level if applicable")
     description: Optional[str] = Field(None, description="Event description")
 
@@ -96,6 +98,7 @@ class ParetoItem(BaseModel):
                 "financial_impact": 1350.00,
                 "event_count": 4,
                 "is_safety_related": False,
+                "is_planned": False,
             }
         }
     )
@@ -107,6 +110,7 @@ class ParetoItem(BaseModel):
     financial_impact: float = Field(0.0, ge=0, description="Total financial impact for this reason")
     event_count: int = Field(0, ge=0, description="Number of events for this reason")
     is_safety_related: bool = Field(False, description="Whether this reason is safety-related")
+    is_planned: bool = Field(False, description="Whether this reason code is primarily planned downtime")
 
 
 class ParetoResponse(BaseModel):
@@ -122,6 +126,8 @@ class ParetoResponse(BaseModel):
                 "data_source": "daily_summaries",
                 "last_updated": "2026-01-05T06:00:00Z",
                 "threshold_80_index": 3,
+                "planned_minutes": 120,
+                "unplanned_minutes": 387,
             }
         }
     )
@@ -133,6 +139,8 @@ class ParetoResponse(BaseModel):
     data_source: str = Field(..., description="Data source used")
     last_updated: str = Field(..., description="ISO timestamp of data freshness")
     threshold_80_index: Optional[int] = Field(None, description="Index where cumulative percentage crosses 80%")
+    planned_minutes: int = Field(0, ge=0, description="Total planned downtime minutes")
+    unplanned_minutes: int = Field(0, ge=0, description="Total unplanned downtime minutes")
 
 
 # =============================================================================
