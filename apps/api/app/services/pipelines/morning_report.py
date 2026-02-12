@@ -22,6 +22,12 @@ from uuid import UUID
 from supabase import create_client, Client
 
 from app.core.config import get_settings
+from app.services.action_engine import get_action_engine
+from app.services.notifications import get_teams_client
+from app.services.notifications.teams import (
+    build_all_clear_card,
+    build_morning_summary_card,
+)
 from app.models.pipeline import (
     CleanedProductionData,
     DailySummaryCreate,
@@ -463,6 +469,18 @@ async def run_morning_report(
             target_date or (date.today() - timedelta(days=1))
         )
 
+    # Story 18.3: Trigger Teams notification after pipeline + summary complete
+    if result.status in (PipelineStatus.SUCCESS, PipelineStatus.PARTIAL):
+        try:
+            await _trigger_teams_notification(
+                target_date or (date.today() - timedelta(days=1))
+            )
+        except Exception as e:
+            logger.error(
+                f"Teams notification failed for {target_date}: {e}. "
+                f"Pipeline result is not affected."
+            )
+
     return result
 
 
@@ -508,6 +526,51 @@ async def _trigger_smart_summary_generation(target_date: date) -> None:
         # AC#9: Handle failures gracefully - don't block pipeline on summary errors
         logger.error(
             f"Smart Summary generation failed for {target_date}: {e}. "
+            f"Pipeline result is not affected."
+        )
+
+
+async def _trigger_teams_notification(target_date: date) -> None:
+    """
+    Trigger Teams notification after pipeline completion.
+
+    Story 18.3 AC#1, AC#2, AC#3:
+    - Posts morning summary card or all-clear card to Teams
+    - Fire-and-forget: never raises, logs errors
+    - Skips silently if Teams webhook not configured
+
+    Args:
+        target_date: Date to generate notification for
+    """
+    try:
+        settings = get_settings()
+        if not settings.teams_configured:
+            logger.info("Teams webhook not configured, skipping notification")
+            return
+
+        engine = get_action_engine()
+        action_list = await engine.generate_action_list(target_date)
+
+        base_url = settings.app_base_url
+        if action_list.total_count > 0:
+            card = build_morning_summary_card(action_list, target_date, base_url)
+        else:
+            card = build_all_clear_card(target_date, base_url)
+
+        client = get_teams_client()
+        result = await client.send_card(card)
+
+        if not result.get("success"):
+            logger.error(
+                f"Teams notification failed for {target_date}: "
+                f"{result.get('message', 'unknown error')}"
+            )
+        else:
+            logger.info(f"Teams notification sent for {target_date}")
+
+    except Exception as e:
+        logger.error(
+            f"Teams notification failed for {target_date}: {e}. "
             f"Pipeline result is not affected."
         )
 

@@ -5,12 +5,18 @@ Story: 18.2 - Teams Webhook Configuration
 AC#2: Post test message to configured Teams channel
 AC#3: Graceful degradation when webhook URL not configured
 
+Story: 18.3 - Morning Summary Teams Card
+AC#1: build_morning_summary_card() produces Adaptive Card with title, summary, bullets, button
+AC#2: build_all_clear_card() produces card for zero-action-item days
+
 References:
 - [Source: docs/architecture-api.md#Technology Stack] - httpx >=0.26.0
 - [Source: apps/api/app/core/config.py] - Settings.teams_webhook_url
+- [Source: apps/api/app/schemas/action.py] - ActionListResponse, ActionItem
 """
 
 import logging
+from datetime import date
 from typing import Optional
 
 import httpx
@@ -18,6 +24,104 @@ import httpx
 from app.core.config import get_settings
 
 logger = logging.getLogger(__name__)
+
+MAX_BULLET_TEXT_LEN = 100
+
+
+def build_morning_summary_card(
+    action_list: "ActionListResponse",
+    report_date: date,
+    base_url: str,
+) -> dict:
+    """Build an Adaptive Card for the morning summary with action items.
+
+    Story 18.3 AC#1: Card includes title, category counts, top 3 bullets, Open Report button.
+    """
+    from app.schemas.action import ActionListResponse  # noqa: F811
+
+    counts = action_list.counts_by_category
+    safety_count = counts.get("safety", 0)
+    oee_count = counts.get("oee", 0)
+    financial_count = counts.get("financial", 0)
+
+    item_word = "item" if action_list.total_count == 1 else "items"
+    summary_text = (
+        f"{action_list.total_count} action {item_word}: "
+        f"{safety_count} safety, {oee_count} OEE misses, {financial_count} financial"
+    )
+
+    top_items = action_list.actions[:3]
+    bullet_lines = []
+    for item in top_items:
+        rec = item.recommendation_text
+        if len(rec) > MAX_BULLET_TEXT_LEN:
+            rec = rec[:MAX_BULLET_TEXT_LEN] + "..."
+        bullet_lines.append(f"- {item.asset_name}: {rec}")
+    bullets_text = "\n".join(bullet_lines)
+
+    base_url = base_url.rstrip("/")
+    report_url = f"{base_url}/morning-report?date={report_date.isoformat()}"
+
+    return {
+        "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+        "type": "AdaptiveCard",
+        "version": "1.4",
+        "body": [
+            {
+                "type": "TextBlock",
+                "text": f"Morning Report -- {report_date.isoformat()}",
+                "weight": "Bolder",
+                "size": "Medium",
+            },
+            {
+                "type": "TextBlock",
+                "text": summary_text,
+                "wrap": True,
+            },
+            {
+                "type": "TextBlock",
+                "text": bullets_text,
+                "wrap": True,
+            },
+        ],
+        "actions": [
+            {
+                "type": "Action.OpenUrl",
+                "title": "Open Report",
+                "url": report_url,
+            }
+        ],
+    }
+
+
+def build_all_clear_card(report_date: date, base_url: str) -> dict:
+    """Build an Adaptive Card for the all-clear (zero action items) case.
+
+    Story 18.3 AC#2: Card with "All clear. No action items today." and Open Report button.
+    """
+    base_url = base_url.rstrip("/")
+    report_url = f"{base_url}/morning-report?date={report_date.isoformat()}"
+
+    return {
+        "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+        "type": "AdaptiveCard",
+        "version": "1.4",
+        "body": [
+            {
+                "type": "TextBlock",
+                "text": f"Morning Report -- {report_date.isoformat()}: All clear. No action items today.",
+                "weight": "Bolder",
+                "size": "Medium",
+            },
+        ],
+        "actions": [
+            {
+                "type": "Action.OpenUrl",
+                "title": "Open Report",
+                "url": report_url,
+            }
+        ],
+    }
 
 
 class TeamsWebhookClient:
