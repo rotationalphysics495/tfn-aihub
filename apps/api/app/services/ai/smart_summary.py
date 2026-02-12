@@ -335,6 +335,12 @@ class SmartSummaryService:
                 )
             lines.append("")
 
+        # Build action plan lookup by asset_id
+        plans_by_asset: dict[str, list] = {}
+        for plan in context.action_plans:
+            aid = plan.get("asset_id", "")
+            plans_by_asset.setdefault(aid, []).append(plan)
+
         # Productivity — OEE misses with likely cause
         below_target = [
             s for s in context.daily_summaries
@@ -364,6 +370,11 @@ class SmartSummaryService:
                 bullet = f"- {name} — {oee:.0f}% OEE ({gap:.0f}% miss)"
                 if cause:
                     bullet += f" · {cause}"
+                # Append action plan note if available
+                asset_plans = plans_by_asset.get(asset_id, [])
+                if asset_plans:
+                    plan = asset_plans[0]
+                    bullet += f" · Action plan: {plan.get('title', '')} (due {plan.get('due_date', 'TBD')})"
                 lines.append(bullet)
             lines.append("")
 
@@ -455,6 +466,8 @@ class SmartSummaryService:
             trend_data=context.trend_data,
             repeat_offenders=context.repeat_offenders,
             top_downtime_drivers=context.top_downtime_drivers,
+            action_plans=context.action_plans,
+            recently_verified_plans=context.recently_verified_plans,
         )
 
         # Estimate tokens for logging

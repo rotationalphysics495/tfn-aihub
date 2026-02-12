@@ -25,6 +25,8 @@ CRITICAL REQUIREMENTS:
 5. Use bullet points for clarity
 6. Reference source tables in citations: [Source: <table_name>, <date>]
 7. When trend context is provided, incorporate week-over-week comparisons, highlight repeat offenders (3+ consecutive days), and mention top downtime drivers in your analysis
+8. When an asset has an active action plan, mention it alongside the asset's issues (e.g., "Grinder 5 OEE is still below target — note that a corrective action plan is in progress (bearing replacement, due Friday)")
+9. When a recently verified action plan exists and the asset's metrics improved, note the possible correlation (e.g., "Grinder 5 OEE improved 5 points since bearing replacement completed last Monday")
 
 OUTPUT FORMAT:
 ## Executive Summary
@@ -59,6 +61,9 @@ DATA_TEMPLATE_DEFAULT = """Today's Date: {date}
 
 === TREND CONTEXT ===
 {trend_context}
+
+=== ACTION PLAN STATUS ===
+{action_plan_data}
 
 Based on this data, provide your analysis following the format specified in your instructions.
 Ensure every claim is backed by a specific data citation."""
@@ -282,6 +287,53 @@ def format_trend_context(
     return "\n".join(lines)
 
 
+def format_action_plans(
+    action_plans: Optional[list] = None,
+    recently_verified_plans: Optional[list] = None,
+) -> str:
+    """
+    Format action plan data for prompt injection.
+
+    Args:
+        action_plans: List of active action plan dictionaries
+        recently_verified_plans: List of recently verified action plan dictionaries
+
+    Returns:
+        Formatted string for prompt
+    """
+    plans = action_plans or []
+    verified = recently_verified_plans or []
+
+    if not plans and not verified:
+        return "No active action plans for assets on today's report."
+
+    lines = []
+    if plans:
+        lines.append("Active action plans for assets on today's report:\n")
+        for plan in plans:
+            asset_name = plan.get("asset_name", "Unknown")
+            title = plan.get("title", "Untitled")
+            status = plan.get("status", "unknown")
+            due_date = plan.get("due_date", "no date")
+            category = plan.get("category", "")
+            lines.append(
+                f"- {asset_name}: \"{title}\" ({category}, {status}, due {due_date})"
+            )
+
+    if verified:
+        lines.append("\nRecently completed action plans (last 7 days):\n")
+        for plan in verified:
+            asset_name = plan.get("asset_name", "Unknown")
+            title = plan.get("title", "Untitled")
+            corrective = plan.get("corrective_action", "")
+            verified_at = plan.get("verified_at", "")
+            lines.append(
+                f"- {asset_name}: \"{title}\" completed — {corrective} (verified {verified_at})"
+            )
+
+    return "\n".join(lines)
+
+
 def format_action_items(action_items: list) -> str:
     """
     Format action engine priorities for prompt injection.
@@ -325,6 +377,8 @@ def render_data_prompt(
     trend_data: Optional[Dict[str, Any]] = None,
     repeat_offenders: Optional[List[Dict[str, Any]]] = None,
     top_downtime_drivers: Optional[List[Dict[str, Any]]] = None,
+    action_plans: Optional[List[Dict[str, Any]]] = None,
+    recently_verified_plans: Optional[List[Dict[str, Any]]] = None,
 ) -> str:
     """
     Render the complete data prompt for LLM.
@@ -359,12 +413,26 @@ def render_data_prompt(
         "trend_context": format_trend_context(
             trend_data, repeat_offenders, top_downtime_drivers
         ),
+        "action_plan_data": format_action_plans(
+            action_plans, recently_verified_plans
+        ),
     }
 
     try:
         return template.format(**format_values)
     except KeyError:
-        # Handle case where custom template doesn't have {trend_context} placeholder
-        trend_section = format_values.pop("trend_context")
-        base = template.format(**format_values)
-        return base + f"\n\n=== TREND CONTEXT ===\n{trend_section}"
+        # Handle case where custom template doesn't have new placeholders
+        extra_sections = []
+        for key, header in [
+            ("trend_context", "TREND CONTEXT"),
+            ("action_plan_data", "ACTION PLAN STATUS"),
+        ]:
+            if key in format_values:
+                section = format_values.pop(key)
+                extra_sections.append(f"\n\n=== {header} ===\n{section}")
+        try:
+            base = template.format(**format_values)
+        except KeyError:
+            # Last resort: use default template
+            base = DATA_TEMPLATE_DEFAULT.format(**format_values)
+        return base + "".join(extra_sections)

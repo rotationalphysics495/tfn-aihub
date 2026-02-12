@@ -65,6 +65,14 @@ class SummaryContext(BaseModel):
         default_factory=list,
         description="Top downtime reason codes aggregated across plant"
     )
+    action_plans: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Active action plans (open/in_progress) for assets in today's action items"
+    )
+    recently_verified_plans: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Action plans verified within last 7 days for correlation analysis"
+    )
     assembled_at: datetime = Field(
         default_factory=datetime.utcnow,
         description="When context was assembled"
@@ -515,6 +523,50 @@ class ContextBuilder:
             logger.error(f"Failed to fetch action items: {e}")
             return []
 
+    async def fetch_active_action_plans(
+        self,
+        target_date: date_type,
+        asset_ids: List[str],
+    ) -> tuple:
+        """
+        Fetch active and recently verified action plans for given assets.
+
+        Args:
+            target_date: Date to query
+            asset_ids: List of asset IDs to filter on
+
+        Returns:
+            Tuple of (active_plans, recently_verified_plans)
+        """
+        if not asset_ids:
+            return ([], [])
+
+        try:
+            client = self._get_client()
+
+            # Active plans (open or in_progress)
+            active_response = client.table("action_plans").select(
+                "id, title, asset_id, category, status, priority, "
+                "due_date, corrective_action, root_cause"
+            ).in_("asset_id", asset_ids).in_(
+                "status", ["open", "in_progress"]
+            ).execute()
+
+            # Recently verified plans (within last 7 days)
+            seven_days_ago = (target_date - timedelta(days=7)).isoformat()
+            verified_response = client.table("action_plans").select(
+                "id, title, asset_id, corrective_action, verified_at, "
+                "completed_at, status"
+            ).in_("asset_id", asset_ids).eq(
+                "status", "verified"
+            ).gte("verified_at", seven_days_ago).execute()
+
+            return (active_response.data or [], verified_response.data or [])
+
+        except Exception as e:
+            logger.error(f"Failed to fetch action plans: {e}")
+            return ([], [])
+
     def _enrich_with_asset_names(
         self,
         records: List[Dict[str, Any]],
@@ -593,12 +645,31 @@ class ContextBuilder:
             except Exception as e:
                 logger.error(f"Failed to fetch top downtime drivers in build_context: {e}")
 
+            # Fetch action plans for assets in action items
+            active_plans = []
+            verified_plans = []
+            try:
+                action_item_asset_ids = list(set(
+                    item.get("asset_id") for item in action_items if item.get("asset_id")
+                ))
+                active_plans, verified_plans = await self.fetch_active_action_plans(
+                    target_date, action_item_asset_ids
+                )
+            except Exception as e:
+                logger.error(f"Failed to fetch action plans in build_context: {e}")
+
             # Enrich records with asset names
             enriched_summaries = self._enrich_with_asset_names(
                 daily_summaries, assets
             )
             enriched_events = self._enrich_with_asset_names(
                 safety_events, assets
+            )
+            enriched_active_plans = self._enrich_with_asset_names(
+                active_plans, assets
+            )
+            enriched_verified_plans = self._enrich_with_asset_names(
+                verified_plans, assets
             )
 
             # Get target OEE from settings
@@ -616,6 +687,8 @@ class ContextBuilder:
                 trend_data=trend_data,
                 repeat_offenders=repeat_offenders,
                 top_downtime_drivers=top_downtime_drivers,
+                action_plans=enriched_active_plans,
+                recently_verified_plans=enriched_verified_plans,
             )
 
             logger.info(
