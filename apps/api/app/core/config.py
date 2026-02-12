@@ -99,6 +99,9 @@ class Settings(BaseSettings):
     smtp_from: str = ""
     smtp_use_tls: bool = True
 
+    # Teams Webhook Configuration (Story 18.2)
+    teams_webhook_url: str = ""
+
     # Application URL for constructing links (Story 15.2)
     app_base_url: str = "http://localhost:3000"
 
@@ -169,6 +172,11 @@ class Settings(BaseSettings):
             self.smtp_password,
             self.smtp_from,
         ])
+
+    @property
+    def teams_configured(self) -> bool:
+        """Check if Teams webhook is properly configured (Story 18.2 AC#1)."""
+        return bool(self.teams_webhook_url and self.teams_webhook_url.strip())
 
 
 @lru_cache()
