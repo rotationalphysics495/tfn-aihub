@@ -23,14 +23,20 @@ def render_assignment_email(
     app_base_url: str,
     financial_impact: Optional[str] = None,
     note: Optional[str] = None,
+    response_token: Optional[str] = None,
 ) -> dict:
     """Render an assignment notification email.
 
     Returns a dict with 'subject', 'html_body', and 'text_body' keys.
+
+    Args:
+        response_token: Optional token to append to the respond URL (Story 15.3).
     """
     subject = f"[Action Required] {category} - {asset_name}: {action_summary}"
 
     respond_url = f"{app_base_url.rstrip('/')}/followups/{followup_id}/respond"
+    if response_token:
+        respond_url = f"{respond_url}?token={response_token}"
 
     # HTML-escape user-supplied values to prevent XSS in email clients
     esc_category = html_escape(category)

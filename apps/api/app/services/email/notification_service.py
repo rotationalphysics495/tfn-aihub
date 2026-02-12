@@ -2,6 +2,7 @@
 Follow-Up Notification Service - orchestrates email sending and message logging.
 
 Story: 15.2 - Email Notification Service
+Story: 15.3 - Response Capture via Token Link (token integration)
 AC#1: Email sent on follow-up assignment
 AC#2: Graceful degradation when SMTP not configured
 AC#3: Graceful failure on send error
@@ -13,6 +14,12 @@ from typing import Any, Dict
 
 from app.core.config import get_settings
 from app.services.email.templates import render_assignment_email
+
+
+def get_token_service():
+    """Lazy import to avoid circular dependency."""
+    from app.services.email import get_token_service as _get_token_service
+    return _get_token_service()
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +83,17 @@ class FollowUpNotificationService:
                     )
                 return
 
+            # Generate response token (Story 15.3)
+            response_token = None
+            try:
+                token_service = get_token_service()
+                response_token = token_service.generate_token(
+                    followup_data.get("followup_id", ""),
+                    assignee_email,
+                )
+            except Exception as e:
+                logger.error(f"Failed to generate response token: {e}")
+
             # Render email template
             email_content = render_assignment_email(
                 category=followup_data.get("category", ""),
@@ -88,6 +106,7 @@ class FollowUpNotificationService:
                 note=followup_data.get("note"),
                 followup_id=followup_data.get("followup_id", ""),
                 app_base_url=settings.app_base_url,
+                response_token=response_token,
             )
 
             # Send email

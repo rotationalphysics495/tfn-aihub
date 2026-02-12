@@ -398,3 +398,43 @@ class FollowUpListResponse(BaseModel):
     counts_by_status: Dict[str, int] = Field(
         default_factory=lambda: {"assigned": 0, "in_progress": 0, "resolved": 0}
     )
+
+
+class TokenResponseRequest(BaseModel):
+    """Request body for submitting a response via token link (Story 15.3)."""
+    token: str = Field(..., description="One-time response token from the email link")
+    response_text: str = Field(
+        ...,
+        min_length=1,
+        max_length=5000,
+        description="Response text from the assignee",
+    )
+
+    model_config = ConfigDict(extra="forbid")
+
+    @field_validator('response_text')
+    @classmethod
+    def validate_response_text(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError('Response text must not be empty')
+        return v
+
+
+class TokenContextResponse(BaseModel):
+    """Response model for follow-up context fetched via token (Story 15.3)."""
+    action_summary: str
+    asset_name: str
+    category: str
+    assigned_by_email: str
+    assigned_by_name: str
+    note: Optional[str] = None
+    report_date: str
+    recommendation: Optional[str] = None
+    evidence_summary: Optional[str] = None
+    financial_impact: Optional[str] = None
+
+
+class TokenResponseResult(BaseModel):
+    """Response model for a successful token-based response submission (Story 15.3)."""
+    success: bool
+    message: str

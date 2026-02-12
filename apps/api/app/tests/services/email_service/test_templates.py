@@ -208,3 +208,76 @@ class TestRenderAssignmentEmail:
         assert "Vibration exceeded threshold" in html
         assert "John Manager" in html
         assert "/followups/uuid-123/respond" in html
+
+
+# =============================================================================
+# Story 15.3: Token URL in email templates
+# =============================================================================
+
+
+class TestRenderAssignmentEmailWithToken:
+    """Tests for render_assignment_email() with response_token parameter (Story 15.3)."""
+
+    def test_includes_token_in_respond_url(self):
+        """
+        15-3-response-capture-via-token-link-UNIT-011: render_assignment_email includes
+        token in Respond URL when provided.
+
+        Given: render_assignment_email() is called with response_token="abc-uuid-token"
+               and followup_id="uuid-123" and app_base_url="https://plant.example.com"
+        When: The email template is rendered
+        Then: The HTML body Respond link href includes the full URL with token:
+              "https://plant.example.com/followups/uuid-123/respond?token=abc-uuid-token"
+        """
+        from app.services.email.templates import render_assignment_email
+
+        result = render_assignment_email(
+            category="safety",
+            asset_name="Pump-101",
+            action_summary="Replace bearing",
+            recommendation="Replace worn bearing immediately",
+            evidence_summary="Vibration levels exceeded threshold",
+            assigner_name="John Manager",
+            followup_id="uuid-123",
+            app_base_url="https://plant.example.com",
+            response_token="abc-uuid-token",
+        )
+
+        html = result["html_body"]
+        expected_url = "https://plant.example.com/followups/uuid-123/respond?token=abc-uuid-token"
+        assert expected_url in html, (
+            f"Expected token URL '{expected_url}' in HTML body"
+        )
+
+    def test_works_without_token_backward_compatible(self):
+        """
+        15-3-response-capture-via-token-link-UNIT-012: render_assignment_email works
+        without token (backward compatibility).
+
+        Given: render_assignment_email() is called with response_token=None (default)
+        When: The email template is rendered
+        Then: The HTML body Respond link href does NOT contain "?token=" -- the URL is
+              just "https://plant.example.com/followups/{id}/respond" without a token
+              query parameter
+        """
+        from app.services.email.templates import render_assignment_email
+
+        result = render_assignment_email(
+            category="safety",
+            asset_name="Pump-101",
+            action_summary="Replace bearing",
+            recommendation="Replace worn bearing immediately",
+            evidence_summary="Vibration levels exceeded threshold",
+            assigner_name="John Manager",
+            followup_id="uuid-123",
+            app_base_url="https://plant.example.com",
+            response_token=None,
+        )
+
+        html = result["html_body"]
+
+        # Should still have the respond URL
+        assert "/followups/uuid-123/respond" in html
+
+        # Should NOT have a token query parameter
+        assert "?token=" not in html

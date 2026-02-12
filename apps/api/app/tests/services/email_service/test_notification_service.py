@@ -486,3 +486,64 @@ class TestNotificationServiceEdgeCases:
 
         # Email should NOT be sent
         mock_provider.send.assert_not_called()
+
+
+# =============================================================================
+# Story 15.3: Token integration in notification flow
+# =============================================================================
+
+
+class TestNotificationServiceTokenIntegration:
+    """Tests for token generation integration during assignment notification."""
+
+    @pytest.mark.asyncio
+    async def test_generates_token_and_includes_in_email(
+        self, sample_followup_data, mock_email_provider_success, mock_supabase_with_user,
+    ):
+        """
+        15-3-response-capture-via-token-link-INT-022: Notification service generates token
+        and includes in email during assignment.
+
+        Given: SMTP is configured, a follow-up is being assigned,
+               TokenService.generate_token is available; Supabase is mocked
+        When: send_assignment_notification() is called with follow-up data
+        Then: (1) TokenService.generate_token() is called with the followup_id and
+              resolved assignee email,
+              (2) The generated token is passed to render_assignment_email(),
+              (3) The respond URL in the email HTML includes ?token={generated_token}
+        """
+        from app.services.email.notification_service import FollowUpNotificationService
+
+        generated_token = "generated-test-token-uuid"
+
+        service = FollowUpNotificationService(
+            email_provider=mock_email_provider_success,
+            supabase_client=mock_supabase_with_user,
+        )
+
+        with patch("app.services.email.notification_service.get_settings") as mock_settings:
+            mock_settings.return_value.smtp_configured = True
+            mock_settings.return_value.app_base_url = "https://plant.example.com"
+
+            with patch("app.services.email.notification_service.get_token_service") as mock_token_svc:
+                mock_token_service = MagicMock()
+                mock_token_service.generate_token.return_value = generated_token
+                mock_token_svc.return_value = mock_token_service
+
+                await service.send_assignment_notification(sample_followup_data)
+
+                # (1) Token generation should be called
+                mock_token_service.generate_token.assert_called_once()
+                call_args = mock_token_service.generate_token.call_args
+                # First arg should be followup_id
+                assert call_args[0][0] == FOLLOWUP_ID or \
+                    call_args[1].get("followup_id") == FOLLOWUP_ID
+
+        # (2 & 3) Verify email was sent and the HTML includes token URL
+        send_call = mock_email_provider_success.send
+        send_call.assert_called_once()
+        call_kwargs = send_call.call_args[1] if send_call.call_args[1] else {}
+        call_args_pos = send_call.call_args[0] if send_call.call_args[0] else ()
+        html_body = call_kwargs.get("html_body") or (call_args_pos[2] if len(call_args_pos) > 2 else "")
+        assert f"?token={generated_token}" in html_body, \
+            f"Email HTML should include token in URL, got: {html_body[:200]}"
