@@ -8,6 +8,7 @@ import { AssignmentBadge } from './AssignmentBadge'
 import type { Recommendation, AssetReference, FollowUpData, TrendData } from './types'
 import { TrendIndicator } from './TrendIndicator'
 import { RepeatOffenderBadge } from './RepeatOffenderBadge'
+import { ActivePlanBadge } from './ActivePlanBadge'
 
 /**
  * Insight Section Component (Left side of card)
@@ -157,6 +158,9 @@ export function InsightSection({
           <Clock className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
           <span>Generated at {formatTimestamp(timestamp)}</span>
         </div>
+
+        {/* Active plan badge (Story 16.4) */}
+        {asset.id && <ActivePlanBadge assetId={asset.id} />}
 
         {/* Acknowledge action */}
         <div className="flex flex-col">

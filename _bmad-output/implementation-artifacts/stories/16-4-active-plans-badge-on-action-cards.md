@@ -1,6 +1,6 @@
 # Story 16.4: Active Plans Badge on Action Cards
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -165,10 +165,140 @@ interface ActivePlanBadgeProps {
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.6
+
+### Implementation Summary
+
+Implemented the Active Plans Badge feature that displays action plan information on action cards in the morning report. When an asset has active (open/in_progress) action plans, a blue info badge appears in the InsightSection context row showing the plan title, due date, and status for a single plan, or a count summary with click-to-expand for multiple plans. The badge navigates to the action plan detail view on click.
+
+### Files Created
+- `apps/web/src/hooks/useActiveActionPlans.ts` - Hook to fetch active action plans for a given asset_id, following useDailyActions.ts pattern with Supabase auth, mountedRef cleanup, and client-side status filtering
+- `apps/web/src/components/action-engine/ActivePlanBadge.tsx` - Badge component rendering single plan detail or multi-plan summary with click navigation, loading skeleton, and silent error handling
+
+### Files Modified
+- `apps/web/src/components/action-engine/InsightSection.tsx` - Added ActivePlanBadge import and render in context row between timestamp and acknowledge button, using existing asset.id prop
+- `apps/web/src/components/action-engine/index.ts` - Added ActivePlanBadge to barrel exports in Subcomponents section
+
+### Key Decisions
+- Sends `status=open,in_progress` as query param in URL AND filters client-side as safety net, matching test expectations while being robust against loose backend filtering
+- Used click-to-expand dropdown for multiple plans instead of Tooltip (Tooltip requires hover which doesn't work well on mobile; click-to-expand provides better UX and matches test expectations for showing plan titles on click)
+- No separate `assetId` prop needed on InsightSection — derived from existing `asset.id` prop already passed through
+- No changes needed to InsightEvidenceCard — asset.id already flows through the asset prop to InsightSection
+
+### Tests Added
+- `apps/web/src/components/action-engine/__tests__/ActivePlanBadge.test.tsx` - 32 tests covering all 3 ACs (pre-existing TDD test file)
+
+### Notes for Reviewer
+- INT-003 test fails due to test data collision: `getByText(/Grinder 5/i)` matches both the recommendation text "Investigate downtime on Grinder 5" and the asset name span "Grinder 5". This is a test fixture issue, not an implementation bug. All 31 other tests pass.
+- 152 existing tests across 12 other test files continue to pass — no regressions.
+
+### Test Results
+- 31 passed, 1 failed (INT-003 — test data collision, not implementation issue)
+- 152 existing tests across other action-engine test files: all passing
+- Total: 153 passing, 1 failing
+
+### Acceptance Criteria Status
+- [x] AC1 - Single active plan badge with title/date/status, click navigates to detail — implemented in ActivePlanBadge.tsx (single plan branch), InsightSection.tsx (rendering), useActiveActionPlans.ts (data fetch)
+- [x] AC2 - Multiple active plans summary badge with count and expandable list — implemented in ActivePlanBadge.tsx (multi-plan branch with click-to-expand dropdown)
+- [x] AC3 - No badge for empty/completed/verified plans — implemented in ActivePlanBadge.tsx (returns null when plans.length === 0) and useActiveActionPlans.ts (client-side filtering)
 
 ### Debug Log References
 
 ### Completion Notes List
+- Tests must be run from `apps/web` directory for path alias resolution to work correctly
 
 ### File List
+- apps/web/src/hooks/useActiveActionPlans.ts (created)
+- apps/web/src/components/action-engine/ActivePlanBadge.tsx (created)
+- apps/web/src/components/action-engine/InsightSection.tsx (modified)
+- apps/web/src/components/action-engine/index.ts (modified)
+- apps/web/src/components/action-engine/__tests__/ActivePlanBadge.test.tsx (pre-existing TDD test)
+
+## Code Review Record
+
+**Reviewer**: Code Review Agent
+**Date**: 2026-02-12
+**Diff Size**: 1171 lines
+
+### Checklist Results
+- Acceptance Criteria: PASS
+- Code Quality: PASS
+- Test Coverage: PASS
+- Security: PASS
+
+### Issues Found
+
+| # | Description | Severity | Status |
+|---|-------------|----------|--------|
+| 1 | Multi-plan badge click both navigates and toggles dropdown simultaneously — navigation defeats dropdown purpose | MEDIUM | Fixed |
+| 2 | Dropdown has no outside-click-to-close handler (coupled to issue #1) | MEDIUM | Fixed (navigation removed; dropdown now toggles correctly) |
+| 3 | INT-003 test failure: `getByText(/Grinder 5/i)` matches both recommendation text and asset name span | MEDIUM | Fixed |
+| 4 | Hook non-error `!response.ok` path doesn't clear stale plans | LOW | Documented |
+| 5 | Hook creates new Supabase client on every fetch (matches existing pattern) | LOW | Documented |
+| 6 | Unnecessary `Content-Type` header on GET request (matches existing pattern) | LOW | Documented |
+| 7 | Multi-plan dropdown only shows titles, not due dates/status (AC#2 spec allows this) | LOW | Documented |
+| 8 | `assetId || undefined` guard is redundant given early return on `!assetId` | LOW | Documented |
+
+**Totals**: 0 HIGH, 3 MEDIUM, 5 LOW
+
+### Fixes Applied
+
+| Issue # | Fix Description | Verified |
+|---------|-----------------|----------|
+| 1 | Removed `router.push()` from multi-plan badge click handler — badge now only toggles dropdown; navigation happens via individual plan links in dropdown | Tests pass (32/32) |
+| 2 | Resolved by fix #1 — dropdown now opens/closes correctly without competing navigation | Tests pass (32/32) |
+| 3 | Changed `getByText(/Grinder 5/i)` to `getAllByText(/Grinder 5/i)` with length assertion to handle multiple matching elements | Tests pass (32/32) |
+
+### Remaining Issues (Low Severity)
+- Issue #4: Hook `!response.ok` path doesn't reset `plans` state — benign since initial state is empty, but could be fragile if refetch logic is added
+- Issue #5: Supabase client instantiated per fetch — follows `useDailyActions.ts` pattern, acceptable for MVP
+- Issue #6: `Content-Type: application/json` on GET — matches project pattern, harmless
+- Issue #7: Multi-plan dropdown shows only titles — acceptable per AC#2 spec ("dropdown or link to view them")
+- Issue #8: Redundant `assetId || undefined` — cosmetic, no impact
+
+### Final Status
+Approved with fixes
+
+## Test Quality Review
+
+**Reviewer**: Test Architect (TEA)
+**Date**: 2026-02-12
+**Quality Score**: 100/100 (A+)
+**Tests Reviewed**: 32 (28 unit, 4 integration)
+**Test File**: `apps/web/src/components/action-engine/__tests__/ActivePlanBadge.test.tsx`
+**All Tests Passing**: Yes (32/32)
+
+### Criteria Results
+
+| # | Criterion | Result | Notes |
+|---|-----------|--------|-------|
+| 1 | BDD Format (Given-When-Then) | PASS | Explicit Given/When/Then comments on every test |
+| 2 | Test ID Conventions | PASS | UNIT-001 through UNIT-028, INT-001 through INT-004 |
+| 3 | Hard Waits Detection | WARN | 2 instances of 50ms setTimeout for negative assertions — justified |
+| 4 | Determinism | PASS | No random values, no conditional flow |
+| 5 | Isolation & Cleanup | PASS | beforeEach/afterEach with full mock reset, no shared state |
+| 6 | Explicit Assertions | PASS | Every test has explicit expect() assertions |
+| 7 | Test Length | WARN | 921 lines — verbose due to BDD comments and fixtures, not complexity |
+| 8 | Test Duration | PASS | 32 tests in 399ms total (~12ms average) |
+| 9 | Fixture Patterns | PASS | createMockPlan(), createMockActionItem(), setupMocks() helpers |
+| 10 | Data Factories | PASS | Factory functions with Partial<T> overrides |
+| 11 | Network-First Pattern | PASS | Mock setup always precedes render calls |
+| 12 | Flakiness Patterns | PASS | No tight timeouts, no race conditions, no retry hiding |
+
+### Issues Found
+
+| # | Criterion | Description | Severity | File:Line | Fixable |
+|---|-----------|-------------|----------|-----------|---------|
+| 1 | Hard Wait | 50ms setTimeout for negative assertion (fetch NOT called) | LOW | ActivePlanBadge.test.tsx:399 | No (justified pattern) |
+| 2 | Hard Wait | 50ms setTimeout for unmount cleanup verification | LOW | ActivePlanBadge.test.tsx:829 | No (justified pattern) |
+| 3 | Test Length | File is 921 lines (above 500 threshold) | LOW | ActivePlanBadge.test.tsx | No (splitting would fragment related context) |
+
+### Fixes Applied
+- None required — no critical or high severity issues
+
+### Bonus Points Awarded
+- Excellent BDD structure: +5
+- Comprehensive fixtures: +5
+- Network-first pattern: +5
+- Perfect isolation: +5
+- All test IDs present: +5
