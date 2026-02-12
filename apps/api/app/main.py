@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import health, assets, summaries, actions, auth, pipelines, production, oee, downtime, safety, financial, live_pulse, memory, chat, asset_history, citations, agent, cache, voice, briefing, preferences, handoff, admin, team, schedule, followups
+from app.api import health, assets, summaries, actions, auth, pipelines, production, oee, downtime, safety, financial, live_pulse, memory, chat, asset_history, citations, agent, cache, voice, briefing, preferences, handoff, admin, team, schedule, followups, action_plans
 from app.core.database import initialize_database, shutdown_database
 from app.services.scheduler import get_scheduler
 from app.services.pipelines.live_pulse import run_live_pulse_poll
@@ -105,6 +105,8 @@ app.include_router(team.router, prefix="/api/v1/team", tags=["Team"])
 app.include_router(schedule.router, prefix="/api/v1/schedule", tags=["Schedule"])
 # Story 15.2: Follow-Ups API for creating follow-ups with email notifications
 app.include_router(followups.router, prefix="/api/v1/followups", tags=["Follow-Ups"])
+# Story 16.2: Action Plans CRUD API
+app.include_router(action_plans.router, prefix="/api/v1/action-plans", tags=["Action Plans"])
 
 
 @app.get("/")

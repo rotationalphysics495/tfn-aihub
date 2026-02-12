@@ -1,6 +1,6 @@
 # Story 16.2: Action Plans CRUD API
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -203,10 +203,118 @@ async def list_action_plans(
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.6
 
-### Debug Log References
+### Implementation Summary
 
-### Completion Notes List
+Implemented the complete Action Plans CRUD API with 7 endpoints covering all 5 acceptance criteria. The API supports creating, listing (with filters/sorting/pagination), updating (with auto-generated change logs), adding progress updates, and verifying action plans. Uses the two-client Supabase pattern for RLS enforcement on write operations and service-role client for reads and cross-user verification.
 
-### File List
+### Files Created
+- `apps/api/app/schemas/action_plan.py` - Pydantic schemas: enums (ActionPlanCategory, ActionPlanStatus, ActionPlanPriority), PRIORITY_SORT_MAP, request models (ActionPlanCreate, ActionPlanUpdate, ActionPlanUpdateCreate, ActionPlanVerifyRequest), response models (ActionPlanResponse, ActionPlanListResponse, ActionPlanUpdateResponse)
+- `apps/api/app/api/action_plans.py` - APIRouter with 7 endpoints: POST /, GET /, GET /{id}, PATCH /{id}, POST /{id}/updates, GET /{id}/updates, POST /{id}/verify. Includes helper functions for Supabase client management, change description building, and priority-based sorting.
+
+### Files Modified
+- `apps/api/app/main.py` - Added action_plans to import line and registered router with prefix="/api/v1/action-plans", tags=["Action Plans"]
+
+### Key Decisions
+- Python-side sorting for priority ranking using PRIORITY_SORT_MAP since Supabase-py doesn't support custom sort expressions. Fetches all filtered results then sorts and paginates in Python.
+- Service-role client used for auto-generated change log inserts in PATCH endpoint (system recording changes on behalf of user) and for verify endpoint (cross-user verification bypasses owner-only RLS).
+- User-scoped client used for POST / (create) and PATCH /{id} (update) to enforce RLS policies.
+- No strict state machine enforcement for status transitions — relies on DB CHECK constraint for valid values per design plan.
+- Empty PATCH body returns 422 before any DB operation via model_dump(exclude_unset=True) check.
+
+### Tests Added
+- `apps/api/tests/test_action_plans_api.py` - 59 tests covering all 5 ACs: 10 unit tests for schema validation, 49 integration tests for endpoint behavior including auth, filters, sorting, pagination, change logging, progress updates, verification, error handling, and router registration.
+
+### Notes for Reviewer
+- The test file was provided as a pre-written TDD specification. All 59 tests pass.
+- The _sort_plans function handles null priorities (rank 99) and null due_dates (sort last) gracefully.
+- The verify endpoint uses service-role client for both the status update and the change log insert, allowing any authenticated user to verify (not just the owner).
+
+### Test Results
+```
+59 passed, 24 warnings in 0.25s
+```
+
+### Acceptance Criteria Status
+- [x] AC#1: POST /api/v1/action-plans creates plan with status='open' and current user as owner — implemented in `apps/api/app/api/action_plans.py::create_action_plan()`
+- [x] AC#2: GET /api/v1/action-plans returns filtered/sorted/paginated results — implemented in `apps/api/app/api/action_plans.py::list_action_plans()`
+- [x] AC#3: PATCH /api/v1/action-plans/{id} updates plan and creates change log — implemented in `apps/api/app/api/action_plans.py::update_action_plan()`
+- [x] AC#4: POST /api/v1/action-plans/{id}/updates adds progress update with optional status change — implemented in `apps/api/app/api/action_plans.py::add_progress_update()`
+- [x] AC#5: POST /api/v1/action-plans/{id}/verify sets status to 'verified' with verified_by/verified_at — implemented in `apps/api/app/api/action_plans.py::verify_action_plan()`
+
+## Code Review Record
+
+**Reviewer**: Code Review Agent
+**Date**: 2026-02-12
+**Diff Size**: 2875 lines
+
+### Checklist Results
+- Acceptance Criteria: PASS
+- Code Quality: PASS
+- Test Coverage: PASS
+- Security: PASS
+
+### Issues Found
+
+| # | Description | Severity | Status |
+|---|-------------|----------|--------|
+| 1 | Inconsistent client creation in update_action_plan — uses inline create_client() instead of _get_supabase_client()/_get_user_client() helpers | MEDIUM | Fixed |
+| 2 | List endpoint fetches ALL matching records for Python-side sorting (documented architectural decision) | MEDIUM | Documented |
+| 3 | _build_change_description str() comparison could produce false positives with enum repr | LOW | Documented |
+| 4 | Helper functions lack return type annotations (handoff.py uses -> Optional[Client]) | LOW | Documented |
+| 5 | New Supabase client created per request (consistent with codebase-wide pattern) | LOW | Documented |
+| 6 | ActionPlanCreate.description is Optional but AC#1 wording implies required (DB allows NULL, tests confirm intentional) | LOW | Documented |
+| 7 | User JWT passed as API key to create_client for RLS (consistent with actions.py and followups.py pattern) | LOW | Documented |
+
+**Totals**: 0 HIGH, 2 MEDIUM, 5 LOW
+
+### Fixes Applied
+
+| Issue # | Fix Description | Verified |
+|---------|-----------------|----------|
+| 1 | Replaced inline `create_client(settings.supabase_url, settings.supabase_key)` and `create_client(settings.supabase_url, user_token)` in `update_action_plan()` with `_get_supabase_client()` and `_get_user_client(user_token)` helper calls for consistency | 59 tests pass |
+
+### Remaining Issues (Low Severity)
+- Issue #3: _build_change_description uses str() comparison — works for current use case but could be fragile with enum types
+- Issue #4: Helper functions missing return type annotations — cosmetic inconsistency with handoff.py
+- Issue #5: Client-per-request pattern — codebase-wide concern, not specific to this PR
+- Issue #6: Optional description field — intentional design decision confirmed by DB schema and tests
+- Issue #7: JWT-as-API-key pattern — established pattern in codebase for RLS enforcement
+
+### Final Status
+Approved with fixes
+
+## Test Quality Review
+
+**Reviewer**: Test Architect (TEA)
+**Date**: 2026-02-12
+**Quality Score**: 100/100 (A+)
+**Tests Reviewed**: 59 (10 unit, 49 integration)
+**Test Duration**: 0.25s total (all 59 tests)
+
+### Criteria Results
+
+| # | Criterion | Result | Notes |
+|---|-----------|--------|-------|
+| 1 | BDD Format | ✅ PASS (+5 bonus) | All 59 tests have explicit Given-When-Then docstrings |
+| 2 | Test ID Conventions | ✅ PASS (+5 bonus) | UNIT-001–010, INT-001–049, all traceable |
+| 3 | Hard Waits | ✅ PASS | No sleep/delay/timeout calls |
+| 4 | Determinism | ✅ PASS | No conditional flow, no random values |
+| 5 | Isolation & Cleanup | ✅ PASS (+5 bonus) | Context-managed mocks, no shared state |
+| 6 | Explicit Assertions | ✅ PASS | Every test has assert statements |
+| 7 | Test Length | ⚠️ WARN | 2133 lines (>500), but well-structured with 8 classes |
+| 8 | Test Duration | ✅ PASS | ~4ms per test, 0.25s total |
+| 9 | Fixture Patterns | ✅ PASS (+5 bonus) | 7 fixtures + helper function |
+| 10 | Data Factories | ⚠️ WARN | Some inline hardcoded dicts, could use factory pattern |
+| 11 | Network-First | ✅ N/A | Synchronous TestClient, no browser |
+| 12 | Flakiness Patterns | ✅ PASS | No flaky patterns detected |
+
+### Issues Found
+- 0 Critical
+- 0 High
+- 2 Medium: file length (2133 lines), some hardcoded inline test data
+- 0 Low
+
+### Fixes Applied
+- None required — no critical or high severity issues
