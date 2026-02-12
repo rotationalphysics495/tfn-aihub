@@ -39,6 +39,7 @@ from app.schemas.action import (
     ActionListResponse,
     EvidenceRef,
     PriorityLevel,
+    TrendData,
 )
 
 
@@ -1521,3 +1522,658 @@ class TestActionItemAcknowledgmentField:
         assert action.acknowledgment is not None
         assert action.acknowledgment.acknowledged_by == "user-123"
         assert action.acknowledgment.note == "Reviewed"
+
+
+# =============================================================================
+# Story 14.2 - Trend Data API Endpoint Tests
+# =============================================================================
+
+
+class TestTrendDataSchema:
+    """Tests for Story 14.2 AC#4 - TrendData schema validation."""
+
+    def test_trend_data_validates_with_all_fields(self):
+        """AC#4: TrendData validates with all required fields."""
+        td = TrendData(
+            metric_values=[78.5, 76.2, 74.8, 80.1, 72.5, None, 71.3],
+            days_on_report=5,
+            consecutive_days=3,
+            week_over_week_change=-9.2,
+        )
+        assert td.metric_values == [78.5, 76.2, 74.8, 80.1, 72.5, None, 71.3]
+        assert td.days_on_report == 5
+        assert td.consecutive_days == 3
+        assert td.week_over_week_change == -9.2
+
+    def test_trend_data_allows_null_week_over_week_change(self):
+        """AC#4: week_over_week_change can be null."""
+        td = TrendData(
+            metric_values=[None, None, None, None, None, None, 85.0],
+            days_on_report=1,
+            consecutive_days=1,
+            week_over_week_change=None,
+        )
+        assert td.week_over_week_change is None
+
+    def test_trend_data_allows_all_none_metric_values(self):
+        """AC#4: metric_values can contain all Nones except one."""
+        td = TrendData(
+            metric_values=[None, None, None, None, None, None, 5.0],
+            days_on_report=1,
+            consecutive_days=1,
+        )
+        assert td.metric_values[6] == 5.0
+        assert all(v is None for v in td.metric_values[:6])
+
+    def test_trend_data_serializes_to_json(self):
+        """AC#4: TrendData serializes correctly to JSON."""
+        td = TrendData(
+            metric_values=[78.5, 76.2, 74.8, 80.1, 72.5, None, 71.3],
+            days_on_report=5,
+            consecutive_days=3,
+            week_over_week_change=-9.2,
+        )
+        data = td.model_dump()
+        assert "metric_values" in data
+        assert "days_on_report" in data
+        assert "consecutive_days" in data
+        assert "week_over_week_change" in data
+        assert len(data["metric_values"]) == 7
+
+    def test_trend_data_days_on_report_bounds(self):
+        """AC#4: days_on_report must be between 0 and 7."""
+        # Valid bounds
+        TrendData(metric_values=[1.0]*7, days_on_report=0, consecutive_days=1)
+        TrendData(metric_values=[1.0]*7, days_on_report=7, consecutive_days=1)
+
+        # Invalid bounds
+        with pytest.raises(Exception):
+            TrendData(metric_values=[1.0]*7, days_on_report=-1, consecutive_days=1)
+        with pytest.raises(Exception):
+            TrendData(metric_values=[1.0]*7, days_on_report=8, consecutive_days=1)
+
+    def test_trend_data_consecutive_days_bounds(self):
+        """AC#4: consecutive_days must be between 0 and 7."""
+        TrendData(metric_values=[1.0]*7, days_on_report=1, consecutive_days=0)
+        TrendData(metric_values=[1.0]*7, days_on_report=1, consecutive_days=7)
+
+        with pytest.raises(Exception):
+            TrendData(metric_values=[1.0]*7, days_on_report=1, consecutive_days=-1)
+        with pytest.raises(Exception):
+            TrendData(metric_values=[1.0]*7, days_on_report=1, consecutive_days=8)
+
+    def test_action_item_trend_data_defaults_to_none(self):
+        """AC#4: ActionItem.trend_data defaults to None for backward compatibility."""
+        action = ActionItem(
+            id="test-id",
+            asset_id="asset-1",
+            asset_name="Grinder 5",
+            priority_level=PriorityLevel.CRITICAL,
+            category=ActionCategory.SAFETY,
+            primary_metric_value="Safety Event",
+            recommendation_text="Investigate",
+            evidence_summary="Unresolved",
+            evidence_refs=[],
+            created_at=datetime.utcnow(),
+        )
+        assert action.trend_data is None
+
+    def test_action_item_with_trend_data(self):
+        """AC#4: ActionItem can hold TrendData."""
+        td = TrendData(
+            metric_values=[78.5, 76.2, 74.8, 80.1, 72.5, None, 71.3],
+            days_on_report=5,
+            consecutive_days=3,
+            week_over_week_change=-9.2,
+        )
+        action = ActionItem(
+            id="test-id",
+            asset_id="asset-1",
+            asset_name="Grinder 5",
+            priority_level=PriorityLevel.HIGH,
+            category=ActionCategory.OEE,
+            primary_metric_value="OEE: 71.3%",
+            recommendation_text="Review",
+            evidence_summary="Below target",
+            evidence_refs=[],
+            created_at=datetime.utcnow(),
+            trend_data=td,
+        )
+        assert action.trend_data is not None
+        assert action.trend_data.days_on_report == 5
+
+
+class TestTrendDataCalculation:
+    """Tests for Story 14.2 AC#1,2,3 - Trend data calculation logic."""
+
+    @pytest.fixture
+    def trend_engine(self, mock_supabase_client, sample_config):
+        """Create an ActionEngine with mocked client and config for trend tests."""
+        engine = ActionEngine(supabase_client=mock_supabase_client, config=sample_config)
+        engine._assets_cache = {
+            "asset-1": {"name": "Grinder 5"},
+            "asset-2": {"name": "Lathe 3"},
+        }
+        engine._cache_timestamp = datetime.utcnow()
+        return engine
+
+    def test_full_7_day_oee_history(self, trend_engine, sample_config):
+        """AC#1: Asset with full 7 days of OEE history returns correct metric array."""
+        target_date = date(2026, 2, 10)
+        trailing_summaries = {
+            "asset-1": [
+                {"report_date": (target_date - timedelta(days=6-i)).isoformat(),
+                 "oee_percentage": 78.0 + i, "financial_loss_dollars": 0}
+                for i in range(7)
+            ]
+        }
+        action = ActionItem(
+            id="o1", asset_id="asset-1", asset_name="Grinder 5",
+            priority_level=PriorityLevel.HIGH, category=ActionCategory.OEE,
+            primary_metric_value="OEE: 84%", recommendation_text="R",
+            evidence_summary="E", evidence_refs=[], created_at=datetime.utcnow(),
+        )
+
+        result = trend_engine._calculate_trend_data(
+            action, target_date, trailing_summaries, {}, sample_config
+        )
+
+        assert len(result.metric_values) == 7
+        assert result.metric_values[0] == 78.0  # oldest (target_date - 6)
+        assert result.metric_values[6] == 84.0  # newest (target_date)
+        assert all(v is not None for v in result.metric_values)
+
+    def test_partial_history_3_days(self, trend_engine, sample_config):
+        """AC#2: Asset with fewer than 7 days returns None for missing days."""
+        target_date = date(2026, 2, 10)
+        # Only last 3 days have data
+        trailing_summaries = {
+            "asset-1": [
+                {"report_date": (target_date - timedelta(days=2-i)).isoformat(),
+                 "oee_percentage": 70.0 + i * 5, "financial_loss_dollars": 0}
+                for i in range(3)
+            ]
+        }
+        action = ActionItem(
+            id="o1", asset_id="asset-1", asset_name="Grinder 5",
+            priority_level=PriorityLevel.HIGH, category=ActionCategory.OEE,
+            primary_metric_value="OEE: 80%", recommendation_text="R",
+            evidence_summary="E", evidence_refs=[], created_at=datetime.utcnow(),
+        )
+
+        result = trend_engine._calculate_trend_data(
+            action, target_date, trailing_summaries, {}, sample_config
+        )
+
+        assert len(result.metric_values) == 7
+        # First 4 days should be None (no data)
+        assert all(v is None for v in result.metric_values[:4])
+        # Last 3 days should have values
+        assert result.metric_values[4] == 70.0
+        assert result.metric_values[5] == 75.0
+        assert result.metric_values[6] == 80.0
+        # week_over_week_change should be None since no data 7 days ago
+        assert result.week_over_week_change is None
+
+    def test_first_appearance_no_prior_history(self, trend_engine, sample_config):
+        """AC#3: First appearance returns days_on_report=1, consecutive_days=1, w_o_w=null."""
+        target_date = date(2026, 2, 10)
+        # Only today's data exists
+        trailing_summaries = {
+            "asset-1": [
+                {"report_date": target_date.isoformat(),
+                 "oee_percentage": 72.5, "financial_loss_dollars": 0}
+            ]
+        }
+        action = ActionItem(
+            id="o1", asset_id="asset-1", asset_name="Grinder 5",
+            priority_level=PriorityLevel.HIGH, category=ActionCategory.OEE,
+            primary_metric_value="OEE: 72.5%", recommendation_text="R",
+            evidence_summary="E", evidence_refs=[], created_at=datetime.utcnow(),
+        )
+
+        result = trend_engine._calculate_trend_data(
+            action, target_date, trailing_summaries, {}, sample_config
+        )
+
+        assert result.days_on_report == 1
+        assert result.consecutive_days == 1
+        assert result.week_over_week_change is None
+        # Only today's value, rest should be None
+        assert result.metric_values[6] == 72.5
+        assert all(v is None for v in result.metric_values[:6])
+
+    def test_safety_metric_uses_event_counts(self, trend_engine, sample_config):
+        """AC#1: Safety trend uses event counts per day."""
+        target_date = date(2026, 2, 10)
+        trailing_safety_counts = {
+            "asset-1": {
+                (target_date - timedelta(days=6)).isoformat(): 2,
+                (target_date - timedelta(days=5)).isoformat(): 1,
+                (target_date - timedelta(days=3)).isoformat(): 3,
+                target_date.isoformat(): 1,
+            }
+        }
+        action = ActionItem(
+            id="s1", asset_id="asset-1", asset_name="Grinder 5",
+            priority_level=PriorityLevel.CRITICAL, category=ActionCategory.SAFETY,
+            primary_metric_value="Safety Event", recommendation_text="R",
+            evidence_summary="E", evidence_refs=[], created_at=datetime.utcnow(),
+        )
+
+        result = trend_engine._calculate_trend_data(
+            action, target_date, {}, trailing_safety_counts, sample_config
+        )
+
+        assert len(result.metric_values) == 7
+        assert result.metric_values[0] == 2.0   # 7 days ago
+        assert result.metric_values[1] == 1.0   # 6 days ago
+        assert result.metric_values[2] is None  # 5 days ago (no events)
+        assert result.metric_values[3] == 3.0   # 4 days ago
+        assert result.metric_values[4] is None  # 3 days ago
+        assert result.metric_values[5] is None  # 2 days ago
+        assert result.metric_values[6] == 1.0   # today
+
+    def test_financial_uses_financial_loss_dollars(self, trend_engine, sample_config):
+        """AC#1: Financial trend uses financial_loss_dollars from daily_summaries."""
+        target_date = date(2026, 2, 10)
+        trailing_summaries = {
+            "asset-1": [
+                # T-7 data for week-over-week comparison
+                {"report_date": (target_date - timedelta(days=7)).isoformat(),
+                 "oee_percentage": 80.0, "financial_loss_dollars": 2000.0},
+                # T-6 data (oldest in metric_values array)
+                {"report_date": (target_date - timedelta(days=6)).isoformat(),
+                 "oee_percentage": 80.0, "financial_loss_dollars": 2100.0},
+                {"report_date": target_date.isoformat(),
+                 "oee_percentage": 75.0, "financial_loss_dollars": 3500.0},
+            ]
+        }
+        action = ActionItem(
+            id="f1", asset_id="asset-1", asset_name="Grinder 5",
+            priority_level=PriorityLevel.HIGH, category=ActionCategory.FINANCIAL,
+            primary_metric_value="Loss: $3,500.00", recommendation_text="R",
+            evidence_summary="E", evidence_refs=[], created_at=datetime.utcnow(),
+        )
+
+        result = trend_engine._calculate_trend_data(
+            action, target_date, trailing_summaries, {}, sample_config
+        )
+
+        assert result.metric_values[0] == 2100.0  # oldest in array (T-6)
+        assert result.metric_values[6] == 3500.0  # today
+        # week_over_week_change uses T-7 (2000.0): ((3500 - 2000) / 2000) * 100 = 75.0
+        assert result.week_over_week_change == 75.0
+
+    def test_week_over_week_change_with_zero_denominator(self, trend_engine, sample_config):
+        """AC#1: week_over_week_change is None when 7-day-ago value is 0."""
+        target_date = date(2026, 2, 10)
+        trailing_summaries = {
+            "asset-1": [
+                # T-7 data with zero OEE (denominator for w-o-w)
+                {"report_date": (target_date - timedelta(days=7)).isoformat(),
+                 "oee_percentage": 0.0, "financial_loss_dollars": 0.0},
+                {"report_date": target_date.isoformat(),
+                 "oee_percentage": 72.5, "financial_loss_dollars": 0.0},
+            ]
+        }
+        action = ActionItem(
+            id="o1", asset_id="asset-1", asset_name="Grinder 5",
+            priority_level=PriorityLevel.HIGH, category=ActionCategory.OEE,
+            primary_metric_value="OEE: 72.5%", recommendation_text="R",
+            evidence_summary="E", evidence_refs=[], created_at=datetime.utcnow(),
+        )
+
+        result = trend_engine._calculate_trend_data(
+            action, target_date, trailing_summaries, {}, sample_config
+        )
+
+        # Denominator is 0 (T-7 OEE = 0.0), should return None
+        assert result.week_over_week_change is None
+
+    def test_days_on_report_counts_oee_below_target(self, trend_engine, sample_config):
+        """AC#1: days_on_report counts days where OEE < target (85%)."""
+        target_date = date(2026, 2, 10)
+        trailing_summaries = {
+            "asset-1": [
+                {"report_date": (target_date - timedelta(days=6)).isoformat(),
+                 "oee_percentage": 80.0, "financial_loss_dollars": 0},  # below 85
+                {"report_date": (target_date - timedelta(days=5)).isoformat(),
+                 "oee_percentage": 90.0, "financial_loss_dollars": 0},  # above 85
+                {"report_date": (target_date - timedelta(days=4)).isoformat(),
+                 "oee_percentage": 70.0, "financial_loss_dollars": 0},  # below 85
+                {"report_date": (target_date - timedelta(days=3)).isoformat(),
+                 "oee_percentage": 65.0, "financial_loss_dollars": 0},  # below 85
+                {"report_date": (target_date - timedelta(days=2)).isoformat(),
+                 "oee_percentage": 88.0, "financial_loss_dollars": 0},  # above 85
+                {"report_date": (target_date - timedelta(days=1)).isoformat(),
+                 "oee_percentage": 82.0, "financial_loss_dollars": 0},  # below 85
+                {"report_date": target_date.isoformat(),
+                 "oee_percentage": 78.0, "financial_loss_dollars": 0},  # below 85
+            ]
+        }
+        action = ActionItem(
+            id="o1", asset_id="asset-1", asset_name="Grinder 5",
+            priority_level=PriorityLevel.HIGH, category=ActionCategory.OEE,
+            primary_metric_value="OEE: 78%", recommendation_text="R",
+            evidence_summary="E", evidence_refs=[], created_at=datetime.utcnow(),
+        )
+
+        result = trend_engine._calculate_trend_data(
+            action, target_date, trailing_summaries, {}, sample_config
+        )
+
+        # Days below 85%: day-6(80), day-4(70), day-3(65), day-1(82), day-0(78) = 5
+        assert result.days_on_report == 5
+
+    def test_consecutive_days_stops_at_non_triggering_day(self, trend_engine, sample_config):
+        """AC#1: consecutive_days stops counting at first day NOT meeting condition."""
+        target_date = date(2026, 2, 10)
+        trailing_summaries = {
+            "asset-1": [
+                {"report_date": (target_date - timedelta(days=6)).isoformat(),
+                 "oee_percentage": 70.0, "financial_loss_dollars": 0},  # below
+                {"report_date": (target_date - timedelta(days=5)).isoformat(),
+                 "oee_percentage": 72.0, "financial_loss_dollars": 0},  # below
+                {"report_date": (target_date - timedelta(days=4)).isoformat(),
+                 "oee_percentage": 90.0, "financial_loss_dollars": 0},  # ABOVE - breaks consecutive
+                {"report_date": (target_date - timedelta(days=3)).isoformat(),
+                 "oee_percentage": 74.0, "financial_loss_dollars": 0},  # below
+                {"report_date": (target_date - timedelta(days=2)).isoformat(),
+                 "oee_percentage": 76.0, "financial_loss_dollars": 0},  # below
+                {"report_date": (target_date - timedelta(days=1)).isoformat(),
+                 "oee_percentage": 73.0, "financial_loss_dollars": 0},  # below
+                {"report_date": target_date.isoformat(),
+                 "oee_percentage": 78.0, "financial_loss_dollars": 0},  # below
+            ]
+        }
+        action = ActionItem(
+            id="o1", asset_id="asset-1", asset_name="Grinder 5",
+            priority_level=PriorityLevel.HIGH, category=ActionCategory.OEE,
+            primary_metric_value="OEE: 78%", recommendation_text="R",
+            evidence_summary="E", evidence_refs=[], created_at=datetime.utcnow(),
+        )
+
+        result = trend_engine._calculate_trend_data(
+            action, target_date, trailing_summaries, {}, sample_config
+        )
+
+        # From target_date backward: day-0(78<85), day-1(73<85), day-2(76<85), day-3(74<85),
+        # day-4(90>=85) -> stops. consecutive_days = 4
+        assert result.consecutive_days == 4
+
+    def test_consecutive_days_minimum_is_1(self, trend_engine, sample_config):
+        """AC#1: consecutive_days minimum is 1 since item is on today's list."""
+        target_date = date(2026, 2, 10)
+        # No trailing data at all
+        trailing_summaries: dict[str, list[dict]] = {}
+        action = ActionItem(
+            id="o1", asset_id="asset-1", asset_name="Grinder 5",
+            priority_level=PriorityLevel.HIGH, category=ActionCategory.OEE,
+            primary_metric_value="OEE: 78%", recommendation_text="R",
+            evidence_summary="E", evidence_refs=[], created_at=datetime.utcnow(),
+        )
+
+        result = trend_engine._calculate_trend_data(
+            action, target_date, trailing_summaries, {}, sample_config
+        )
+
+        # Even with no data, minimum is 1
+        assert result.consecutive_days == 1
+
+    def test_no_trailing_data_for_asset(self, trend_engine, sample_config):
+        """AC#3: Asset with no trailing data has all-None metrics."""
+        target_date = date(2026, 2, 10)
+        trailing_summaries: dict[str, list[dict]] = {}
+
+        action = ActionItem(
+            id="o1", asset_id="asset-99", asset_name="Unknown",
+            priority_level=PriorityLevel.HIGH, category=ActionCategory.OEE,
+            primary_metric_value="OEE: 72%", recommendation_text="R",
+            evidence_summary="E", evidence_refs=[], created_at=datetime.utcnow(),
+        )
+
+        result = trend_engine._calculate_trend_data(
+            action, target_date, trailing_summaries, {}, sample_config
+        )
+
+        assert all(v is None for v in result.metric_values)
+        assert result.days_on_report == 0
+        assert result.consecutive_days == 1  # minimum
+        assert result.week_over_week_change is None
+
+
+class TestTrendBatchLoading:
+    """Tests for Story 14.2 AC#5 - Batch query loading."""
+
+    @pytest.mark.asyncio
+    async def test_load_trailing_summaries_batches_query(self, action_engine, mock_supabase_client):
+        """AC#5: _load_trailing_summaries makes a single batched query for all assets."""
+        action_engine._client = mock_supabase_client
+
+        target_date = date(2026, 2, 10)
+        asset_ids = ["asset-1", "asset-2", "asset-3"]
+
+        mock_response_data = [
+            {"asset_id": "asset-1", "report_date": "2026-02-10", "oee_percentage": 80.0,
+             "downtime_minutes": 30, "financial_loss_dollars": 500, "actual_output": 800,
+             "target_output": 1000, "id": "s1"},
+            {"asset_id": "asset-2", "report_date": "2026-02-10", "oee_percentage": 75.0,
+             "downtime_minutes": 60, "financial_loss_dollars": 1200, "actual_output": 750,
+             "target_output": 1000, "id": "s2"},
+            {"asset_id": "asset-1", "report_date": "2026-02-09", "oee_percentage": 82.0,
+             "downtime_minutes": 20, "financial_loss_dollars": 300, "actual_output": 820,
+             "target_output": 1000, "id": "s3"},
+        ]
+
+        # Mock the chained query
+        mock_supabase_client.table.return_value.select.return_value.in_.return_value.gte.return_value.lte.return_value.execute.return_value.data = mock_response_data
+
+        result = await action_engine._load_trailing_summaries(target_date, asset_ids)
+
+        # Verify single call to table
+        mock_supabase_client.table.assert_called_with("daily_summaries")
+
+        # Verify results grouped by asset
+        assert "asset-1" in result
+        assert "asset-2" in result
+        assert len(result["asset-1"]) == 2  # Two rows for asset-1
+        assert len(result["asset-2"]) == 1  # One row for asset-2
+
+        # Verify sorted by date ascending
+        assert result["asset-1"][0]["report_date"] == "2026-02-09"
+        assert result["asset-1"][1]["report_date"] == "2026-02-10"
+
+    @pytest.mark.asyncio
+    async def test_load_trailing_summaries_empty_asset_ids(self, action_engine, mock_supabase_client):
+        """AC#5: Empty asset_ids returns empty dict without querying."""
+        action_engine._client = mock_supabase_client
+
+        result = await action_engine._load_trailing_summaries(date(2026, 2, 10), [])
+
+        assert result == {}
+        mock_supabase_client.table.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_load_trailing_summaries_handles_error(self, action_engine, mock_supabase_client):
+        """AC#5: Returns empty dict on error without raising."""
+        action_engine._client = mock_supabase_client
+        mock_supabase_client.table.return_value.select.return_value.in_.return_value.gte.return_value.lte.return_value.execute.side_effect = Exception("DB error")
+
+        result = await action_engine._load_trailing_summaries(date(2026, 2, 10), ["asset-1"])
+
+        assert result == {}
+
+    @pytest.mark.asyncio
+    async def test_load_trailing_safety_events_batches_query(self, action_engine, mock_supabase_client):
+        """AC#5: _load_trailing_safety_events makes a single batched query."""
+        action_engine._client = mock_supabase_client
+
+        target_date = date(2026, 2, 10)
+        asset_ids = ["asset-1", "asset-2"]
+
+        mock_response_data = [
+            {"asset_id": "asset-1", "event_timestamp": "2026-02-10T14:30:00Z"},
+            {"asset_id": "asset-1", "event_timestamp": "2026-02-10T15:00:00Z"},
+            {"asset_id": "asset-2", "event_timestamp": "2026-02-09T10:00:00Z"},
+        ]
+
+        mock_supabase_client.table.return_value.select.return_value.in_.return_value.gte.return_value.lte.return_value.eq.return_value.execute.return_value.data = mock_response_data
+
+        result = await action_engine._load_trailing_safety_events(target_date, asset_ids)
+
+        mock_supabase_client.table.assert_called_with("safety_events")
+
+        assert "asset-1" in result
+        assert "asset-2" in result
+        assert result["asset-1"]["2026-02-10"] == 2  # Two events on same day
+        assert result["asset-2"]["2026-02-09"] == 1
+
+    @pytest.mark.asyncio
+    async def test_load_trailing_safety_events_empty_ids(self, action_engine, mock_supabase_client):
+        """AC#5: Empty asset_ids returns empty dict without querying."""
+        action_engine._client = mock_supabase_client
+
+        result = await action_engine._load_trailing_safety_events(date(2026, 2, 10), [])
+
+        assert result == {}
+        mock_supabase_client.table.assert_not_called()
+
+
+class TestTrendDataIntegration:
+    """Tests for Story 14.2 AC#1,6 - Integration with generate_action_list."""
+
+    @pytest.mark.asyncio
+    async def test_generate_action_list_includes_trend_data(
+        self, action_engine, mock_supabase_client, sample_assets
+    ):
+        """AC#1: generate_action_list result includes trend_data on each action item."""
+        action_engine._client = mock_supabase_client
+        action_engine._assets_cache = sample_assets
+        action_engine._shift_targets_cache = {}
+        action_engine._cost_centers_cache = {}
+        action_engine._cache_timestamp = datetime.utcnow()
+
+        target_date = date.today() - timedelta(days=1)
+
+        # Mock safety query - no safety events
+        safety_mock = MagicMock()
+        safety_mock.data = []
+
+        # Mock OEE daily_summaries query
+        oee_data = [
+            {
+                "id": str(uuid4()),
+                "asset_id": "asset-1",
+                "report_date": target_date.isoformat(),
+                "oee_percentage": 72.0,
+                "actual_output": 720,
+                "target_output": 1000,
+                "financial_loss_dollars": 2000.0,
+                "downtime_minutes": 60,
+            }
+        ]
+
+        # Mock financial query
+        financial_data = []
+
+        # Mock trailing summaries query
+        trailing_data = [
+            {
+                "id": "ts1", "asset_id": "asset-1",
+                "report_date": target_date.isoformat(),
+                "oee_percentage": 72.0, "downtime_minutes": 60,
+                "financial_loss_dollars": 2000.0, "actual_output": 720,
+                "target_output": 1000,
+            }
+        ]
+
+        # Set up the mock to return different data for different table calls
+        call_count = {"count": 0}
+        table_mocks = {}
+
+        def mock_table(table_name):
+            if table_name not in table_mocks:
+                table_mocks[table_name] = MagicMock()
+            return table_mocks[table_name]
+
+        mock_supabase_client.table = mock_table
+
+        # Assets query (already cached, won't be called)
+        # Safety events query
+        table_mocks["safety_events"] = MagicMock()
+        table_mocks["safety_events"].select.return_value.eq.return_value.gte.return_value.execute.return_value.data = []
+
+        # Daily summaries query (for OEE actions)
+        oee_select_mock = MagicMock()
+        oee_select_mock.eq.return_value.execute.return_value.data = oee_data
+        # For trailing summaries - in_ chain
+        trailing_mock = MagicMock()
+        trailing_mock.gte.return_value.lte.return_value.execute.return_value.data = trailing_data
+        oee_select_mock.in_.return_value = trailing_mock
+        # For financial - eq then gt chain
+        oee_select_mock.eq.return_value.gt.return_value.execute.return_value.data = financial_data
+
+        table_mocks["daily_summaries"] = MagicMock()
+        table_mocks["daily_summaries"].select.return_value = oee_select_mock
+
+        result = await action_engine.generate_action_list(
+            target_date=target_date,
+            use_cache=False,
+        )
+
+        # Should have at least one action item with trend_data
+        assert len(result.actions) >= 1
+        for action in result.actions:
+            assert action.trend_data is not None
+            assert len(action.trend_data.metric_values) == 7
+            assert action.trend_data.days_on_report >= 0
+            assert action.trend_data.consecutive_days >= 1
+
+    @pytest.mark.asyncio
+    async def test_cached_response_preserves_trend_data(
+        self, action_engine
+    ):
+        """AC#6: Cached response preserves trend_data on action items."""
+        target_date = date.today() - timedelta(days=1)
+
+        td = TrendData(
+            metric_values=[78.5, 76.2, 74.8, 80.1, 72.5, None, 71.3],
+            days_on_report=5,
+            consecutive_days=3,
+            week_over_week_change=-9.2,
+        )
+        cached_response = ActionListResponse(
+            actions=[
+                ActionItem(
+                    id="action-oee-abc123",
+                    asset_id="asset-1",
+                    asset_name="Grinder 5",
+                    priority_level=PriorityLevel.HIGH,
+                    category=ActionCategory.OEE,
+                    primary_metric_value="OEE: 71.3%",
+                    recommendation_text="Review",
+                    evidence_summary="Below target",
+                    evidence_refs=[],
+                    created_at=datetime.utcnow(),
+                    trend_data=td,
+                ),
+            ],
+            generated_at=datetime.utcnow(),
+            report_date=target_date,
+            total_count=1,
+            counts_by_category={"safety": 0, "oee": 1, "financial": 0},
+        )
+        cache_key = f"{target_date.isoformat()}-all"
+        action_engine._action_list_cache[cache_key] = cached_response
+
+        result = await action_engine.generate_action_list(
+            target_date=target_date,
+            use_cache=True,
+        )
+
+        assert result.actions[0].trend_data is not None
+        assert result.actions[0].trend_data.days_on_report == 5
+        assert result.actions[0].trend_data.consecutive_days == 3
+        assert result.actions[0].trend_data.week_over_week_change == -9.2
+        assert result.actions[0].trend_data.metric_values == [78.5, 76.2, 74.8, 80.1, 72.5, None, 71.3]

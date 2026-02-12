@@ -126,6 +126,43 @@ class AcknowledgmentInfo(BaseModel):
     note: Optional[str] = None
 
 
+class TrendData(BaseModel):
+    """7-day trend data for an action item's asset+metric."""
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "metric_values": [78.5, 76.2, 74.8, 80.1, 72.5, None, 71.3],
+                "days_on_report": 5,
+                "consecutive_days": 3,
+                "week_over_week_change": -9.2,
+            }
+        }
+    )
+
+    metric_values: List[Optional[float]] = Field(
+        ...,
+        description="7-day array of metric values (index 0 = oldest, 6 = target_date). None for missing days.",
+        max_length=7,
+    )
+    days_on_report: int = Field(
+        ...,
+        ge=0,
+        le=7,
+        description="Number of days this asset+category appeared as an action item in the last 7 days",
+    )
+    consecutive_days: int = Field(
+        ...,
+        ge=0,
+        le=7,
+        description="Number of consecutive days this has been an issue (counting backward from target_date)",
+    )
+    week_over_week_change: Optional[float] = Field(
+        None,
+        description="Percentage change vs. same metric 7 days ago. Null if no data 7 days ago.",
+    )
+
+
 class ActionItem(BaseModel):
     """
     A prioritized action item for the Daily Action List.
@@ -192,6 +229,12 @@ class ActionItem(BaseModel):
     acknowledgment: Optional[AcknowledgmentInfo] = Field(
         default=None,
         description="Acknowledgment info if this action was acknowledged by the current user"
+    )
+
+    # Story 14.2: 7-day trend data for this action item's asset+metric
+    trend_data: Optional[TrendData] = Field(
+        default=None,
+        description="7-day trend data for this action item's asset+metric"
     )
 
     # Story 3.2 AC#7: Computed fields for alias compatibility

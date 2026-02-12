@@ -32,6 +32,7 @@ from app.schemas.action import (
     ActionListResponse,
     EvidenceRef,
     PriorityLevel,
+    TrendData,
 )
 
 logger = logging.getLogger(__name__)
@@ -258,6 +259,304 @@ class ActionEngine:
         except Exception as e:
             logger.error(f"Failed to load acknowledgments: {e}")
             return {}
+
+    async def _load_trailing_summaries(
+        self, target_date: date, asset_ids: List[str], lookback_days: int = 7
+    ) -> Dict[str, List[dict]]:
+        """
+        Load trailing daily summaries for trend data calculation.
+
+        Story 14.2 AC#5: Single batched query for all asset IDs.
+
+        Args:
+            target_date: The report date (end of lookback window)
+            asset_ids: List of asset UUIDs to query
+            lookback_days: Number of days to look back (default 7)
+
+        Returns:
+            Dictionary mapping asset_id to list of daily_summary rows sorted by report_date ascending
+        """
+        if not asset_ids:
+            return {}
+
+        try:
+            client = self._get_client()
+            start_date = target_date - timedelta(days=lookback_days - 1)
+
+            response = (
+                client.table("daily_summaries")
+                .select(
+                    "id, asset_id, report_date, oee_percentage, downtime_minutes, "
+                    "financial_loss_dollars, actual_output, target_output"
+                )
+                .in_("asset_id", asset_ids)
+                .gte("report_date", start_date.isoformat())
+                .lte("report_date", target_date.isoformat())
+                .execute()
+            )
+
+            result: Dict[str, List[dict]] = {}
+            for row in response.data or []:
+                aid = row.get("asset_id")
+                if aid:
+                    result.setdefault(aid, []).append(row)
+
+            # Sort each asset's rows by report_date ascending
+            for aid in result:
+                result[aid].sort(key=lambda r: r.get("report_date", ""))
+
+            logger.debug(
+                f"Loaded trailing summaries for {len(result)} assets "
+                f"({start_date} to {target_date})"
+            )
+            return result
+
+        except Exception as e:
+            logger.error(f"Failed to load trailing summaries: {e}")
+            return {}
+
+    async def _load_trailing_safety_events(
+        self, target_date: date, asset_ids: List[str], lookback_days: int = 7
+    ) -> Dict[str, Dict[str, int]]:
+        """
+        Load trailing safety event counts for trend data calculation.
+
+        Story 14.2 AC#5: Single batched query for all safety asset IDs.
+
+        Args:
+            target_date: The report date (end of lookback window)
+            asset_ids: List of asset UUIDs to query
+            lookback_days: Number of days to look back (default 7)
+
+        Returns:
+            Dictionary mapping asset_id to dict of date_str -> event count
+        """
+        if not asset_ids:
+            return {}
+
+        try:
+            client = self._get_client()
+            start_date = target_date - timedelta(days=lookback_days - 1)
+            start_ts = datetime.combine(start_date, datetime.min.time())
+            end_ts = datetime.combine(target_date, datetime.max.time())
+
+            response = (
+                client.table("safety_events")
+                .select("asset_id, event_timestamp")
+                .in_("asset_id", asset_ids)
+                .gte("event_timestamp", start_ts.isoformat())
+                .lte("event_timestamp", end_ts.isoformat())
+                .eq("is_resolved", False)
+                .execute()
+            )
+
+            result: Dict[str, Dict[str, int]] = {}
+            for row in response.data or []:
+                aid = row.get("asset_id")
+                ts = row.get("event_timestamp", "")
+                if aid and ts:
+                    # Extract date from timestamp
+                    try:
+                        event_date = datetime.fromisoformat(
+                            ts.replace("Z", "+00:00")
+                        ).date().isoformat()
+                    except (ValueError, AttributeError):
+                        continue
+                    result.setdefault(aid, {})
+                    result[aid][event_date] = result[aid].get(event_date, 0) + 1
+
+            logger.debug(
+                f"Loaded trailing safety events for {len(result)} assets "
+                f"({start_date} to {target_date})"
+            )
+            return result
+
+        except Exception as e:
+            logger.error(f"Failed to load trailing safety events: {e}")
+            return {}
+
+    def _calculate_trend_data(
+        self,
+        action: ActionItem,
+        target_date: date,
+        trailing_summaries: Dict[str, List[dict]],
+        trailing_safety_counts: Dict[str, Dict[str, int]],
+        config: ActionEngineConfig,
+    ) -> TrendData:
+        """
+        Calculate trend data for a single action item.
+
+        Story 14.2 AC#1: Computes metric_values, days_on_report,
+        consecutive_days, and week_over_week_change.
+
+        Args:
+            action: The action item to compute trend for
+            target_date: The report date
+            trailing_summaries: Pre-loaded daily summaries by asset_id
+            trailing_safety_counts: Pre-loaded safety event counts by asset_id
+            config: Engine configuration for thresholds
+
+        Returns:
+            TrendData instance with computed fields
+        """
+        asset_id = action.asset_id
+        category = action.category
+
+        # Build 7-day metric_values array (index 0 = oldest = target_date-6, index 6 = target_date)
+        metric_values: List[Optional[float]] = []
+        for i in range(7):
+            day = target_date - timedelta(days=6 - i)
+            day_str = day.isoformat()
+
+            if category == ActionCategory.SAFETY:
+                counts = trailing_safety_counts.get(asset_id, {})
+                count = counts.get(day_str)
+                metric_values.append(float(count) if count is not None else None)
+            else:
+                # OEE or FINANCIAL: look up from daily_summaries
+                summaries = trailing_summaries.get(asset_id, [])
+                day_summary = next(
+                    (s for s in summaries if s.get("report_date") == day_str), None
+                )
+                if day_summary is None:
+                    metric_values.append(None)
+                else:
+                    if category == ActionCategory.OEE:
+                        val = day_summary.get("oee_percentage")
+                    else:  # FINANCIAL
+                        val = day_summary.get("financial_loss_dollars")
+                    metric_values.append(float(val) if val is not None else None)
+
+        days_on_report = self._calculate_days_on_report(
+            asset_id, category, target_date, trailing_summaries,
+            trailing_safety_counts, config
+        )
+        consecutive_days = self._calculate_consecutive_days(
+            asset_id, category, target_date, trailing_summaries,
+            trailing_safety_counts, config
+        )
+
+        # Week-over-week change: compare today (T) vs T-7 (true 7 days ago)
+        # metric_values covers T-6 to T (indices 0-6), so T-7 must be
+        # looked up separately from the trailing data (loaded with lookback=8)
+        week_over_week_change: Optional[float] = None
+        today_val = metric_values[6]
+        week_ago_date = (target_date - timedelta(days=7)).isoformat()
+        week_ago_val: Optional[float] = None
+        if category == ActionCategory.SAFETY:
+            counts = trailing_safety_counts.get(asset_id, {})
+            count = counts.get(week_ago_date)
+            week_ago_val = float(count) if count is not None else None
+        else:
+            summaries = trailing_summaries.get(asset_id, [])
+            week_ago_summary = next(
+                (s for s in summaries if s.get("report_date") == week_ago_date), None
+            )
+            if week_ago_summary is not None:
+                if category == ActionCategory.OEE:
+                    val = week_ago_summary.get("oee_percentage")
+                else:  # FINANCIAL
+                    val = week_ago_summary.get("financial_loss_dollars")
+                week_ago_val = float(val) if val is not None else None
+
+        if week_ago_val is not None and week_ago_val != 0 and today_val is not None:
+            week_over_week_change = round(
+                ((today_val - week_ago_val) / week_ago_val) * 100, 2
+            )
+
+        return TrendData(
+            metric_values=metric_values,
+            days_on_report=days_on_report,
+            consecutive_days=consecutive_days,
+            week_over_week_change=week_over_week_change,
+        )
+
+    def _calculate_days_on_report(
+        self,
+        asset_id: str,
+        category: ActionCategory,
+        target_date: date,
+        trailing_summaries: Dict[str, List[dict]],
+        trailing_safety_counts: Dict[str, Dict[str, int]],
+        config: ActionEngineConfig,
+    ) -> int:
+        """
+        Count how many of the trailing 7 days would have triggered an action item.
+
+        Story 14.2 AC#1: days_on_report field.
+        """
+        count = 0
+        for i in range(7):
+            day = target_date - timedelta(days=6 - i)
+            day_str = day.isoformat()
+
+            if category == ActionCategory.SAFETY:
+                events = trailing_safety_counts.get(asset_id, {})
+                if events.get(day_str, 0) > 0:
+                    count += 1
+            else:
+                summaries = trailing_summaries.get(asset_id, [])
+                day_summary = next(
+                    (s for s in summaries if s.get("report_date") == day_str), None
+                )
+                if day_summary is None:
+                    continue
+                if category == ActionCategory.OEE:
+                    oee = day_summary.get("oee_percentage")
+                    if oee is not None and oee < config.target_oee_percentage:
+                        count += 1
+                else:  # FINANCIAL
+                    loss = day_summary.get("financial_loss_dollars")
+                    if loss is not None and loss > config.financial_loss_threshold:
+                        count += 1
+
+        return count
+
+    def _calculate_consecutive_days(
+        self,
+        asset_id: str,
+        category: ActionCategory,
+        target_date: date,
+        trailing_summaries: Dict[str, List[dict]],
+        trailing_safety_counts: Dict[str, Dict[str, int]],
+        config: ActionEngineConfig,
+    ) -> int:
+        """
+        Count consecutive days backward from target_date where the condition holds.
+
+        Story 14.2 AC#1: consecutive_days field. Minimum 1 since the item is on today's list.
+        """
+        count = 0
+        for i in range(7):
+            day = target_date - timedelta(days=i)
+            day_str = day.isoformat()
+            triggered = False
+
+            if category == ActionCategory.SAFETY:
+                events = trailing_safety_counts.get(asset_id, {})
+                if events.get(day_str, 0) > 0:
+                    triggered = True
+            else:
+                summaries = trailing_summaries.get(asset_id, [])
+                day_summary = next(
+                    (s for s in summaries if s.get("report_date") == day_str), None
+                )
+                if day_summary is not None:
+                    if category == ActionCategory.OEE:
+                        oee = day_summary.get("oee_percentage")
+                        if oee is not None and oee < config.target_oee_percentage:
+                            triggered = True
+                    else:  # FINANCIAL
+                        loss = day_summary.get("financial_loss_dollars")
+                        if loss is not None and loss > config.financial_loss_threshold:
+                            triggered = True
+
+            if triggered:
+                count += 1
+            else:
+                break
+
+        return max(count, 1)  # Minimum 1 since the item is on today's list
 
     def _generate_action_id(self, category: ActionCategory, asset_id: str) -> str:
         """Generate a unique action item ID."""
@@ -779,6 +1078,30 @@ class ActionEngine:
                     oee_actions,
                     financial_actions
                 )
+
+            # Story 14.2: Compute trend data for all action items (batch queries)
+            # Use lookback_days=8 to include T-7 for week-over-week comparison
+            if merged:
+                all_asset_ids = list({a.asset_id for a in merged})
+                trailing_summaries = await self._load_trailing_summaries(
+                    target_date, all_asset_ids, lookback_days=8
+                )
+
+                safety_asset_ids = [
+                    a.asset_id for a in merged
+                    if a.category == ActionCategory.SAFETY
+                ]
+                trailing_safety_counts: Dict[str, Dict[str, int]] = {}
+                if safety_asset_ids:
+                    trailing_safety_counts = await self._load_trailing_safety_events(
+                        target_date, list(set(safety_asset_ids)), lookback_days=8
+                    )
+
+                for action in merged:
+                    action.trend_data = self._calculate_trend_data(
+                        action, target_date, trailing_summaries,
+                        trailing_safety_counts, effective_config
+                    )
 
             # Count by category (before limiting)
             counts = {
