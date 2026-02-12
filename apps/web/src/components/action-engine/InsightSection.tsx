@@ -5,7 +5,9 @@ import { CheckCircle2, Circle, Clock, MapPin, UserPlus } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { PriorityBadge, type PriorityType } from './PriorityBadge'
 import { AssignmentBadge } from './AssignmentBadge'
-import type { Recommendation, AssetReference, FollowUpData } from './types'
+import type { Recommendation, AssetReference, FollowUpData, TrendData } from './types'
+import { TrendIndicator } from './TrendIndicator'
+import { RepeatOffenderBadge } from './RepeatOffenderBadge'
 
 /**
  * Insight Section Component (Left side of card)
@@ -32,6 +34,8 @@ interface InsightSectionProps {
   acknowledgedAt?: string | null
   onAcknowledge?: () => void
   followUp?: FollowUpData | null
+  trendData?: TrendData
+  isLoading?: boolean
   className?: string
 }
 
@@ -78,6 +82,8 @@ export function InsightSection({
   acknowledgedAt,
   onAcknowledge,
   followUp,
+  trendData,
+  isLoading,
   className,
 }: InsightSectionProps) {
   const router = useRouter()
@@ -93,6 +99,7 @@ export function InsightSection({
       {/* Priority badge - prominent and glanceable (AC #4) */}
       <div className="flex items-center gap-3 flex-wrap">
         <PriorityBadge priority={priority} />
+        <RepeatOffenderBadge trendData={trendData} />
 
         {/* Financial impact - prominent display when applicable (AC #2) */}
         {financialImpact > 0 && (
@@ -109,6 +116,11 @@ export function InsightSection({
           </span>
         )}
       </div>
+
+      {/* Trend indicator row (Story 14.4 AC #2, #3, #5) */}
+      {(trendData || isLoading) && (
+        <TrendIndicator trendData={trendData} priority={priority} isLoading={isLoading} />
+      )}
 
       {/* Assignment badge - shows when a follow-up exists (Story 13.4 AC #1) */}
       {followUp && <AssignmentBadge followUp={followUp} />}

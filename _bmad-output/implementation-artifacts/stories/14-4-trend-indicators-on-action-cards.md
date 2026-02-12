@@ -1,6 +1,6 @@
 # Story 14.4: Trend Indicators on Action Cards
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -208,10 +208,149 @@ Updated layout with trend indicators:
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.6
+
+### Implementation Summary
+
+Implemented trend indicators on action cards including:
+- TrendData TypeScript interface and ActionItem extension
+- API trend_data snake_case to camelCase transformer mapping
+- RepeatOffenderBadge component (New/repeat offender/frequency badges)
+- TrendIndicator component (trend arrow, percentage change, 7-day Recharts sparkline, skeleton state)
+- Integration into InsightSection and InsightEvidenceCard
+- Barrel exports for new components and types
+
+### Files Created
+- apps/web/src/components/action-engine/TrendIndicator.tsx - Trend arrow + sparkline + skeleton component
+- apps/web/src/components/action-engine/RepeatOffenderBadge.tsx - Repeat offender / New / frequency badge component
+
+### Files Modified
+- apps/web/src/components/action-engine/types.ts - Added TrendData interface, optional trendData field on ActionItem
+- apps/web/src/hooks/useDailyActions.ts - Added trend_data snake_case field to API ActionItem interface
+- apps/web/src/components/action-engine/transformers.ts - Added trend_data to trendData mapping in transformAPIActionItem()
+- apps/web/src/components/action-engine/InsightSection.tsx - Added trendData/isLoading props, renders RepeatOffenderBadge inline with PriorityBadge, renders TrendIndicator row
+- apps/web/src/components/action-engine/InsightEvidenceCard.tsx - Passes item.trendData to InsightSection
+- apps/web/src/components/action-engine/index.ts - Added TrendIndicator, RepeatOffenderBadge exports and TrendData type export
+
+### Key Decisions
+- Used lucide-react TrendingUp/TrendingDown/ArrowRight icons for trend direction (consistent with existing icon library usage)
+- Stable threshold is strictly < 2% absolute change (>=2% shows directional arrow per test spec boundary tests)
+- SAFETY priority items skip trend arrow entirely (only sparkline if data available)
+- Null metric_values filtered for sparkline but preserved in metricHistory for component-level handling
+- Malformed trend_data.metric_values (non-array) handled gracefully by checking Array.isArray
+
+### Tests Added
+- apps/web/src/components/action-engine/__tests__/RepeatOffenderBadge.test.tsx - 15 tests for badge variants, ordinals, ARIA, edge cases
+- apps/web/src/components/action-engine/__tests__/TrendIndicator.test.tsx - 29 tests for trend direction, sparkline, skeleton, edge cases
+- apps/web/src/components/action-engine/__tests__/transformers.trend.test.tsx - 7 tests for transformer mapping
+- apps/web/src/components/action-engine/__tests__/types.test.ts - 2 tests for type verification
+- apps/web/src/components/action-engine/__tests__/InsightSection.trend.test.tsx - 6 tests for integration
+
+### Notes for Reviewer
+- INT-004 test has a pre-existing query issue: `getByText(/grinder 5/i)` matches two DOM elements because the mock data has "Grinder 5" in both recommendation text and asset name. This is a test fixture issue, not an implementation issue.
+- E2E tests (action-cards-trend.spec.ts) require Playwright which is not yet installed. They serve as specification only.
+- The @ts-expect-error directives in InsightSection.trend.test.tsx are now unused because the trendData/isLoading props exist. This is expected TDD behavior.
+
+### Test Results
+97 of 98 tests pass. 1 failure in INT-004 due to pre-existing test query ambiguity (getByText matches multiple elements).
+
+### Acceptance Criteria Status
+- [x] AC1 - Repeat offender badge when consecutive_days >= 3 - implemented in RepeatOffenderBadge.tsx
+- [x] AC2 - Trend arrow based on week_over_week_change - implemented in TrendIndicator.tsx
+- [x] AC3 - 7-day sparkline chart - implemented in TrendIndicator.tsx with Recharts LineChart
+- [x] AC4 - "New" badge for first-appearance items - implemented in RepeatOffenderBadge.tsx
+- [x] AC5 - Skeleton placeholder when loading - implemented in TrendIndicator.tsx
+- [x] AC6 - TypeScript types and transformer mapping - implemented in types.ts, useDailyActions.ts, transformers.ts
+- [x] AC7 - Responsive layout on tablet - implemented in InsightSection.tsx with flex-wrap layout
 
 ### Debug Log References
 
 ### Completion Notes List
 
 ### File List
+- apps/web/src/components/action-engine/types.ts
+- apps/web/src/hooks/useDailyActions.ts
+- apps/web/src/components/action-engine/transformers.ts
+- apps/web/src/components/action-engine/RepeatOffenderBadge.tsx
+- apps/web/src/components/action-engine/TrendIndicator.tsx
+- apps/web/src/components/action-engine/InsightSection.tsx
+- apps/web/src/components/action-engine/InsightEvidenceCard.tsx
+- apps/web/src/components/action-engine/index.ts
+
+## Code Review Record
+
+**Reviewer**: Code Review Agent
+**Date**: 2026-02-11
+**Diff Size**: 2056 lines added, 3 deleted (15 files)
+
+### Checklist Results
+- Acceptance Criteria: PASS
+- Code Quality: PASS
+- Test Coverage: PASS
+- Security: PASS
+
+### Issues Found
+
+| # | Description | Severity | Status |
+|---|-------------|----------|--------|
+| 1 | INT-004 test failure: `getByText(/grinder 5/i)` matches multiple DOM elements (recommendation text and asset name) | MEDIUM | Fixed |
+| 2 | Stale `@ts-expect-error` directives in InsightSection.trend.test.tsx (props now exist) | MEDIUM | Fixed |
+| 3 | TrendIndicator icons use semantic direction (improving/worsening) rather than metric direction — TrendingUp for FINANCIAL improving even though metric went down | LOW | Documented |
+| 4 | Sparkline container lacks `data-testid` on wrapper div (E2E specs reference it via mock) | LOW | Documented |
+| 5 | RepeatOffenderBadge: consecutiveDays=1, daysOnReport=2 renders no badge (arguable gap) | LOW | Documented |
+| 6 | Redundant `gap-1.5` class in RepeatOffenderBadge Badge elements | LOW | Documented |
+
+**Totals**: 0 HIGH, 2 MEDIUM, 4 LOW
+
+### Fixes Applied
+
+| Issue # | Fix Description | Verified |
+|---------|-----------------|----------|
+| 1 | Changed `getByText(/grinder 5/i)` to `getByLabelText(/view asset details for grinder 5/i)` for unique element query | 98/98 tests pass |
+| 2 | Removed 4 stale `@ts-expect-error` directives and associated TDD comments from InsightSection.trend.test.tsx | 98/98 tests pass |
+
+### Remaining Issues (Low Severity)
+- Issue 3: Icon direction is semantic (improving=TrendingUp) rather than metric-directional. This is consistent with the design intent and test expectations, so no change needed.
+- Issue 4: Sparkline `data-testid` is applied via the Recharts mock in tests. The actual Recharts `LineChart` renders an SVG, so adding a wrapper div with `data-testid` would change the DOM structure. E2E tests will need a different selector for real Recharts output.
+- Issue 5: The gap at consecutiveDays=1, daysOnReport=2 is acceptable — this represents a "second appearance but not consecutive second day" which is a low-signal state.
+- Issue 6: Minor CSS redundancy, no functional impact.
+
+### Final Status
+Approved with fixes
+
+## Test Quality Review
+
+**Reviewer**: Test Architect (TEA)
+**Date**: 2026-02-11
+**Quality Score**: 100/100 (A+)
+**Tests Reviewed**: 59 tests across 6 files (5 unit/integration + 1 E2E spec)
+
+### Criteria Results
+
+| # | Criterion | Result | Notes |
+|---|-----------|--------|-------|
+| 1 | BDD Format (Given-When-Then) | PASS (+5) | Explicit Given/When/Then comments in every test |
+| 2 | Test ID Conventions | PASS (+5) | UNIT-001–043, INT-001–005, EDGE-001–006, ERROR-001–002, E2E-001–002 |
+| 3 | Hard Waits Detection | PASS | No hard waits; E2E uses proper explicit waits |
+| 4 | Determinism | PASS (+5) | No randomness, no conditional flow, deterministic fixtures |
+| 5 | Isolation & Cleanup | PASS (+5) | beforeEach/afterEach with mock clear/restore in all suites |
+| 6 | Explicit Assertions | PASS | Every test has explicit expect() assertions |
+| 7 | Test Length | WARN (-4) | TrendIndicator.test.tsx: 623 lines, RepeatOffenderBadge.test.tsx: 361 lines |
+| 8 | Test Duration | PASS | 98 tests complete in ~1s total |
+| 9 | Fixture Patterns | PASS (+5) | Shared factory functions with overrides in all suites |
+| 10 | Data Factories | PASS | createMockTrendData, createMockAPIActionItem, createMockActionItem |
+| 11 | Network-First Pattern | PASS (+5) | Module-level mocks before imports; E2E setup before navigation |
+| 12 | Flakiness Patterns | PASS | No tight timeouts, race conditions, or timing dependencies |
+
+### Issues Found
+- 0 Critical
+- 0 High
+- 2 Medium: Test file length (TrendIndicator: 623 lines, RepeatOffenderBadge: 361 lines) — acceptable given test count
+- 2 Low: Duplicate TrendData interface and createMockTrendData factory across 3 test files — cosmetic, no functional impact
+
+### Fixes Applied
+- None required — no critical or high issues found
+
+### Test Execution Verification
+- 98/98 tests pass (run from apps/web directory)
+- E2E spec (2 tests) is specification-only — Playwright not yet installed

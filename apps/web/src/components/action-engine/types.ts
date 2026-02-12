@@ -75,6 +75,18 @@ export interface Recommendation {
 }
 
 /**
+ * Trend data for action item trend indicators
+ *
+ * @see Story 14.4 - Trend Indicators on Action Cards
+ */
+export interface TrendData {
+  metricHistory: (number | null)[]
+  daysOnReport: number
+  consecutiveDays: number
+  weekOverWeekChange: number | null
+}
+
+/**
  * Acknowledgment info for an action item
  */
 export interface AcknowledgmentInfo {
@@ -98,6 +110,7 @@ export interface ActionItem {
   financialImpact: number         // Total $ impact
   timestamp: string               // When insight was generated (ISO string)
   acknowledgment?: AcknowledgmentInfo | null
+  trendData?: TrendData
 }
 
 /**

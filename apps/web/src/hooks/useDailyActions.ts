@@ -52,6 +52,13 @@ export interface ActionItem {
   description: string
   // Acknowledgment state from Story 13.1 enriched response
   acknowledgment?: AcknowledgmentInfo | null
+  // Trend data from Story 14.2 API endpoint
+  trend_data?: {
+    metric_values: (number | null)[]
+    days_on_report: number
+    consecutive_days: number
+    week_over_week_change: number | null
+  } | null
 }
 
 export interface ActionListResponse {

@@ -16,12 +16,15 @@ export { AssignmentBadge } from './AssignmentBadge'
 export { InsightSection } from './InsightSection'
 export { EvidenceSection } from './EvidenceSection'
 export { PriorityBadge, getPriorityBorderColor, getPriorityAccentBg } from './PriorityBadge'
+export { TrendIndicator } from './TrendIndicator'
+export { RepeatOffenderBadge } from './RepeatOffenderBadge'
 
 // Types
 export type { PriorityType } from './PriorityBadge'
 export type {
   ActionItem,
   AcknowledgmentInfo,
+  TrendData,
   FollowUpData,
   SafetyEvidence,
   OEEEvidence,

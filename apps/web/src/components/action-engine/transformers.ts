@@ -10,6 +10,7 @@
 import type { PriorityType } from './PriorityBadge'
 import type {
   ActionItem as InsightActionItem,
+  TrendData,
   SafetyEvidence,
   OEEEvidence,
   FinancialEvidence,
@@ -203,6 +204,14 @@ export function transformAPIActionItem(item: APIActionItem): InsightActionItem {
     financialImpact: item.financial_impact_usd,
     timestamp: item.created_at,
     acknowledgment: item.acknowledgment ?? null,
+    trendData: item.trend_data ? {
+      metricHistory: Array.isArray(item.trend_data.metric_values)
+        ? item.trend_data.metric_values
+        : [],
+      daysOnReport: item.trend_data.days_on_report,
+      consecutiveDays: item.trend_data.consecutive_days,
+      weekOverWeekChange: item.trend_data.week_over_week_change,
+    } as TrendData : undefined,
   }
 }
 
