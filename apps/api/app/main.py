@@ -8,6 +8,7 @@ from app.api import health, assets, summaries, actions, auth, pipelines, product
 from app.core.database import initialize_database, shutdown_database
 from app.services.scheduler import get_scheduler
 from app.services.pipelines.live_pulse import run_live_pulse_poll
+from app.services.notifications.escalation import run_escalation_check
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,25 @@ async def lifespan(app: FastAPI):
         logger.info("Live Pulse polling scheduler started")
     except Exception as e:
         logger.warning(f"Failed to start polling scheduler: {e}")
+
+    # Story 18.5: Register escalation check job on the underlying scheduler
+    # Option A per dev notes — add directly to scheduler._scheduler to avoid modifying PipelineScheduler
+    try:
+        if scheduler._scheduler is not None and scheduler._scheduler.running:
+            from apscheduler.triggers.interval import IntervalTrigger
+            from app.core.config import get_settings
+            _settings = get_settings()
+            scheduler._scheduler.add_job(
+                run_escalation_check,
+                IntervalTrigger(minutes=_settings.escalation_check_interval_minutes),
+                id="escalation_check",
+                name="Escalation Nudge Check",
+                replace_existing=True,
+                misfire_grace_time=120,
+            )
+            logger.info("Escalation nudge check job registered")
+    except Exception as e:
+        logger.warning(f"Failed to register escalation check job: {e}")
 
     yield
 

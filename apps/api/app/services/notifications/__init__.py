@@ -1,5 +1,5 @@
 """
-Notifications Services Package (Story 18.2, 18.3)
+Notifications Services Package (Story 18.2, 18.3, 18.5)
 
 Provides notification services for posting messages to external channels.
 
@@ -7,6 +7,9 @@ Components:
 - TeamsWebhookClient: Posts Adaptive Cards to Microsoft Teams via Incoming Webhooks
 - build_morning_summary_card: Builds Adaptive Card for morning summary with action items
 - build_all_clear_card: Builds Adaptive Card for zero-action-item days
+- build_safety_escalation_card: Builds Adaptive Card for safety event escalation nudges
+- build_followup_escalation_card: Builds Adaptive Card for stale follow-up escalation nudges
+- run_escalation_check: Periodic background task for escalation nudge notifications
 """
 
 from app.services.notifications.teams import (

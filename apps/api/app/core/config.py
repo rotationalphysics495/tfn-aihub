@@ -102,6 +102,12 @@ class Settings(BaseSettings):
     # Teams Webhook Configuration (Story 18.2)
     teams_webhook_url: str = ""
 
+    # Escalation Nudge Configuration (Story 18.5)
+    escalation_check_interval_minutes: int = 60
+    escalation_safety_threshold_hours: int = 2
+    escalation_followup_threshold_hours: int = 24
+    escalation_cooldown_hours: int = 4
+
     # Application URL for constructing links (Story 15.2)
     app_base_url: str = "http://localhost:3000"
 
