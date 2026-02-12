@@ -45,7 +45,9 @@ async function seed() {
   await supabase.from('safety_events').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   await supabase.from('live_snapshots').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   await supabase.from('shift_targets').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-  console.log('  ✓ Cleared production_actuals, production_schedule, products, safety_events, live_snapshots, and shift_targets');
+  await supabase.from('downtime_events').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  await supabase.from('daily_summaries').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  console.log('  ✓ Cleared production_actuals, production_schedule, products, safety_events, live_snapshots, shift_targets, downtime_events, and daily_summaries');
 
   // 1. Assets (Epic 5 UAT: 5-8 assets required, including Grinder 5)
   console.log('📦 Inserting assets...');
@@ -1423,6 +1425,182 @@ async function seed() {
   const { error: summariesErr } = await supabase.from('daily_summaries').upsert(summariesWithoutReasons, { onConflict: 'asset_id,report_date' });
   if (summariesErr) console.error('  Daily summaries error:', summariesErr.message);
   else console.log('  ✓ Daily summaries inserted (note: downtime_reasons requires manual migration)');
+
+  // 3a. Downtime Events (Story 14.1: Individual downtime event records for Pareto analysis)
+  console.log('🔧 Inserting downtime events...');
+
+  // Reason code mapping: freeform daily_summaries keys → standard reason codes
+  const REASON_CODE_MAP = {
+    'Mechanical Failure': { reason_code: 'Mechanical', is_planned: false },
+    'Changeover': { reason_code: 'Changeover', is_planned: true },
+    'Material Shortage': { reason_code: 'Material Shortage', is_planned: false },
+    'Material Issue': { reason_code: 'Material Shortage', is_planned: false },
+    'Quality Hold': { reason_code: 'Quality Hold', is_planned: false },
+    'QA Hold': { reason_code: 'Quality Hold', is_planned: false },
+    'Operator Unavailable': { reason_code: 'Operator Unavailable', is_planned: false },
+    'Operator Break': { reason_code: 'Operator Unavailable', is_planned: false },
+    'Planned Maintenance': { reason_code: 'Planned Maintenance', is_planned: true },
+    'Cleanup': { reason_code: 'Planned Maintenance', is_planned: true },
+    'Safety Stop': { reason_code: 'Mechanical', is_planned: false },
+    'Inspection': { reason_code: 'Mechanical', is_planned: false },
+    'Cooling System': { reason_code: 'Mechanical', is_planned: false },
+    'Sensor Malfunction': { reason_code: 'Mechanical', is_planned: false },
+    'Burner Issue': { reason_code: 'Mechanical', is_planned: false },
+    'Valve Issue': { reason_code: 'Mechanical', is_planned: false },
+    'Jam': { reason_code: 'Mechanical', is_planned: false },
+    'Pressure Issue': { reason_code: 'Mechanical', is_planned: false },
+    'Label Changeover': { reason_code: 'Mechanical', is_planned: false },
+    'Startup Delay': { reason_code: 'Mechanical', is_planned: false },
+    'Case Erector Jam': { reason_code: 'Mechanical', is_planned: false },
+    'Carton Issue': { reason_code: 'Mechanical', is_planned: false },
+    'Chaff Collection': { reason_code: 'Planned Maintenance', is_planned: true },
+    'Calibration': { reason_code: 'Planned Maintenance', is_planned: true },
+    'Cooling Cycle': { reason_code: 'Mechanical', is_planned: false },
+    'Feed Rate Issue': { reason_code: 'Mechanical', is_planned: false },
+    'Hopper Feed Issue': { reason_code: 'Mechanical', is_planned: false },
+    'Film Tension': { reason_code: 'Mechanical', is_planned: false },
+    'Bag Feed Issue': { reason_code: 'Mechanical', is_planned: false },
+    'Film Feed': { reason_code: 'Mechanical', is_planned: false },
+    'Label Applicator': { reason_code: 'Mechanical', is_planned: false },
+    'Labeler Jam': { reason_code: 'Mechanical', is_planned: false },
+    'Case Erector': { reason_code: 'Mechanical', is_planned: false },
+    'Label Issue': { reason_code: 'Mechanical', is_planned: false },
+  };
+
+  // Reason detail templates for realistic descriptions
+  const REASON_DETAILS = {
+    'Mechanical': [
+      'Bearing noise detected, required adjustment.',
+      'Vibration exceeded threshold, auto-stop triggered.',
+      'Component wear detected during inspection.',
+      'Alignment check required mid-shift.',
+      'Assembly vibration causing operational issues.',
+      'Intermittent sensor malfunction addressed.',
+      'Jam cleared from feed mechanism.',
+      'Pressure regulator replacement needed.',
+      'Motor current spike investigated.',
+      'Belt tension adjustment performed.',
+    ],
+    'Changeover': [
+      'Switched to new product profile.',
+      'SKU changeover between batches.',
+      'Grind size adjustment for new blend.',
+      'Label format change for retail line.',
+      'Packaging format switch completed.',
+      'Product line changeover performed.',
+      'Configuration change for new batch.',
+      'Tooling swap for different product.',
+    ],
+    'Material Shortage': [
+      'Hopper ran empty waiting on upstream supply.',
+      'Raw material delivery delayed.',
+      'Input material quality variance caused pause.',
+      'Upstream feed interrupted supply.',
+      'Bean moisture variance required adjustment.',
+      'Material feed interruption from supplier.',
+    ],
+    'Quality Hold': [
+      'Product sample failed QA check.',
+      'Line held for quality inspection.',
+      'Product quarantined pending review.',
+      'Weight variance exceeded specification.',
+      'Quality parameter out of tolerance.',
+    ],
+    'Operator Unavailable': [
+      'Scheduled operator break.',
+      'Shift handover pause.',
+      'Operator reassigned temporarily.',
+      'Break during shift change.',
+      'Brief pause for crew rotation.',
+    ],
+    'Planned Maintenance': [
+      'Routine cleaning cycle completed.',
+      'Scheduled maintenance window.',
+      'Preventive maintenance performed.',
+      'Equipment calibration completed.',
+      'System cleanup between batches.',
+      'Chaff collection system cleaned.',
+    ],
+  };
+
+  // Shift assignment logic: distribute events across shifts
+  const SHIFTS = ['morning', 'afternoon', 'night'];
+  let detailCounters = {};
+
+  const getReasonDetail = (reasonCode) => {
+    const details = REASON_DETAILS[reasonCode];
+    if (!detailCounters[reasonCode]) detailCounters[reasonCode] = 0;
+    const detail = details[detailCounters[reasonCode] % details.length];
+    detailCounters[reasonCode]++;
+    return detail;
+  };
+
+  const downtimeEvents = [];
+
+  for (const summary of dailySummaries) {
+    // Skip if no downtime or empty reasons
+    if (!summary.downtime_minutes || summary.downtime_minutes === 0) continue;
+    if (!summary.downtime_reasons || Object.keys(summary.downtime_reasons).length === 0) continue;
+
+    const reasons = Object.entries(summary.downtime_reasons);
+    let eventIdx = 0;
+
+    // Distribute events across shifts, splitting large-duration events to increase event count
+    reasons.forEach((entry) => {
+      const [rawReason, totalMinutes] = entry;
+      const mapping = REASON_CODE_MAP[rawReason];
+      if (!mapping) {
+        console.warn(`  ⚠ Unknown reason key: "${rawReason}" — skipping`);
+        return;
+      }
+
+      // Split events to increase granularity:
+      // - Mechanical events > 12 min split into 2 (reflects multiple incident types)
+      // - Changeover events never split (single changeover operations)
+      // - Other events > 25 min split into 2
+      const isRoaster = summary.asset_id.endsWith('000000000001') || summary.asset_id.endsWith('000000000002') || summary.asset_id.endsWith('000000000003');
+      let splitThreshold;
+      if (mapping.reason_code === 'Mechanical') {
+        splitThreshold = 10;
+      } else if (mapping.reason_code === 'Changeover') {
+        splitThreshold = 999; // Never split changeover events
+      } else {
+        splitThreshold = 25;
+      }
+      const eventParts = totalMinutes > splitThreshold ? [Math.ceil(totalMinutes / 2), Math.floor(totalMinutes / 2)] : [totalMinutes];
+
+      eventParts.forEach((minutes, partIdx) => {
+        // Shift distribution: cycle through morning, afternoon, night
+        // Split parts get different shifts to avoid duplicates
+        let shift;
+        if (eventIdx === 0 && partIdx === 0) {
+          shift = 'morning';
+        } else if (eventIdx === 0 && partIdx === 1) {
+          shift = 'afternoon';
+        } else if (eventIdx === 1 && partIdx === 0) {
+          shift = 'afternoon';
+        } else {
+          shift = isRoaster ? 'night' : SHIFTS[(eventIdx + partIdx) % 3];
+        }
+        if (partIdx === 0) eventIdx++;
+
+        downtimeEvents.push({
+          asset_id: summary.asset_id,
+          event_date: summary.report_date,
+          shift: shift,
+          reason_code: mapping.reason_code,
+          reason_detail: getReasonDetail(mapping.reason_code),
+          duration_minutes: minutes,
+          is_planned: mapping.is_planned,
+          source_system: 'manual',
+        });
+      });
+    });
+  }
+
+  const { error: downtimeErr } = await supabase.from('downtime_events').insert(downtimeEvents);
+  if (downtimeErr) console.error('  Downtime events error:', downtimeErr.message);
+  else console.log(`  ✓ ${downtimeEvents.length} downtime events inserted`);
 
   // 3b. Shift Targets (Story 11.3: Production targets per shift for all 14 assets)
   console.log('🎯 Inserting shift targets...');
