@@ -283,6 +283,17 @@ class SmartSummaryService:
 
             if parts:
                 lines.append(f"{', '.join(parts).capitalize()}.")
+
+            # Week-over-week OEE comparison (after opening paragraph)
+            if context.trend_data:
+                wow_change = context.trend_data.get("plant_oee_wow_change", 0)
+                plant_oee = context.trend_data.get("plant_oee_current", 0)
+                direction = "up" if wow_change >= 0 else "down"
+                lines.append(
+                    f"Overall plant OEE {plant_oee:.1f}%, "
+                    f"{direction} {abs(wow_change):.1f} points from last week."
+                )
+
             lines.append("")
         else:
             lines.append("No production data available for yesterday.")
@@ -310,6 +321,18 @@ class SmartSummaryService:
                 if desc:
                     bullet += f". {desc}"
                 lines.append(bullet)
+            lines.append("")
+
+        # Recurring Issues — repeat offenders (3+ consecutive days)
+        if context.repeat_offenders:
+            lines.append("**Recurring Issues**")
+            for offender in context.repeat_offenders:
+                name = offender.get("asset_name", "Unknown")
+                days = offender.get("consecutive_days", 0)
+                lines.append(
+                    f"- {name} — {days} consecutive days on report, "
+                    f"consider escalating to maintenance planning"
+                )
             lines.append("")
 
         # Productivity — OEE misses with likely cause
@@ -342,6 +365,18 @@ class SmartSummaryService:
                 if cause:
                     bullet += f" · {cause}"
                 lines.append(bullet)
+            lines.append("")
+
+        # Downtime Drivers — top downtime reason codes
+        if context.top_downtime_drivers:
+            lines.append("**Downtime Drivers**")
+            for driver in context.top_downtime_drivers:
+                reason = driver.get("reason_code", "Unknown")
+                minutes = driver.get("total_minutes", 0)
+                asset_count = driver.get("asset_count", 0)
+                lines.append(
+                    f"- {reason}: {minutes} min across {asset_count} assets"
+                )
             lines.append("")
 
         # Financial impact
@@ -417,6 +452,9 @@ class SmartSummaryService:
             action_items=context.action_items,
             cost_centers=context.cost_centers,
             target_oee=context.target_oee,
+            trend_data=context.trend_data,
+            repeat_offenders=context.repeat_offenders,
+            top_downtime_drivers=context.top_downtime_drivers,
         )
 
         # Estimate tokens for logging

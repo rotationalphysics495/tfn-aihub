@@ -10,7 +10,7 @@ AC: #5 - Data Citation Requirement (NFR1 Compliance)
 
 import os
 from datetime import date as date_type
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 # AC#3: Externalized prompt template - can be overridden via environment
 SYSTEM_PROMPT_DEFAULT = """You are an experienced manufacturing operations analyst reviewing daily production data.
@@ -24,6 +24,7 @@ CRITICAL REQUIREMENTS:
 4. Keep the executive summary to 2-3 sentences maximum
 5. Use bullet points for clarity
 6. Reference source tables in citations: [Source: <table_name>, <date>]
+7. When trend context is provided, incorporate week-over-week comparisons, highlight repeat offenders (3+ consecutive days), and mention top downtime drivers in your analysis
 
 OUTPUT FORMAT:
 ## Executive Summary
@@ -55,6 +56,9 @@ DATA_TEMPLATE_DEFAULT = """Today's Date: {date}
 
 === ACTION ENGINE PRIORITIES ===
 {action_items}
+
+=== TREND CONTEXT ===
+{trend_context}
 
 Based on this data, provide your analysis following the format specified in your instructions.
 Ensure every claim is backed by a specific data citation."""
@@ -225,6 +229,59 @@ def format_financial_data(
     return "\n".join(lines)
 
 
+def format_trend_context(
+    trend_data: Optional[Dict[str, Any]] = None,
+    repeat_offenders: Optional[List[Dict[str, Any]]] = None,
+    top_downtime_drivers: Optional[List[Dict[str, Any]]] = None,
+) -> str:
+    """
+    Format trend context data for prompt injection.
+
+    Renders week-over-week OEE comparison, repeat offenders, and top
+    downtime drivers into a structured text block.
+
+    Args:
+        trend_data: Plant-level WoW OEE data
+        repeat_offenders: Assets on report 3+ consecutive days
+        top_downtime_drivers: Top downtime reason codes
+
+    Returns:
+        Formatted string for prompt
+    """
+    lines = []
+
+    if trend_data:
+        current = trend_data.get("plant_oee_current", 0)
+        previous = trend_data.get("plant_oee_previous_week", 0)
+        change = trend_data.get("plant_oee_wow_change", 0)
+        lines.append(
+            f"Week-over-Week OEE: Current {current:.1f}% vs Last Week "
+            f"{previous:.1f}% (change: {change:+.1f} points)"
+        )
+
+    if repeat_offenders:
+        lines.append("")
+        lines.append("Repeat Offenders (3+ consecutive days on report):")
+        for offender in repeat_offenders:
+            name = offender.get("asset_name", "Unknown")
+            days = offender.get("consecutive_days", 0)
+            lines.append(f"- {name}: {days} consecutive days (OEE below target)")
+
+    if top_downtime_drivers:
+        lines.append("")
+        lines.append("Top Downtime Drivers (yesterday):")
+        for driver in top_downtime_drivers:
+            reason = driver.get("reason_code", "Unknown")
+            minutes = driver.get("total_minutes", 0)
+            assets = driver.get("asset_count", 0)
+            lines.append(f"- {reason}: {minutes} min across {assets} assets")
+
+    if not lines:
+        return "No trend data available for this period."
+
+    return "\n".join(lines)
+
+
 def format_action_items(action_items: list) -> str:
     """
     Format action engine priorities for prompt injection.
@@ -265,6 +322,9 @@ def render_data_prompt(
     action_items: list,
     cost_centers: Optional[Dict[str, Any]] = None,
     target_oee: float = 85.0,
+    trend_data: Optional[Dict[str, Any]] = None,
+    repeat_offenders: Optional[List[Dict[str, Any]]] = None,
+    top_downtime_drivers: Optional[List[Dict[str, Any]]] = None,
 ) -> str:
     """
     Render the complete data prompt for LLM.
@@ -279,16 +339,32 @@ def render_data_prompt(
         action_items: List of action items from Action Engine
         cost_centers: Optional cost center mapping
         target_oee: Target OEE percentage
+        trend_data: Optional plant-level WoW OEE data
+        repeat_offenders: Optional list of repeat offender assets
+        top_downtime_drivers: Optional list of top downtime drivers
 
     Returns:
         Rendered prompt string ready for LLM
     """
     template = get_data_template()
 
-    return template.format(
-        date=target_date.isoformat(),
-        safety_events_data=format_safety_events(safety_events),
-        oee_data=format_oee_data(daily_summaries, target_oee),
-        financial_data=format_financial_data(daily_summaries, cost_centers),
-        action_items=format_action_items(action_items),
-    )
+    # Pre-compute all format values so KeyErrors from format functions
+    # propagate naturally rather than being caught by the template fallback
+    format_values = {
+        "date": target_date.isoformat(),
+        "safety_events_data": format_safety_events(safety_events),
+        "oee_data": format_oee_data(daily_summaries, target_oee),
+        "financial_data": format_financial_data(daily_summaries, cost_centers),
+        "action_items": format_action_items(action_items),
+        "trend_context": format_trend_context(
+            trend_data, repeat_offenders, top_downtime_drivers
+        ),
+    }
+
+    try:
+        return template.format(**format_values)
+    except KeyError:
+        # Handle case where custom template doesn't have {trend_context} placeholder
+        trend_section = format_values.pop("trend_context")
+        base = template.format(**format_values)
+        return base + f"\n\n=== TREND CONTEXT ===\n{trend_section}"

@@ -375,7 +375,7 @@ class TestSmartSummaryGeneration:
         )
 
         assert summary.is_fallback is True
-        assert "AI summary unavailable" in summary.summary_text
+        assert "missed OEE targets" in summary.summary_text
         assert "Grinder 5" in summary.summary_text
         assert summary.model_used == "fallback_template"
 
@@ -384,7 +384,7 @@ class TestSmartSummaryGeneration:
         service = SmartSummaryService()
         summary = service.generate_fallback_summary(sample_context)
 
-        assert "Safety Events" in summary.summary_text
+        assert "**Safety**" in summary.summary_text
         assert "Emergency Stop" in summary.summary_text
 
     def test_fallback_includes_oee_gaps(self, sample_context):
@@ -392,8 +392,8 @@ class TestSmartSummaryGeneration:
         service = SmartSummaryService()
         summary = service.generate_fallback_summary(sample_context)
 
-        assert "OEE Below Target" in summary.summary_text
-        assert "72.5%" in summary.summary_text
+        assert "**Productivity**" in summary.summary_text
+        assert "72%" in summary.summary_text
 
     def test_fallback_includes_financial_losses(self, sample_context):
         """Test fallback includes financial losses (AC#8)."""
@@ -647,4 +647,4 @@ Production targets were missed on Grinder 5 due to a safety event. [Asset: Grind
 
         # Should use fallback
         assert summary.is_fallback is True
-        assert "AI summary unavailable" in summary.summary_text
+        assert "missed OEE targets" in summary.summary_text

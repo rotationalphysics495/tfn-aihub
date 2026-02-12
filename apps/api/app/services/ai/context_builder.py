@@ -53,6 +53,18 @@ class SummaryContext(BaseModel):
         default=85.0,
         description="Target OEE percentage"
     )
+    trend_data: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Plant-level week-over-week trend data"
+    )
+    repeat_offenders: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Assets appearing on report 3+ consecutive days"
+    )
+    top_downtime_drivers: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Top downtime reason codes aggregated across plant"
+    )
     assembled_at: datetime = Field(
         default_factory=datetime.utcnow,
         description="When context was assembled"
@@ -132,6 +144,209 @@ class ContextBuilder:
         if self._action_engine is None:
             self._action_engine = get_action_engine()
         return self._action_engine
+
+    async def fetch_trend_data(self, target_date: date_type) -> Optional[Dict[str, Any]]:
+        """
+        Fetch week-over-week OEE trend data for the plant.
+
+        Computes plant-wide average OEE for target_date and target_date - 7,
+        returning the change between weeks.
+
+        Args:
+            target_date: Date to query
+
+        Returns:
+            Dict with plant_oee_current, plant_oee_previous_week, plant_oee_wow_change,
+            or None if insufficient data
+        """
+        try:
+            client = self._get_client()
+
+            # Fetch OEE for target date
+            current_response = client.table("daily_summaries").select(
+                "oee_percentage"
+            ).eq("report_date", target_date.isoformat()).execute()
+
+            current_data = current_response.data or []
+            if not current_data:
+                return None
+
+            # Fetch OEE for 7 days prior
+            previous_date = target_date - timedelta(days=7)
+            previous_response = client.table("daily_summaries").select(
+                "oee_percentage"
+            ).eq("report_date", previous_date.isoformat()).execute()
+
+            previous_data = previous_response.data or []
+            if not previous_data:
+                return None
+
+            # Compute averages
+            current_values = [
+                r["oee_percentage"] for r in current_data
+                if r.get("oee_percentage") is not None
+            ]
+            previous_values = [
+                r["oee_percentage"] for r in previous_data
+                if r.get("oee_percentage") is not None
+            ]
+
+            if not current_values or not previous_values:
+                return None
+
+            current_avg = sum(current_values) / len(current_values)
+            previous_avg = sum(previous_values) / len(previous_values)
+            wow_change = round(current_avg - previous_avg, 1)
+
+            return {
+                "plant_oee_current": round(current_avg, 1),
+                "plant_oee_previous_week": round(previous_avg, 1),
+                "plant_oee_wow_change": wow_change,
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to fetch trend data: {e}")
+            return None
+
+    async def fetch_repeat_offenders(
+        self, target_date: date_type
+    ) -> List[Dict[str, Any]]:
+        """
+        Identify assets below OEE target for 3+ consecutive days ending on target_date.
+
+        Args:
+            target_date: Date to query (end of trailing window)
+
+        Returns:
+            List of repeat offender dicts sorted by consecutive_days descending
+        """
+        try:
+            client = self._get_client()
+            settings = get_settings()
+            target_oee = settings.target_oee_percentage
+
+            # Fetch trailing 7 days of daily_summaries
+            start_date = target_date - timedelta(days=6)
+            response = client.table("daily_summaries").select(
+                "asset_id, report_date, oee_percentage"
+            ).gte(
+                "report_date", start_date.isoformat()
+            ).lte(
+                "report_date", target_date.isoformat()
+            ).execute()
+
+            records = response.data or []
+            if not records:
+                return []
+
+            # Fetch assets for name enrichment
+            assets = await self.fetch_assets()
+
+            # Group by asset_id
+            asset_records: Dict[str, List[Dict[str, Any]]] = {}
+            for record in records:
+                asset_id = record.get("asset_id")
+                if asset_id:
+                    asset_records.setdefault(asset_id, []).append(record)
+
+            offenders = []
+            for asset_id, recs in asset_records.items():
+                # Sort by date descending (from target_date backwards)
+                sorted_recs = sorted(
+                    recs,
+                    key=lambda r: r.get("report_date", ""),
+                    reverse=True,
+                )
+
+                # Verify asset has a record on target_date itself
+                if not sorted_recs or sorted_recs[0].get("report_date") != target_date.isoformat():
+                    continue
+
+                # Count consecutive calendar days below target ending on target_date
+                consecutive = 0
+                expected_date = target_date
+                for rec in sorted_recs:
+                    rec_date_str = rec.get("report_date", "")
+                    if rec_date_str != expected_date.isoformat():
+                        break
+                    oee = rec.get("oee_percentage")
+                    if oee is not None and oee < target_oee:
+                        consecutive += 1
+                        expected_date = expected_date - timedelta(days=1)
+                    else:
+                        break
+
+                if consecutive >= 3:
+                    asset_info = assets.get(asset_id, {})
+                    asset_name = asset_info.get("name", "Unknown Asset")
+                    offenders.append({
+                        "asset_name": asset_name,
+                        "consecutive_days": consecutive,
+                        "category": "oee",
+                    })
+
+            # Sort by consecutive_days descending
+            offenders.sort(key=lambda x: x["consecutive_days"], reverse=True)
+            return offenders
+
+        except Exception as e:
+            logger.error(f"Failed to fetch repeat offenders: {e}")
+            return []
+
+    async def fetch_top_downtime_drivers(
+        self, target_date: date_type
+    ) -> List[Dict[str, Any]]:
+        """
+        Fetch and aggregate top downtime drivers by reason_code for target_date.
+
+        Args:
+            target_date: Date to query
+
+        Returns:
+            List of top 3 downtime drivers sorted by total_minutes descending
+        """
+        try:
+            client = self._get_client()
+
+            response = client.table("downtime_events").select(
+                "reason_code, duration_minutes, asset_id"
+            ).eq("event_date", target_date.isoformat()).execute()
+
+            events = response.data or []
+            if not events:
+                return []
+
+            # Aggregate by reason_code
+            aggregated: Dict[str, Dict[str, Any]] = {}
+            for event in events:
+                reason = event.get("reason_code", "Unknown")
+                if reason not in aggregated:
+                    aggregated[reason] = {
+                        "reason_code": reason,
+                        "total_minutes": 0,
+                        "asset_ids": set(),
+                    }
+                aggregated[reason]["total_minutes"] += event.get("duration_minutes") or 0
+                asset_id = event.get("asset_id")
+                if asset_id:
+                    aggregated[reason]["asset_ids"].add(asset_id)
+
+            # Convert to output format
+            result = []
+            for reason, data in aggregated.items():
+                result.append({
+                    "reason_code": data["reason_code"],
+                    "total_minutes": data["total_minutes"],
+                    "asset_count": len(data["asset_ids"]),
+                })
+
+            # Sort by total_minutes descending, return top 3
+            result.sort(key=lambda x: x["total_minutes"], reverse=True)
+            return result[:3]
+
+        except Exception as e:
+            logger.error(f"Failed to fetch top downtime drivers: {e}")
+            return []
 
     async def fetch_daily_summaries(self, target_date: date_type) -> List[Dict[str, Any]]:
         """
@@ -359,6 +574,25 @@ class ContextBuilder:
             safety_events = await self.fetch_safety_events(target_date)
             action_items = await self.fetch_action_items(target_date)
 
+            # Fetch trend data (each in its own try/except for isolation)
+            trend_data = None
+            try:
+                trend_data = await self.fetch_trend_data(target_date)
+            except Exception as e:
+                logger.error(f"Failed to fetch trend data in build_context: {e}")
+
+            repeat_offenders = []
+            try:
+                repeat_offenders = await self.fetch_repeat_offenders(target_date)
+            except Exception as e:
+                logger.error(f"Failed to fetch repeat offenders in build_context: {e}")
+
+            top_downtime_drivers = []
+            try:
+                top_downtime_drivers = await self.fetch_top_downtime_drivers(target_date)
+            except Exception as e:
+                logger.error(f"Failed to fetch top downtime drivers in build_context: {e}")
+
             # Enrich records with asset names
             enriched_summaries = self._enrich_with_asset_names(
                 daily_summaries, assets
@@ -379,6 +613,9 @@ class ContextBuilder:
                 action_items=action_items,
                 assets=assets,
                 target_oee=target_oee,
+                trend_data=trend_data,
+                repeat_offenders=repeat_offenders,
+                top_downtime_drivers=top_downtime_drivers,
             )
 
             logger.info(

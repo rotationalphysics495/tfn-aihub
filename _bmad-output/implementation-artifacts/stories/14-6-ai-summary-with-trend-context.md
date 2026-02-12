@@ -1,6 +1,6 @@
 # Story 14.6: AI Summary with Trend Context
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -199,10 +199,139 @@ The fallback summary in `generate_fallback_summary()` currently has sections: op
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.6
 
-### Debug Log References
+### Implementation Summary
 
-### Completion Notes List
+Implemented trend context enrichment for the Smart Summary generation pipeline. The system now fetches week-over-week OEE comparison data, identifies repeat offender assets (3+ consecutive days below target), and aggregates top downtime drivers from the downtime_events table. All three data sources are integrated into both the LLM prompt template and the fallback summary template, with full error isolation ensuring trend data failures never block summary generation.
 
-### File List
+### Files Created
+
+- (none - all modifications to existing files)
+
+### Files Modified
+
+- apps/api/app/services/ai/context_builder.py - Added trend_data, repeat_offenders, top_downtime_drivers fields to SummaryContext; added fetch_trend_data(), fetch_repeat_offenders(), fetch_top_downtime_drivers() methods; integrated into build_context() with try/except isolation
+- apps/api/app/services/ai/prompts.py - Added format_trend_context() function; added TREND CONTEXT section to DATA_TEMPLATE_DEFAULT; updated render_data_prompt() to accept and format trend context; updated SYSTEM_PROMPT_DEFAULT with trend context instructions
+- apps/api/app/services/ai/smart_summary.py - Updated _generate_with_llm() to pass trend fields to render_data_prompt(); enhanced generate_fallback_summary() with WoW OEE line, Recurring Issues section, and Downtime Drivers section
+- apps/api/tests/test_smart_summary.py - Fixed 4 pre-existing stale test assertions that didn't match current fallback format
+
+### Key Decisions
+
+- Used direct Supabase queries in ContextBuilder rather than calling ActionEngine to avoid circular coupling, per story dev notes
+- Implemented repeat offender detection by counting consecutive trailing days below target OEE ending on target_date (strictly less than target)
+- Added KeyError catch in render_data_prompt to handle custom DATA_TEMPLATE_DEFAULT env overrides missing the {trend_context} placeholder
+- Fixed 4 pre-existing stale test assertions in test_smart_summary.py (asserting "AI summary unavailable", "Safety Events", "OEE Below Target" which never matched the actual implementation)
+
+### Tests Added
+
+- apps/api/tests/test_smart_summary_trend_context.py - 43 tests covering all 5 acceptance criteria:
+  - TestTrendDataFetching (2 tests) - WoW OEE computation
+  - TestSummaryContextTrendFields (3 tests) - Optional field defaults
+  - TestBuildContextTrend (3 tests) - build_context integration
+  - TestFormatTrendContext (4 tests) - prompt formatting
+  - TestRenderDataPromptTrend (2 tests) - render_data_prompt integration
+  - TestGenerateWithLLMTrend (1 test) - LLM passthrough
+  - TestSystemPromptTrend (1 test) - system prompt instructions
+  - TestRepeatOffenders (5 tests) - consecutive day detection
+  - TestTopDowntimeDrivers (4 tests) - downtime aggregation
+  - TestGracefulDegradation (7 tests) - error isolation
+  - TestFallbackSummaryTrends (8 tests) - fallback template enhancement
+  - TestSmartSummaryTrendIntegration (2 tests) - end-to-end integration
+  - TestFormatTrendContext UNIT-030 (1 test) - graceful no-data message
+
+### Notes for Reviewer
+
+- The 4 fixes to test_smart_summary.py corrected pre-existing stale assertions that were already failing before this story
+- The downtime_events table dependency from Story 14.1 is handled gracefully — fetch_top_downtime_drivers returns [] if the table doesn't exist
+- fetch_repeat_offenders uses strictly less than target_oee (not <=) for below-target detection
+- All new SummaryContext fields use Optional/default values so existing code constructing SummaryContext without them is unaffected
+
+### Test Results
+
+75 passed, 0 failed (43 new trend context tests + 32 existing tests)
+
+### Acceptance Criteria Status
+
+- [x] AC#1 - WoW OEE comparison in summary — implemented in context_builder.py (fetch_trend_data), prompts.py (format_trend_context), smart_summary.py (_generate_with_llm)
+- [x] AC#2 - Repeat offender identification (3+ consecutive days) — implemented in context_builder.py (fetch_repeat_offenders), prompts.py (format_trend_context)
+- [x] AC#3 - Top downtime drivers from Pareto data — implemented in context_builder.py (fetch_top_downtime_drivers), prompts.py (format_trend_context)
+- [x] AC#4 - Graceful omission when trend data unavailable — implemented via try/except isolation in context_builder.py, default values in SummaryContext, graceful messaging in format_trend_context
+- [x] AC#5 - Fallback template includes trend lines — implemented in smart_summary.py (generate_fallback_summary) with WoW OEE, Recurring Issues, and Downtime Drivers sections
+
+## Code Review Record
+
+**Reviewer**: Code Review Agent
+**Date**: 2026-02-11
+**Diff Size**: 2,156 lines (2,138 additions, 18 deletions)
+
+### Checklist Results
+- Acceptance Criteria: PASS
+- Code Quality: PASS
+- Test Coverage: PASS
+- Security: PASS
+
+### Issues Found
+
+| # | Description | Severity | Status |
+|---|-------------|----------|--------|
+| 1 | `fetch_repeat_offenders` doesn't verify first record is on `target_date` — could flag assets absent from target day | MEDIUM | Fixed |
+| 2 | `except KeyError` in `render_data_prompt` too broad — catches KeyErrors from format functions, not just missing template placeholder | MEDIUM | Fixed |
+| 3 | `duration_minutes` could be `None` from DB causing `0 + None` TypeError in `fetch_top_downtime_drivers` | MEDIUM | Fixed |
+| 4 | `fetch_repeat_offenders` doesn't validate consecutive calendar days — gaps in records still counted as consecutive | MEDIUM | Fixed |
+| 5 | Double try/except for trend fetches in `build_context` — each method already has its own, outer never triggers | LOW | Documented |
+| 6 | `format_trend_context` produces "+0.0" when change is exactly 0 — minor cosmetic | LOW | Documented |
+| 7 | Test file is 1740 lines — could be split by AC for maintainability | LOW | Documented |
+
+**Totals**: 0 HIGH, 4 MEDIUM, 3 LOW
+
+### Fixes Applied
+
+| Issue # | Fix Description | Verified |
+|---------|-----------------|----------|
+| 1 | Added guard checking `sorted_recs[0].get("report_date") != target_date.isoformat()` before counting in `fetch_repeat_offenders` | Tests pass (75/75) |
+| 2 | Refactored `render_data_prompt` to pre-compute all format values before template.format() so KeyErrors from format functions propagate, only template KeyError is caught | Tests pass (75/75) |
+| 3 | Changed `event.get("duration_minutes", 0)` to `event.get("duration_minutes") or 0` to handle explicit None values | Tests pass (75/75) |
+| 4 | Added calendar date validation in consecutive day loop — tracks `expected_date` and breaks on gaps | Tests pass (75/75) |
+
+### Remaining Issues (Low Severity)
+
+- Double try/except in `build_context` is defensive but redundant — not harmful, can be cleaned up in a future pass
+- `format_trend_context` "+0.0" edge case is cosmetic only
+- Test file size (1740 lines) is manageable but could be split for readability
+
+### Final Status
+Approved with fixes
+
+## Test Quality Review
+
+**Quality Score**: 100/100 (A+)
+**Tests Reviewed**: 43 (in test_smart_summary_trend_context.py) + 32 existing (in test_smart_summary.py)
+**Reviewer**: Test Architect (TEA)
+**Date**: 2026-02-11
+
+### Criteria Results
+
+| # | Criterion | Rating |
+|---|-----------|--------|
+| 1 | BDD Format (Given-When-Then) | PASS - All 43 tests have explicit GWT docstrings |
+| 2 | Test ID Conventions | PASS - All 43 tests have `14-6-ai-summary-with-trend-context-UNIT/INT-XXX` IDs |
+| 3 | Hard Waits Detection | PASS - No hard waits found |
+| 4 | Determinism | PASS - No random values or non-deterministic control flow |
+| 5 | Isolation & Cleanup | PASS - Fresh mocks/fixtures per test, no shared state |
+| 6 | Explicit Assertions | PASS - 140 assertions across 43 tests |
+| 7 | Test Length | WARN - Main file 1740 lines (>500 threshold) |
+| 8 | Test Duration | PASS - 75 tests complete in 0.19s total |
+| 9 | Fixture Patterns | PASS - 11 pytest fixtures for common setup |
+| 10 | Data Factories | WARN - Fixture-based, some inline repetition |
+| 11 | Network-First Pattern | N/A - All mocked, no real network |
+| 12 | Flakiness Patterns | PASS - No flaky patterns detected |
+
+### Issues Found
+- 0 Critical
+- 0 High
+- 0 Medium
+- 3 Low: test file length (1740 lines), some inline data construction, duplicated mock chain setup
+
+### Fixes Applied
+- None required (all issues LOW severity, documented only)
