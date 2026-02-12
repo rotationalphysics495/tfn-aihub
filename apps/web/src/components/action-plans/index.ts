@@ -1,2 +1,6 @@
 export { ActionPlanForm } from './ActionPlanForm'
 export type { ActionPlanPrefill } from './ActionPlanForm'
+export { ActionPlanCard } from './ActionPlanCard'
+export { ActionPlanDetail } from './ActionPlanDetail'
+export { UpdateTimeline } from './UpdateTimeline'
+export * from './types'

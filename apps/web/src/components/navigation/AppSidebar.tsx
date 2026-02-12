@@ -25,6 +25,7 @@ import {
   Upload,
   Sun,
   Moon,
+  Target,
 } from 'lucide-react'
 
 interface NavItem {
@@ -60,6 +61,7 @@ const navGroups: NavGroup[] = [
     items: [
       { href: '/briefing', label: 'Briefings', icon: <Mic className="w-5 h-5" /> },
       { href: '/handoff', label: 'Shift Handoffs', icon: <ArrowLeftRight className="w-5 h-5" /> },
+      { href: '/action-plans', label: 'Action Plans', icon: <Target className="w-5 h-5" /> },
     ],
   },
   {
