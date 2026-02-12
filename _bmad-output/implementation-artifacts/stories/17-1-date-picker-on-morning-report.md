@@ -1,6 +1,6 @@
 # Story 17.1: Date Picker on Morning Report
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -242,10 +242,135 @@ Note: `@radix-ui/react-popover` (v1.1.6) is already in `package.json`. Shadcn ma
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.6
 
-### Debug Log References
+### Implementation Summary
 
-### Completion Notes List
+Implemented a date picker on the Morning Report page that lets plant managers navigate to any past date for reviewing historical reports. The solution uses Shadcn Calendar + Popover components with prev/next day arrow buttons. A new MorningReportClient wrapper manages date state via URL search params, threads the selected date to all report section hooks, and handles empty state detection. The page.tsx remains a Server Component with Suspense boundary for useSearchParams compatibility.
 
-### File List
+### Files Created
+- `apps/web/src/components/ui/calendar.tsx` - Shadcn Calendar component wrapping react-day-picker v9
+- `apps/web/src/components/report/DateNavigation.tsx` - Date picker + prev/next arrow buttons component
+- `apps/web/src/components/report/index.ts` - Barrel export for report domain components
+- `apps/web/src/app/(main)/morning-report/MorningReportClient.tsx` - Client Component wrapper with date state, URL sync, and date threading
+- `apps/web/src/components/report/__tests__/DateNavigation.test.tsx` - Unit tests for DateNavigation (8 tests)
+- `apps/web/src/app/(main)/morning-report/__tests__/MorningReportClient.test.tsx` - Integration tests for MorningReportClient (14 tests)
+
+### Files Modified
+- `apps/web/src/app/(main)/morning-report/page.tsx` - Replaced inline JSX with Suspense + MorningReportClient; kept as Server Component for metadata
+- `apps/web/src/components/action-list/MorningSummarySection.tsx` - Added reportDate/onDateChange/selectedDate props; dynamic badge text (T-1 Data vs formatted date); dynamic performance label; DateNavigation integration in header
+- `apps/web/src/components/action-engine/InsightEvidenceCardList.tsx` - Added reportDate prop, passed to useDailyActions
+- `apps/web/src/components/production/WorkcenterScorecard.tsx` - Added date prop, passed to useWorkcenterSummary
+- `apps/web/src/components/production/ScheduleAttainment.tsx` - Added date prop, passed to useScheduleAttainment
+- `apps/web/src/components/ui/button.tsx` - Restored Industrial Clarity custom variants after Shadcn CLI overwrote it
+
+### Key Decisions
+- Used date-fns for all date arithmetic (startOfDay, subDays, addDays, format) instead of manual Date manipulation to avoid timezone issues near midnight
+- Empty state detection uses useDailyActions in MorningReportClient to check if actions array is empty for the selected date, while keeping DateNavigation interactive
+- MorningReportClient reads initial date from useSearchParams and syncs URL on every change via router.push with { scroll: false }
+- Shadcn CLI (npx shadcn@latest) overwrote button.tsx with generic version; manually restored Industrial Clarity custom variants (destructive=amber, retrospective, live modes)
+- Popover.tsx already existed in the codebase from prior Shadcn install — CLI correctly skipped it
+
+### Tests Added
+- `apps/web/src/components/report/__tests__/DateNavigation.test.tsx` - 8 unit tests: renders formatted date, prev/next arrows, disabled state for next when at yesterday, date change callbacks
+- `apps/web/src/app/(main)/morning-report/__tests__/MorningReportClient.test.tsx` - 14 integration tests: URL param parsing (valid, invalid, future dates), date threading to all hooks, empty state rendering, dynamic badge text, URL sync on navigation
+
+### Notes for Reviewer
+- Pre-existing test failures (9 files, 11 tests) confirmed identical before and after changes — no regressions introduced
+- The existing page.test.tsx (Story 12.6 integration test) continues to pass with navigation mocks from global setup.ts
+- All hooks (useDailyActions, useSmartSummary, useWorkcenterSummary, useScheduleAttainment) already supported optional date params — no hook internals were modified
+- react-day-picker v9.13.2 and date-fns v4.1.0 were already in package.json; Shadcn Calendar wrapper generated compatible code
+
+### Test Results
+- New tests: 23 passed (8 DateNavigation + 14 MorningReportClient + 1 existing page.test.tsx)
+- Full suite: 87 passed | 9 failed (all pre-existing) | 4 skipped — identical to baseline
+
+### Acceptance Criteria Status
+- [x] AC#1 (Date picker placement) - DateNavigation component in MorningSummarySection header next to dynamic badge; trigger shows formatted date (e.g., "Feb 5, 2026")
+- [x] AC#2 (Date change reloads all data) - MorningReportClient threads reportDate to MorningSummarySection, InsightEvidenceCardList, WorkcenterScorecard, ScheduleAttainment; URL updates to /morning-report?date=YYYY-MM-DD; badge shows "T-1 Data" or "Feb 5 Data"
+- [x] AC#3 (Prev/next day arrows) - ChevronLeft/ChevronRight buttons in DateNavigation; next disabled when date >= yesterday; future dates disabled in Calendar
+- [x] AC#4 (URL-driven date on load) - MorningReportClient reads searchParams.get('date'), validates format/range, falls back to yesterday for invalid/future dates
+- [x] AC#5 (Empty state for missing data) - Shows "No production data available for {date}" when actions array is empty; DateNavigation and arrows remain functional
+
+## Code Review Record
+
+**Reviewer**: Code Review Agent
+**Date**: 2026-02-12
+**Diff Size**: 1047 lines (+1047, -72)
+
+### Checklist Results
+- Acceptance Criteria: PASS
+- Code Quality: PASS
+- Test Coverage: PASS
+- Security: PASS
+
+### Issues Found
+
+| # | Description | Severity | Status |
+|---|-------------|----------|--------|
+| 1 | "Today's Action Items" heading misleading for historical dates | MEDIUM | Fixed |
+| 2 | Duplicate useDailyActions call (follows existing pattern - no cache layer) | LOW | Documented |
+| 3 | getDateBadgeText/getPerformanceLabel create new Date() on every render | LOW | Documented |
+| 4 | Empty state check actionsData !== null is fragile but functionally correct | LOW | Documented |
+| 5 | DateNavigation computes yesterday on every render via new Date() | LOW | Documented |
+| 6 | Shadcn auto-generated code inconsistency (forwardRef vs functional) | LOW | Documented |
+| 7 | chain-plan.yaml unstaged changes visible in git status (unrelated) | LOW | Documented |
+
+**Totals**: 0 HIGH, 1 MEDIUM, 6 LOW
+
+### Fixes Applied
+
+| Issue # | Fix Description | Verified |
+|---------|-----------------|----------|
+| 1 | Changed "Today's Action Items" to "Action Items" in MorningReportClient.tsx:115 to avoid misleading label when viewing historical dates | Tests pass (22/22) |
+
+### Remaining Issues (Low Severity)
+- Issue #2: Duplicate useDailyActions fetch. Both MorningReportClient (for empty state) and MorningSummarySection call the same hook. This follows the existing codebase pattern (no shared cache layer). Future cleanup: introduce React Query or a context provider for shared data.
+- Issue #3: getDateBadgeText/getPerformanceLabel compute new Date() on every render. Minimal perf impact since these are cheap operations.
+- Issue #4: Empty state detection relies on actionsData !== null check. Functionally correct given the hook's state machine.
+- Issue #5: DateNavigation computes yesterday on every render. Could be memoized but impact is negligible.
+- Issue #6: Auto-generated Shadcn components use different React patterns (forwardRef vs modern). Standard Shadcn output, not worth modifying.
+
+### Final Status
+Approved with fixes
+
+## Test Quality Review
+
+**Quality Score**: 93/100 (A)
+**Tests Reviewed**: 22 (8 unit + 14 integration)
+**Reviewer**: TEA (Test Architect)
+**Date**: 2026-02-12
+
+### Criteria Assessment
+
+| # | Criterion | Rating |
+|---|-----------|--------|
+| 1 | BDD Format | WARN - Implicit arrange/act/assert, no explicit Given-When-Then |
+| 2 | Test ID Conventions | PASS - Fixed: Added IDs (17-1-UNIT-001..008, 17-1-INT-001..014) |
+| 3 | Hard Waits | PASS - No hard waits detected |
+| 4 | Determinism | PASS - No conditionals, random values, or try/catch abuse |
+| 5 | Isolation & Cleanup | PASS - beforeEach/afterEach with mock clearing/restoring |
+| 6 | Explicit Assertions | PASS - Every test has explicit expect() assertions |
+| 7 | Test Length | PASS - 113 lines (unit), 372 lines (integration, acceptable) |
+| 8 | Test Duration | PASS - All tests complete in <1s |
+| 9 | Fixture Patterns | PASS - setupDefaultMocks() centralizes mock setup with overrides |
+| 10 | Data Factories | WARN - Centralized mock data but not using factory builder pattern |
+| 11 | Network-First | PASS (N/A) - All hooks mocked, no network calls |
+| 12 | Flakiness | PASS - No flaky patterns detected |
+
+### Issues Found
+
+| # | Criterion | Description | Severity | Status |
+|---|-----------|-------------|----------|--------|
+| 1 | Test IDs | Missing test ID conventions in test descriptions | HIGH | Fixed |
+| 2 | BDD Format | No explicit Given-When-Then comments | HIGH | Documented |
+| 3 | Test Length | MorningReportClient.test.tsx 372 lines (>300 threshold) | MEDIUM | Documented |
+| 4 | Data Factories | Hardcoded mock data instead of factory builder functions | HIGH | Documented |
+
+### Fixes Applied
+- Added test IDs to all 22 tests across both files (17-1-UNIT-001..008 for DateNavigation, 17-1-INT-001..014 for MorningReportClient)
+
+### Documented (No Fix Required)
+- BDD format: Tests have clear implicit structure via describe blocks mapping to ACs; adding explicit Given/When/Then comments would be cosmetic
+- Test length: 372 lines is within acceptable range; splitting would fragment the integration test context
+- Data factories: setupDefaultMocks() with overrides provides factory-like behavior; full factory builder pattern not warranted for this scope

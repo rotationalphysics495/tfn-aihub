@@ -26,15 +26,16 @@ import { cn } from '@/lib/utils'
 
 interface InsightEvidenceCardListProps {
   className?: string
+  reportDate?: string
 }
 
-export function InsightEvidenceCardList({ className }: InsightEvidenceCardListProps) {
+export function InsightEvidenceCardList({ className, reportDate: reportDateProp }: InsightEvidenceCardListProps) {
   const {
     data,
     isLoading,
     error,
     refetch,
-  } = useDailyActions()
+  } = useDailyActions(reportDateProp ? { reportDate: reportDateProp } : {})
 
   // Transform API action items to Insight + Evidence format
   const transformedItems = useMemo(() => {

@@ -1,41 +1,13 @@
 # Epic Chain Execution Plan
-# Generated: 2026-02-11 07:08:39
+# Generated: 2026-02-12 05:40:09
 
-epics: [10 11 12 13 14 15 16 17 18 19]
-total_epics: 10
+epics: [17 18 19]
+total_epics: 3
 
 execution_order:
-  - epic: 10
-    file: epic-10.md
-    stories: 7
-    dependencies: []
-  - epic: 11
-    file: epic-11.md
-    stories: 6
-    dependencies: []
-  - epic: 12
-    file: epic-12.md
-    stories: 12
-    dependencies: []
-  - epic: 13
-    file: epic-13.md
-    stories: 10
-    dependencies: []
-  - epic: 14
-    file: epic-14.md
-    stories: 12
-    dependencies: []
-  - epic: 15
-    file: epic-15.md
-    stories: 8
-    dependencies: []
-  - epic: 16
-    file: epic-16.md
-    stories: 12
-    dependencies: []
   - epic: 17
     file: epic-17.md
-    stories: 8
+    stories: 9
     dependencies: []
   - epic: 18
     file: epic-18.md
@@ -46,7 +18,7 @@ execution_order:
     stories: 6
     dependencies: []
 
-total_stories: 91
+total_stories: 25
 
 options:
   dry_run: false

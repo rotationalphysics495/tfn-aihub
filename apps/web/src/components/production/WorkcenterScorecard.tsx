@@ -8,10 +8,11 @@ import { WorkcenterRow } from './WorkcenterRow'
 
 interface WorkcenterScorecardProps {
   className?: string
+  date?: string
 }
 
-export function WorkcenterScorecard({ className }: WorkcenterScorecardProps) {
-  const { data, isLoading, error, refetch } = useWorkcenterSummary()
+export function WorkcenterScorecard({ className, date }: WorkcenterScorecardProps) {
+  const { data, isLoading, error, refetch } = useWorkcenterSummary(date ? { date } : {})
 
   // Loading state
   if (isLoading && !data) {

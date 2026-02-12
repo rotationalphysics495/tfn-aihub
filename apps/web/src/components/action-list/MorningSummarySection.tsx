@@ -3,10 +3,12 @@
 import { AlertTriangle, TrendingDown, Gauge, Calendar, Sparkles, RefreshCw, AlertCircle } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import { format, subDays, startOfDay } from 'date-fns'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { useDailyActions } from '@/hooks/useDailyActions'
 import { useSmartSummary } from '@/hooks/useSmartSummary'
+import { DateNavigation } from '@/components/report'
 import { SummarySkeleton } from './ActionListSkeleton'
 import { cn } from '@/lib/utils'
 
@@ -22,6 +24,9 @@ import { cn } from '@/lib/utils'
 
 interface MorningSummarySectionProps {
   className?: string
+  reportDate?: string
+  onDateChange?: (date: Date) => void
+  selectedDate?: Date
 }
 
 // Format date for display
@@ -55,9 +60,27 @@ function cleanSummaryText(text: string): string {
     .trim()
 }
 
-export function MorningSummarySection({ className }: MorningSummarySectionProps) {
-  const { data, isLoading, summary } = useDailyActions()
-  const { data: smartSummary, isLoading: isSummaryLoading, isGenerating, error: summaryError, refetch: refetchSummary, regenerate: regenerateSummary, hasSummary } = useSmartSummary()
+function getDateBadgeText(selectedDate?: Date): string {
+  if (!selectedDate) return 'T-1 Data'
+  const yesterday = startOfDay(subDays(new Date(), 1))
+  if (startOfDay(selectedDate).getTime() === yesterday.getTime()) {
+    return 'T-1 Data'
+  }
+  return format(selectedDate, 'MMM d') + ' Data'
+}
+
+function getPerformanceLabel(selectedDate?: Date): string {
+  if (!selectedDate) return "Yesterday's Performance"
+  const yesterday = startOfDay(subDays(new Date(), 1))
+  if (startOfDay(selectedDate).getTime() === yesterday.getTime()) {
+    return "Yesterday's Performance"
+  }
+  return format(selectedDate, 'MMM d') + ' Performance'
+}
+
+export function MorningSummarySection({ className, reportDate: reportDateProp, onDateChange, selectedDate }: MorningSummarySectionProps) {
+  const { data, isLoading, summary } = useDailyActions(reportDateProp ? { reportDate: reportDateProp } : {})
+  const { data: smartSummary, isLoading: isSummaryLoading, isGenerating, error: summaryError, refetch: refetchSummary, regenerate: regenerateSummary, hasSummary } = useSmartSummary(reportDateProp ? { reportDate: reportDateProp } : {})
 
   // Loading state
   if (isLoading && !data) {
@@ -65,7 +88,7 @@ export function MorningSummarySection({ className }: MorningSummarySectionProps)
   }
 
   // Get report date or use yesterday as default
-  const reportDate = data?.report_date
+  const displayDate = data?.report_date
     ? formatReportDate(data.report_date)
     : formatReportDate(new Date(Date.now() - 86400000).toISOString())
 
@@ -76,21 +99,26 @@ export function MorningSummarySection({ className }: MorningSummarySectionProps)
   return (
     <Card mode="retrospective" className={cn('', className)}>
       <CardContent className="p-4 md:p-6">
-        {/* Header with date context - AC #1, #6 */}
+        {/* Header with date context - AC #1, #6, Story 17.1 */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
           <div>
             <div className="flex items-center gap-2 text-muted-foreground mb-1">
               <Calendar className="w-4 h-4" aria-hidden="true" />
-              <span className="text-sm font-medium">Yesterday&apos;s Performance</span>
+              <span className="text-sm font-medium">{getPerformanceLabel(selectedDate)}</span>
             </div>
             <h2 className="text-lg md:text-xl font-semibold text-foreground">
-              {reportDate}
+              {displayDate}
             </h2>
           </div>
 
-          <Badge variant="retrospective" className="self-start sm:self-center">
-            T-1 Data
-          </Badge>
+          <div className="flex items-center gap-2 self-start sm:self-center">
+            <Badge variant="retrospective">
+              {getDateBadgeText(selectedDate)}
+            </Badge>
+            {onDateChange && selectedDate && (
+              <DateNavigation date={selectedDate} onDateChange={onDateChange} />
+            )}
+          </div>
         </div>
 
         {/* Key metrics at a glance - AC #6 */}

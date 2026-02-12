@@ -11,6 +11,7 @@ import { ProductMixChart } from './ProductMixChart'
 
 export interface ScheduleAttainmentProps {
   className?: string
+  date?: string
 }
 
 function getAttainmentColor(pct: number): string {
@@ -23,8 +24,8 @@ function getAllProducts(workcenters: { products: { product_name: string; schedul
   return workcenters.flatMap(wc => wc.products)
 }
 
-export function ScheduleAttainment({ className }: ScheduleAttainmentProps) {
-  const { data, isLoading, error, refetch } = useScheduleAttainment()
+export function ScheduleAttainment({ className, date }: ScheduleAttainmentProps) {
+  const { data, isLoading, error, refetch } = useScheduleAttainment(date ? { date } : {})
 
   // Loading state
   if (isLoading && !data) {
