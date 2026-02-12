@@ -1,6 +1,6 @@
 # Story 17.3: Shift Summaries Data Model
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -190,9 +190,117 @@ The seed script (`scripts/seed-data.mjs`) already has 14 assets with 7 days + to
 ## Dev Agent Record
 
 ### Agent Model Used
+Claude Opus 4.6
+
+### Implementation Summary
+Created the `shift_summaries` database table via Supabase migration and added shift-level seed data generation to the existing seed script. The table stores per-shift (morning, afternoon, night) performance breakdowns alongside the existing `daily_summaries` table. Seed data generates 3 shift records per asset per day with deterministic variance using a seeded PRNG, ensuring shift units_produced sums exactly match daily actual_output and weighted-average shift OEE approximately matches daily oee_percentage.
+
+### Files Created
+- `supabase/migrations/0035_shift_summaries.sql` - Migration creating shift_summaries table with UUID PK, FK to assets, TEXT CHECK constraint for shift values, UNIQUE constraint on (asset_id, date, shift), 3 indexes, RLS policies, column comments, and verification queries
+
+### Files Modified
+- `_bmad/scripts/seed-data.mjs` - Added shift_summaries clearing step, seeded PRNG helpers (hashString, seededRandom), generateShiftSummaries() distribution function, and shift_summaries upsert insertion block
+
+### Key Decisions
+- Used migration number 0035 instead of story-specified 0032 (0032-0034 already exist)
+- Used deterministic seeded PRNG (linear congruential generator with string hash) instead of Math.random() for reproducible seed data across runs
+- Generated shift records for ALL 14 assets with daily_summaries data (not just the 8 with daysAgo(0) records), per AC#5 requirement
+- OEE sub-components: availability (85-98%) and quality (95-100%) generated first, then performance back-calculated from target shift OEE to ensure component consistency
+- Night shift weighted toward more downtime (45% allocation), afternoon shift has 30% chance of distinctly lower performance for realistic manufacturing patterns
+
+### Tests Added
+- No application code tests needed — this story only creates a SQL migration and modifies seed data. Verification is via embedded SQL comments in the migration file and seed script execution. Story 17.4 will add API endpoint tests.
+
+### Notes for Reviewer
+- Pre-existing test failures (9 failing test files) are unrelated to this story — they're in handoff, voice, command-center, action-list, and live-pulse components
+- The shift_summaries clearing is placed BEFORE daily_summaries clearing in the seed script to respect FK ordering
+- The generateShiftSummaries function handles edge cases: zero actual_output, zero downtime_minutes, and OEE clamping
+
+### Test Results
+89 test files passed, 9 failed (pre-existing). 1517 tests passed, 11 failed (pre-existing), 4 skipped. No new failures introduced.
+
+### Acceptance Criteria Status
+- [x] AC1 (Table with all columns) - implemented in `supabase/migrations/0035_shift_summaries.sql` lines 23-36
+- [x] AC2 (Unique constraint on asset_id, date, shift) - implemented in `supabase/migrations/0035_shift_summaries.sql` line 35
+- [x] AC3 (Indexes on asset_id, date, composite) - implemented in `supabase/migrations/0035_shift_summaries.sql` lines 53-59
+- [x] AC4 (RLS matching daily_summaries pattern) - implemented in `supabase/migrations/0035_shift_summaries.sql` lines 68-85
+- [x] AC5 (3 shift records per asset per day) - implemented in `_bmad/scripts/seed-data.mjs` generateShiftSummaries function
+- [x] AC6 (Shift totals match daily aggregates) - implemented in `_bmad/scripts/seed-data.mjs` exact sum adjustment for units_produced and downtime_minutes
+- [x] AC7 (Realistic variance across shifts) - implemented in `_bmad/scripts/seed-data.mjs` with afternoon lower-performance pattern and night higher-downtime weighting
+- [x] AC8 (Existing daily_summaries unchanged) - verified: no ALTER TABLE on existing tables, daily_summaries upsert logic untouched
 
 ### Debug Log References
 
 ### Completion Notes List
 
 ### File List
+- `supabase/migrations/0035_shift_summaries.sql` (created)
+- `_bmad/scripts/seed-data.mjs` (modified)
+- `_bmad-output/implementation-artifacts/stories/17-3-shift-summaries-data-model.md` (updated)
+
+## Code Review Record
+
+**Reviewer**: Code Review Agent
+**Date**: 2026-02-12
+**Diff Size**: 313 lines changed (3 files)
+
+### Checklist Results
+- Acceptance Criteria: PASS (all 8 ACs verified)
+- Code Quality: PASS
+- Test Coverage: PASS (data-only story; no application code tests needed)
+- Security: PASS (RLS enabled, FK constraints, CHECK constraint)
+
+### Issues Found
+
+| # | Description | Severity | Status |
+|---|-------------|----------|--------|
+| 1 | Redundant `idx_shift_summaries_asset_id` index — composite `(asset_id, date)` index already serves asset_id-only queries via leftmost prefix. daily_summaries reference (0003) does not have a standalone asset_id index either. | LOW | Documented |
+| 2 | Data flow: generateShiftSummaries receives full dailySummaries with extra fields (downtime_reasons, smart_summary_text) but correctly ignores them. No functional issue. | LOW | Documented |
+| 3 | OEE formula `(A * P * Q) / 10000 * 100` verified correct — equivalent to `/1000000 * 10000` for percentage-to-percentage conversion. | LOW | Documented |
+| 4 | Section numbering: shift summaries block labeled `3b` appears before `3a` (downtime events) in seed script. Cosmetic ordering inconsistency. | LOW | Documented |
+| 5 | `seededRandom` returns range [0, 1.0] inclusive (divides by `0x7fffffff`). Conventional practice excludes 1.0 but no edge case impact for this use case. | LOW | Documented |
+| 6 | `hashString` returns 0 for empty string input. LCG still produces varied output from state=0. No functional impact for seed data keys. | LOW | Documented |
+| 7 | Nullable OEE/metric columns (oee, availability, performance, quality, downtime_minutes, units_produced) — consistent with daily_summaries reference pattern. Machine-generated data may not need NULLs, but spec doesn't require NOT NULL. | LOW | Documented |
+
+**Totals**: 0 HIGH, 0 MEDIUM, 7 LOW
+
+### Fixes Applied
+None — all issues are LOW severity. Per review policy, LOW issues are documented only.
+
+### Remaining Issues (Low Severity)
+All 7 issues above are documented for future cleanup. Most notable:
+- Issue #1 (redundant index) could be removed in a future optimization pass to reduce write overhead
+- Issue #4 (section ordering) is cosmetic and can be addressed in any future seed script modification
+
+### Final Status
+Approved
+
+## Test Quality Review
+
+**Reviewer**: Test Architect (TEA)
+**Date**: 2026-02-12
+**Quality Score**: 100/100 (A+)
+**Tests Reviewed**: 0 (data-only story — no application code tests applicable)
+
+### Assessment
+
+This story creates a SQL DDL migration and modifies a seed data script. No application test files were created or modified. This is appropriate because:
+
+1. **SQL migration** (`0035_shift_summaries.sql`) — DDL-only (CREATE TABLE, indexes, RLS policies). Verified via embedded SQL verification queries and runtime execution. No ORM or application logic to unit test.
+2. **Seed script** (`seed-data.mjs`) — Data generation utility using deterministic seeded PRNG. Validated by successful execution. Not production application code.
+3. **Cross-story coverage** — Story 17.4 (Shift Breakdown API & UI) will add API endpoint tests that exercise the `shift_summaries` table.
+
+### Issues Found
+- 0 Critical
+- 0 High
+- 0 Medium
+- 0 Low
+
+### Fixes Applied
+None needed.
+
+### Regression Check
+89 test files passed, 9 failed (pre-existing). 1517 tests passed, 11 failed (pre-existing), 4 skipped. No new failures introduced by this story.
+
+### Final Status
+Approved

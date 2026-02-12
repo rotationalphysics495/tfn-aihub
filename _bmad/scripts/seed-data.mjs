@@ -34,6 +34,134 @@ const minutesAgo = (mins) => {
   return d.toISOString();
 };
 
+// Deterministic seeded PRNG (linear congruential generator)
+// Ensures reproducible but varied data across runs
+function hashString(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash);
+}
+
+function seededRandom(seed) {
+  let state = hashString(String(seed));
+  return function next() {
+    state = (state * 1664525 + 1013904223) & 0x7fffffff;
+    return state / 0x7fffffff;
+  };
+}
+
+/**
+ * Generate shift_summaries records from dailySummaries array.
+ * For each daily record, creates 3 shift records (morning, afternoon, night).
+ *
+ * Ensures:
+ * - Sum of shift units_produced exactly matches daily actual_output
+ * - Weighted-average shift OEE approximately matches daily oee_percentage
+ * - Realistic variance: afternoon occasionally lower, night more downtime
+ * - Deterministic output via seeded PRNG
+ */
+function generateShiftSummaries(dailySummaries) {
+  const shifts = ['morning', 'afternoon', 'night'];
+  const shiftSummaries = [];
+
+  for (const daily of dailySummaries) {
+    const rng = seededRandom(`${daily.asset_id}-${daily.report_date}`);
+
+    // Base allocation percentages for units_produced
+    const baseAllocations = [0.37, 0.33, 0.30]; // morning, afternoon, night
+
+    // Apply variance: ±5-15% of base allocation
+    const variance = baseAllocations.map((base) => {
+      const variancePct = 0.05 + rng() * 0.10; // 5-15% variance
+      const direction = rng() > 0.5 ? 1 : -1;
+      return base * (1 + direction * variancePct);
+    });
+
+    // Normalize so allocations sum to 1.0
+    const totalAlloc = variance.reduce((sum, v) => sum + v, 0);
+    const normalizedAlloc = variance.map(v => v / totalAlloc);
+
+    // Distribute units_produced — ensure exact sum match
+    const totalUnits = daily.actual_output || 0;
+    const shiftUnits = normalizedAlloc.map(alloc => Math.round(alloc * totalUnits));
+    // Adjust last shift to ensure exact sum
+    const unitsDiff = totalUnits - shiftUnits.reduce((sum, u) => sum + u, 0);
+    shiftUnits[2] += unitsDiff;
+
+    // Distribute downtime_minutes — weight toward night and lower-performing shifts
+    const totalDowntime = daily.downtime_minutes || 0;
+    const downtimeWeights = [0.25, 0.30, 0.45]; // night gets more downtime
+    // Apply some variance to downtime distribution
+    const downtimeVariance = downtimeWeights.map((w) => {
+      return w * (0.85 + rng() * 0.30);
+    });
+    const totalDtWeight = downtimeVariance.reduce((sum, w) => sum + w, 0);
+    const shiftDowntime = downtimeVariance.map(w => Math.round((w / totalDtWeight) * totalDowntime));
+    // Adjust last shift to ensure exact sum
+    const dtDiff = totalDowntime - shiftDowntime.reduce((sum, d) => sum + d, 0);
+    shiftDowntime[2] += dtDiff;
+
+    // Generate OEE and sub-components per shift
+    const dailyOee = daily.oee_percentage || 80;
+
+    for (let i = 0; i < 3; i++) {
+      const shiftName = shifts[i];
+
+      // Base shift OEE varies around daily OEE
+      let shiftOeeOffset;
+      if (shiftName === 'morning') {
+        // Morning tends to be slightly above daily average
+        shiftOeeOffset = 1 + rng() * 4; // +1 to +5
+      } else if (shiftName === 'afternoon') {
+        // Afternoon: 30% chance of distinctly lower performance
+        const isLowPerformance = rng() < 0.30;
+        if (isLowPerformance) {
+          shiftOeeOffset = -(5 + rng() * 10); // -5 to -15
+        } else {
+          shiftOeeOffset = -2 + rng() * 4; // -2 to +2
+        }
+      } else {
+        // Night: slightly lower on average
+        shiftOeeOffset = -(1 + rng() * 5); // -1 to -6
+      }
+
+      let shiftOee = Math.max(20, Math.min(100, dailyOee + shiftOeeOffset));
+      shiftOee = Math.round(shiftOee * 100) / 100;
+
+      // Generate OEE sub-components such that availability * performance * quality / 10000 ≈ shiftOee
+      // Availability: 85-98% range
+      const availability = Math.round((85 + rng() * 13) * 100) / 100;
+      // Quality: 95-100% range
+      const quality = Math.round((95 + rng() * 5) * 100) / 100;
+      // Back-calculate performance from target OEE
+      let performance = (shiftOee * 10000) / (availability * quality);
+      performance = Math.max(50, Math.min(100, performance));
+      performance = Math.round(performance * 100) / 100;
+
+      // Recalculate actual OEE from components (may differ slightly due to clamping)
+      const actualOee = Math.round((availability * performance * quality) / 10000 * 100) / 100;
+
+      shiftSummaries.push({
+        asset_id: daily.asset_id,
+        date: daily.report_date,
+        shift: shiftName,
+        oee: actualOee,
+        availability,
+        performance,
+        quality,
+        downtime_minutes: shiftDowntime[i],
+        units_produced: Math.max(0, shiftUnits[i]),
+      });
+    }
+  }
+
+  return shiftSummaries;
+}
+
 async function seed() {
   console.log('🌱 Starting seed...\n');
 
@@ -46,8 +174,9 @@ async function seed() {
   await supabase.from('live_snapshots').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   await supabase.from('shift_targets').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   await supabase.from('downtime_events').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+  await supabase.from('shift_summaries').delete().neq('id', '00000000-0000-0000-0000-000000000000');
   await supabase.from('daily_summaries').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-  console.log('  ✓ Cleared production_actuals, production_schedule, products, safety_events, live_snapshots, shift_targets, downtime_events, and daily_summaries');
+  console.log('  ✓ Cleared production_actuals, production_schedule, products, safety_events, live_snapshots, shift_targets, downtime_events, shift_summaries, and daily_summaries');
 
   // 1. Assets (Epic 5 UAT: 5-8 assets required, including Grinder 5)
   console.log('📦 Inserting assets...');
@@ -1425,6 +1554,13 @@ async function seed() {
   const { error: summariesErr } = await supabase.from('daily_summaries').upsert(summariesWithoutReasons, { onConflict: 'asset_id,report_date' });
   if (summariesErr) console.error('  Daily summaries error:', summariesErr.message);
   else console.log('  ✓ Daily summaries inserted (note: downtime_reasons requires manual migration)');
+
+  // 3b. Shift Summaries (Story 17.3: Per-shift performance breakdowns)
+  console.log('📊 Inserting shift summaries...');
+  const shiftSummaries = generateShiftSummaries(dailySummaries);
+  const { error: shiftErr } = await supabase.from('shift_summaries').upsert(shiftSummaries, { onConflict: 'asset_id,date,shift' });
+  if (shiftErr) console.error('  Shift summaries error:', shiftErr.message);
+  else console.log(`  ✓ Shift summaries inserted (${shiftSummaries.length} records for ${dailySummaries.length} daily records)`);
 
   // 3a. Downtime Events (Story 14.1: Individual downtime event records for Pareto analysis)
   console.log('🔧 Inserting downtime events...');
