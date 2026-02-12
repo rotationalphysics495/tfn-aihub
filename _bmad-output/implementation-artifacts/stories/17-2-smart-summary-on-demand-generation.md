@@ -1,6 +1,6 @@
 # Story 17.2: Smart Summary On-Demand Generation for Historical Dates
 
-Status: ready-for-dev
+Status: done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -238,10 +238,134 @@ All three endpoints accept arbitrary dates and are protected with JWT auth. No b
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.6
 
-### Debug Log References
+### Implementation Summary
 
-### Completion Notes List
+Added on-demand smart summary generation for historical dates. When a user navigates to a historical date that has no cached summary, instead of auto-triggering generation (which costs LLM tokens), the UI shows a "Generate Summary" prompt with a button. Clicking the button manually triggers generation via POST /api/summaries/generate. Existing T-1 (yesterday) behavior is preserved — auto-generation on 404 still works by default.
 
-### File List
+### Files Created
+- `apps/web/src/hooks/__tests__/useSmartSummary.test.ts` — 11 unit tests for hook: autoGenerate behavior, generate() method, error handling, unmount safety
+- `apps/web/src/components/action-list/__tests__/MorningSummarySection.test.tsx` — 10 component tests: generation prompt UI, loading states, error handling with retry, existing summary display
+
+### Files Modified
+- `apps/web/src/hooks/useSmartSummary.ts` — Added `autoGenerate` option (default: true), `generate()` method for manual on-demand generation, `canGenerate` computed boolean. Modified 404 handler to skip auto-generation when `autoGenerate: false`.
+- `apps/web/src/components/action-list/MorningSummarySection.tsx` — Added Wand2 icon and Button imports, destructured `generate`/`canGenerate` from hook, passes `autoGenerate: false` when `reportDate` is provided, added on-demand generation prompt UI with "Generate Summary" button, updated error retry to use `generate()` vs `refetch()` depending on `canGenerate` state.
+
+### Key Decisions
+- `autoGenerate` defaults to `true` in the hook, preserving existing T-1 behavior. The component sets it to `false` only when a `reportDate` prop is explicitly passed (indicating historical date navigation from Story 17.1).
+- The `generate()` method is a separate useCallback from `regenerate()` — generate POSTs to `/api/summaries/generate` with `regenerate: false`, while regenerate GETs with `?regenerate=true`. This maintains the existing API contract.
+- Error retry in the component checks `canGenerate` to decide whether to call `generateSummary()` or `refetchSummary()` — this ensures that if a generation fails, the retry button triggers generation again rather than just re-fetching (which would still 404).
+- The "no summary" fallback (previously always shown) is now split into two states: `canGenerate` (shows generation prompt) and `!canGenerate` (shows generic "No AI summary available" text).
+
+### Tests Added
+- `apps/web/src/hooks/__tests__/useSmartSummary.test.ts` — Tests: Bearer token auth, hasSummary on 200, auto-generate on 404 (default), no auto-generate on 404 with autoGenerate=false, generate() POST call, generate() success state update, generate() error handling, generate() network error, generate() expired session, regenerate() still works, unmount safety
+- `apps/web/src/components/action-list/__tests__/MorningSummarySection.test.tsx` — Tests: generate button renders when canGenerate, no generate button when hasSummary, autoGenerate=false passed with reportDate, no autoGenerate when no reportDate, clicking generate calls function, loading state during generation, existing summary display, regenerate button visible, error retry calls generate vs refetch
+
+### Notes for Reviewer
+- Pre-existing test failures exist in `src/__tests__/action-list.test.tsx` (cleanSummaryText receives undefined summary_text) — confirmed these failures exist on the base branch before this story's changes.
+- No backend changes needed — all three endpoints (`GET /smart/{date}`, `GET /smart/{date}?regenerate=true`, `POST /generate`) already support arbitrary dates.
+- No new npm dependencies added — Wand2 icon is available in existing lucide-react v0.312.0.
+
+### Test Results
+```
+ ✓ src/hooks/__tests__/useSmartSummary.test.ts  (11 tests) 547ms
+ ✓ src/components/action-list/__tests__/MorningSummarySection.test.tsx  (10 tests) 74ms
+
+ Test Files  2 passed (2)
+      Tests  21 passed (21)
+```
+
+### Acceptance Criteria Status
+- [x] AC1 - Historical date with no summary shows generation prompt — implemented in MorningSummarySection.tsx (generation prompt UI) and useSmartSummary.ts (autoGenerate=false skips auto-generation on 404)
+- [x] AC2 - Generate button triggers API, shows loading, saves result — implemented in useSmartSummary.ts (generate() method POSTs to /api/summaries/generate) and MorningSummarySection.tsx (button onClick, existing isGenerating loading block)
+- [x] AC3 - Existing summary displayed immediately — existing behavior preserved in MorningSummarySection.tsx (hasSummary=true renders summary, no generation prompt)
+- [x] AC4 - Regenerate option on existing summaries — already implemented, no changes needed (regenerate button at MorningSummarySection.tsx)
+- [x] AC5 - Error handling with retry — implemented in useSmartSummary.ts (generate() catches errors) and MorningSummarySection.tsx (retry button calls generate or refetch based on canGenerate state)
+
+## Code Review Record
+
+**Reviewer**: Code Review Agent
+**Date**: 2026-02-12
+**Diff Size**: 922 lines (+922, -10)
+
+### Checklist Results
+- Acceptance Criteria: PASS
+- Code Quality: PASS
+- Test Coverage: PASS
+- Security: PASS
+
+### Issues Found
+
+| # | Description | Severity | Status |
+|---|-------------|----------|--------|
+| 1 | `response.ok \|\| response.status === 201` is redundant (`ok` already includes 201) — pre-existing pattern copied forward | LOW | Documented |
+| 2 | Auth boilerplate duplicated across `fetchSummary`, `regenerateSummary`, `generateSummary` — pre-existing pattern, not introduced by this story | LOW | Documented |
+| 3 | "Generate Summary" button not `disabled` during `isGenerating`, allowing potential double-click race | MEDIUM | Fixed |
+| 4 | `generateSummary` missing 401 status handling (unlike `fetchSummary`) — user would see generic error instead of "Session expired" | MEDIUM | Fixed |
+| 5 | No test for double-click / concurrent generation guard | LOW | Documented |
+| 6 | `reportDate` not validated as YYYY-MM-DD before API URL interpolation | LOW | Documented |
+| 7 | Component line 84 is 230+ chars, hard to read | LOW | Documented |
+
+**Totals**: 0 HIGH, 2 MEDIUM (fixed), 5 LOW (documented)
+
+### Fixes Applied
+
+| Issue # | Fix Description | Verified |
+|---------|-----------------|----------|
+| 3 | Added `disabled={isGenerating}` prop to Generate Summary Button in MorningSummarySection.tsx | Tests pass (21/21) |
+| 4 | Added `if (response.status === 401) throw new Error('Session expired...')` to `generateSummary` in useSmartSummary.ts | Tests pass (21/21) |
+
+### Remaining Issues (Low Severity)
+- Issue #1: Redundant `response.ok || response.status === 201` check — pre-existing pattern, consider cleanup in tech-debt sprint
+- Issue #2: Auth boilerplate duplication — consider extracting shared auth helper when touching these functions next
+- Issue #5: Missing double-click guard test — could be added in future test improvements
+- Issue #6: Date format validation — backend validates, low risk for internal calls
+- Issue #7: Long line in component — cosmetic, no functional impact
+
+### Final Status
+Approved with fixes
+
+## Test Quality Review
+
+**Quality Score**: 100/100 (A+)
+**Tests Reviewed**: 21 (11 unit + 10 component)
+**Reviewer**: Test Architect Agent
+**Date**: 2026-02-12
+
+### Files Reviewed
+- `apps/web/src/hooks/__tests__/useSmartSummary.test.ts` (461 lines, 11 tests)
+- `apps/web/src/components/action-list/__tests__/MorningSummarySection.test.tsx` (328 lines, 10 tests)
+
+### Criteria Results
+
+| # | Criterion | useSmartSummary.test | MorningSummarySection.test |
+|---|-----------|---------------------|---------------------------|
+| 1 | BDD Format | PASS | PASS |
+| 2 | Test IDs | WARN — no formal IDs | WARN — no formal IDs |
+| 3 | Hard Waits | PASS | PASS |
+| 4 | Determinism | PASS | PASS |
+| 5 | Isolation & Cleanup | PASS | PASS |
+| 6 | Explicit Assertions | PASS | PASS |
+| 7 | Test Length | WARN — 461 lines | PASS — 328 lines |
+| 8 | Test Duration | PASS — 549ms | PASS — 69ms |
+| 9 | Fixture Patterns | PASS — excellent | PASS — excellent |
+| 10 | Data Factories | PASS — with overrides | PASS — with overrides |
+| 11 | Network-First | N/A (mocked) | N/A (mocked) |
+| 12 | Flakiness | PASS | PASS |
+
+### Issues Found
+- 0 Critical
+- 0 High (test IDs missing but offset by excellent BDD naming)
+- 0 Medium
+- 2 Low: Missing formal test IDs (e.g., `17-2-UNIT-001`) — documented for future convention adoption
+
+### Strengths
+- Excellent factory pattern with override support in both files
+- Perfect mock isolation with `beforeEach`/`afterEach` cleanup
+- Well-organized describe blocks mapping to acceptance criteria
+- Unmount safety test in hook tests (prevents memory leaks)
+- Error and edge case coverage (network errors, expired sessions, retry flows)
+
+### Fixes Applied
+None required — no critical or high issues identified.

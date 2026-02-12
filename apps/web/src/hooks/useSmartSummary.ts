@@ -46,6 +46,8 @@ interface UseSmartSummaryOptions {
   apiUrl?: string
   /** Report date override (YYYY-MM-DD, defaults to T-1/yesterday) */
   reportDate?: string
+  /** Auto-generate if no cached summary on 404 (default: true for T-1, set false for historical) */
+  autoGenerate?: boolean
 }
 
 export interface UseSmartSummaryReturn extends SmartSummaryState {
@@ -53,8 +55,12 @@ export interface UseSmartSummaryReturn extends SmartSummaryState {
   refetch: () => Promise<void>
   /** Force regenerate the summary (bypasses cache) */
   regenerate: () => Promise<void>
+  /** Manually trigger summary generation (for historical dates) */
+  generate: () => Promise<void>
   /** Whether a real AI summary is available */
   hasSummary: boolean
+  /** Whether the user can trigger on-demand generation (no summary, not loading) */
+  canGenerate: boolean
 }
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -70,6 +76,7 @@ export function useSmartSummary(options: UseSmartSummaryOptions = {}): UseSmartS
     autoFetch = true,
     apiUrl = API_BASE_URL,
     reportDate,
+    autoGenerate = true,
   } = options
 
   const [state, setState] = useState<SmartSummaryState>({
@@ -117,9 +124,17 @@ export function useSmartSummary(options: UseSmartSummaryOptions = {}): UseSmartS
         return
       }
 
-      // 404 = no cached summary — trigger generation
+      // 404 = no cached summary
       if (response.status === 404) {
         if (!mountedRef.current) return
+
+        // When autoGenerate is false (historical dates), don't auto-trigger generation
+        if (!autoGenerate) {
+          setState(prev => ({ ...prev, isLoading: false, isGenerating: false, error: null }))
+          return
+        }
+
+        // Auto-trigger generation for T-1 (default behavior)
         setState(prev => ({ ...prev, isGenerating: true }))
 
         const generateUrl = `${apiUrl}/api/summaries/generate`
@@ -164,7 +179,7 @@ export function useSmartSummary(options: UseSmartSummaryOptions = {}): UseSmartS
         error: message,
       }))
     }
-  }, [apiUrl, reportDate])
+  }, [apiUrl, reportDate, autoGenerate])
 
   const regenerateSummary = useCallback(async () => {
     if (!mountedRef.current) return
@@ -205,6 +220,59 @@ export function useSmartSummary(options: UseSmartSummaryOptions = {}): UseSmartS
     }
   }, [apiUrl, reportDate])
 
+  const generateSummary = useCallback(async () => {
+    if (!mountedRef.current) return
+
+    setState(prev => ({ ...prev, isGenerating: true, error: null }))
+
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        setState(prev => ({ ...prev, isGenerating: false, error: 'Session expired. Please log in again.' }))
+        return
+      }
+
+      const date = reportDate || getYesterdayDate()
+      const headers = {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      }
+
+      const generateUrl = `${apiUrl}/api/summaries/generate`
+      const response = await fetch(generateUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ target_date: date, regenerate: false }),
+      })
+
+      if (response.ok || response.status === 201) {
+        const data: SmartSummaryData = await response.json()
+        if (mountedRef.current) {
+          setState({ data, isLoading: false, isGenerating: false, error: null })
+        }
+        return
+      }
+
+      if (response.status === 401) {
+        throw new Error('Session expired. Please log in again.')
+      }
+
+      if (mountedRef.current) {
+        setState(prev => ({
+          ...prev,
+          isGenerating: false,
+          error: 'Unable to generate AI summary. Please try again.',
+        }))
+      }
+    } catch (error) {
+      if (!mountedRef.current) return
+      const message = error instanceof Error ? error.message : 'Unable to generate AI summary.'
+      setState(prev => ({ ...prev, isGenerating: false, error: message }))
+    }
+  }, [apiUrl, reportDate])
+
   useEffect(() => {
     mountedRef.current = true
     if (autoFetch) {
@@ -217,6 +285,8 @@ export function useSmartSummary(options: UseSmartSummaryOptions = {}): UseSmartS
     ...state,
     refetch: fetchSummary,
     regenerate: regenerateSummary,
+    generate: generateSummary,
     hasSummary: state.data !== null,
+    canGenerate: !state.data && !state.isLoading && !state.isGenerating,
   }
 }

@@ -1,11 +1,12 @@
 'use client'
 
-import { AlertTriangle, TrendingDown, Gauge, Calendar, Sparkles, RefreshCw, AlertCircle } from 'lucide-react'
+import { AlertTriangle, TrendingDown, Gauge, Calendar, Sparkles, RefreshCw, AlertCircle, Wand2 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { format, subDays, startOfDay } from 'date-fns'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { useDailyActions } from '@/hooks/useDailyActions'
 import { useSmartSummary } from '@/hooks/useSmartSummary'
 import { DateNavigation } from '@/components/report'
@@ -80,7 +81,7 @@ function getPerformanceLabel(selectedDate?: Date): string {
 
 export function MorningSummarySection({ className, reportDate: reportDateProp, onDateChange, selectedDate }: MorningSummarySectionProps) {
   const { data, isLoading, summary } = useDailyActions(reportDateProp ? { reportDate: reportDateProp } : {})
-  const { data: smartSummary, isLoading: isSummaryLoading, isGenerating, error: summaryError, refetch: refetchSummary, regenerate: regenerateSummary, hasSummary } = useSmartSummary(reportDateProp ? { reportDate: reportDateProp } : {})
+  const { data: smartSummary, isLoading: isSummaryLoading, isGenerating, error: summaryError, refetch: refetchSummary, regenerate: regenerateSummary, generate: generateSummary, hasSummary, canGenerate } = useSmartSummary(reportDateProp ? { reportDate: reportDateProp, autoGenerate: false } : {})
 
   // Loading state
   if (isLoading && !data) {
@@ -263,7 +264,7 @@ export function MorningSummarySection({ className, reportDate: reportDateProp, o
                     <p className="text-xs text-muted-foreground">
                       AI summary unavailable &mdash;{' '}
                       <button
-                        onClick={() => refetchSummary()}
+                        onClick={() => canGenerate ? generateSummary() : refetchSummary()}
                         className="underline hover:text-foreground transition-colors"
                       >
                         retry
@@ -287,8 +288,27 @@ export function MorningSummarySection({ className, reportDate: reportDateProp, o
                 </div>
               )}
 
+              {/* On-demand generation prompt for historical dates */}
+              {!isSummaryLoading && !isGenerating && !summaryError && !hasSummary && canGenerate && (
+                <div className="text-center py-3">
+                  <p className="text-sm text-muted-foreground mb-2">
+                    No summary exists for this date. Generate one?
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => generateSummary()}
+                    disabled={isGenerating}
+                    className="gap-2"
+                  >
+                    <Wand2 className="w-4 h-4" />
+                    Generate Summary
+                  </Button>
+                </div>
+              )}
+
               {/* No summary and no error (shouldn't happen normally, but safe fallback) */}
-              {!isSummaryLoading && !isGenerating && !summaryError && !hasSummary && (
+              {!isSummaryLoading && !isGenerating && !summaryError && !hasSummary && !canGenerate && (
                 <p className="text-base text-muted-foreground italic">
                   No AI summary available for this date.
                 </p>
