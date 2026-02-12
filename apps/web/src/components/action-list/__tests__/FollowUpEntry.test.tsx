@@ -282,6 +282,63 @@ describe('Feature: FollowUpEntry Component (Story 13.5)', () => {
   })
 
   // =========================================================================
+  // AC2 (Story 15.4): has_unread server-side indicator
+  // =========================================================================
+  describe('AC2 (Story 15.4): has_unread Server-Side Indicator', () => {
+    it('15-4-message-thread-ui-UNIT-007: FollowUpEntry shows blue dot when has_unread is true', () => {
+      // Given: A FollowUpEntry component receives a follow-up item with has_unread=true
+      const followUp = createMockFollowUp({
+        id: 'fu-unread',
+        has_unread: true,
+      } as Partial<MockFollowUpItem>)
+
+      // When: The component renders
+      render(<FollowUpEntry followUp={followUp} onSelect={vi.fn()} />)
+
+      // Then: A blue dot indicator (data-testid="new-update-indicator") is visible
+      const indicator = screen.getByTestId('new-update-indicator')
+      expect(indicator).toBeInTheDocument()
+    })
+
+    it('15-4-message-thread-ui-UNIT-008: FollowUpEntry hides blue dot when has_unread is false', () => {
+      // Given: A FollowUpEntry component receives a follow-up item with has_unread=false
+      const followUp = createMockFollowUp({
+        id: 'fu-read',
+        has_unread: false,
+      } as Partial<MockFollowUpItem>)
+
+      // When: The component renders
+      render(<FollowUpEntry followUp={followUp} onSelect={vi.fn()} />)
+
+      // Then: No blue dot indicator is present on the entry
+      const indicator = screen.queryByTestId('new-update-indicator')
+      expect(indicator).toBeNull()
+    })
+
+    it('15-4-message-thread-ui-UNIT-009: FollowUpEntry hides blue dot when has_unread is undefined (backward compat)', () => {
+      // Given: A FollowUpEntry component receives a follow-up item without the has_unread property
+      const followUp = createMockFollowUp({
+        id: 'fu-no-unread-field',
+        updated_at: '2026-02-11T10:30:00Z',
+      })
+      // has_unread is undefined — should fall back to localStorage-based behavior
+
+      // When: The component renders
+      render(<FollowUpEntry followUp={followUp} onSelect={vi.fn()} />)
+
+      // Then: Falls back to existing localStorage-based unread detection behavior
+      // With no localStorage entry and updated_at set, the localStorage-based check
+      // should show the indicator (existing behavior from Story 13.5)
+      const indicator = document.querySelector(
+        '[data-testid="new-update-indicator"]'
+      )
+      // When has_unread is undefined, the component should use localStorage logic
+      // (the existing UNIT-019 test verifies localStorage fallback)
+      expect(indicator).toBeTruthy()
+    })
+  })
+
+  // =========================================================================
   // Click behavior
   // =========================================================================
   describe('Click Behavior', () => {

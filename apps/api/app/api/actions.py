@@ -393,7 +393,7 @@ async def list_followups(
     limit: Optional[int] = Query(None, ge=1, le=100, description="Maximum items to return"),
     offset: Optional[int] = Query(None, ge=0, description="Pagination offset"),
     current_user: CurrentUser = Depends(get_current_user),
-    engine: ActionEngine = Depends(get_engine),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
     """
     List follow-up assignments created by the current user.
@@ -403,8 +403,11 @@ async def list_followups(
 
     Requires authentication.
     """
+    settings = get_settings()
+    user_token = credentials.credentials
+
     try:
-        client = engine._get_client()
+        client = create_client(settings.supabase_url, user_token)
 
         # Resolve assigned_by
         assigner_id = current_user.id if assigned_by == "me" else assigned_by
@@ -465,10 +468,10 @@ async def list_followups(
         # Build response items
         items = []
         for f in followups_data:
-            items.append(FollowUpListItem(
-                **f,
-                assigned_to_email=email_map.get(f["assigned_to"]),
-            ))
+            # Use email from data if present, otherwise resolve from email_map
+            if "assigned_to_email" not in f or f["assigned_to_email"] is None:
+                f["assigned_to_email"] = email_map.get(f["assigned_to"])
+            items.append(FollowUpListItem(**f))
 
         # Compute counts by status from returned items
         counts = {"assigned": 0, "in_progress": 0, "resolved": 0}

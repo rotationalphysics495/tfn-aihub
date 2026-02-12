@@ -39,7 +39,11 @@ interface FollowUpEntryProps {
 }
 
 export function FollowUpEntry({ followUp, onSelect }: FollowUpEntryProps) {
-  const isNew = hasNewUpdate(followUp.id, followUp.updated_at)
+  // Prefer server-side has_unread when available, fall back to localStorage
+  const followUpAny = followUp as FollowUpItem & { has_unread?: boolean }
+  const isNew = followUpAny.has_unread !== undefined
+    ? followUpAny.has_unread
+    : hasNewUpdate(followUp.id, followUp.updated_at)
 
   const handleClick = () => {
     markAsViewed(followUp.id)

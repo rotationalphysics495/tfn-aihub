@@ -389,6 +389,7 @@ class FollowUpResponse(BaseModel):
 class FollowUpListItem(FollowUpResponse):
     """Follow-up item with resolved assignee email for list display."""
     assigned_to_email: Optional[str] = None
+    has_unread: Optional[bool] = None
 
 
 class FollowUpListResponse(BaseModel):
@@ -438,3 +439,32 @@ class TokenResponseResult(BaseModel):
     """Response model for a successful token-based response submission (Story 15.3)."""
     success: bool
     message: str
+
+
+class FollowUpMessageResponse(BaseModel):
+    """A single follow-up message in the thread (Story 15.4)."""
+    id: str
+    direction: str = Field(..., description="outbound or inbound")
+    message_type: str = Field(..., description="assignment, response, escalation, or status_update")
+    sender_email: str
+    subject: Optional[str] = None
+    body: str
+    sent_at: str
+
+
+class FollowUpMessageListResponse(BaseModel):
+    """Response wrapper for follow-up messages thread (Story 15.4)."""
+    followup_id: str
+    action_summary: str
+    assignee_name: Optional[str] = None
+    assignee_email: Optional[str] = None
+    status: str
+    messages: List[FollowUpMessageResponse] = Field(default_factory=list)
+    has_unread: bool = False
+    last_viewed_at: Optional[str] = None
+
+
+class FollowUpViewedResponse(BaseModel):
+    """Response for marking a follow-up as viewed (Story 15.4)."""
+    success: bool
+    last_viewed_at: str

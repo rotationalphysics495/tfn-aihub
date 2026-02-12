@@ -17,6 +17,7 @@ export interface FollowUpItem {
   report_date: string
   created_at: string
   updated_at: string
+  has_unread?: boolean
 }
 
 interface FollowUpListResponse {

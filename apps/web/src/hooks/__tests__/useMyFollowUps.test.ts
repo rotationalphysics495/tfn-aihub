@@ -273,6 +273,39 @@ describe('Feature: useMyFollowUps Hook (Story 13.5)', () => {
   })
 
   // =========================================================================
+  // Story 15.4 - AC2: has_unread passthrough
+  // =========================================================================
+  describe('Story 15.4 - AC2: has_unread Passthrough', () => {
+    it('15-4-message-thread-ui-INT-006: useMyFollowUps hook passes has_unread from API to FollowUpEntry', async () => {
+      // Given: The useMyFollowUps hook fetches follow-ups from the API,
+      //        and the API response includes has_unread fields
+      const followupsWithUnread = [
+        createMockFollowUp('fu-1', 'assigned', { has_unread: true } as Partial<MockFollowUpItem>),
+        createMockFollowUp('fu-2', 'in_progress', { has_unread: false } as Partial<MockFollowUpItem>),
+      ]
+      mockFetch.mockResolvedValue(createMockApiResponse(followupsWithUnread))
+
+      // When: The hook returns data to the consuming component
+      const { result } = renderHook(() =>
+        useMyFollowUps({ apiUrl: MOCK_API_URL })
+      )
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false)
+      })
+
+      // Then: Each FollowUpItem in the returned array includes the has_unread boolean field
+      expect(result.current.followups).toHaveLength(2)
+      expect(result.current.followups[0]).toHaveProperty('has_unread', true)
+      expect(result.current.followups[1]).toHaveProperty('has_unread', false)
+
+      // And: Grouped items also carry has_unread
+      expect(result.current.grouped.assigned[0]).toHaveProperty('has_unread', true)
+      expect(result.current.grouped.in_progress[0]).toHaveProperty('has_unread', false)
+    })
+  })
+
+  // =========================================================================
   // Error handling
   // =========================================================================
   describe('Error Handling', () => {

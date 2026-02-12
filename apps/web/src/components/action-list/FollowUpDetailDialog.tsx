@@ -11,6 +11,8 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Clock, User } from 'lucide-react'
 import type { FollowUpItem } from '@/hooks/useMyFollowUps'
+import { useFollowUpMessages } from '@/hooks/useFollowUpMessages'
+import { MessageThread } from './MessageThread'
 
 const STATUS_CONFIG: Record<string, { label: string; variant: 'info' | 'warning' | 'success' }> = {
   assigned: { label: 'Assigned', variant: 'info' },
@@ -36,6 +38,13 @@ interface FollowUpDetailDialogProps {
 }
 
 export function FollowUpDetailDialog({ followUp, open, onClose }: FollowUpDetailDialogProps) {
+  const {
+    messages,
+    isLoading: messagesLoading,
+    assignee_name,
+    markViewed,
+  } = useFollowUpMessages({ followUpId: followUp.id, autoFetch: open })
+
   useEffect(() => {
     if (open && followUp) {
       try {
@@ -46,8 +55,9 @@ export function FollowUpDetailDialog({ followUp, open, onClose }: FollowUpDetail
       } catch {
         // localStorage unavailable
       }
+      markViewed()
     }
-  }, [open, followUp])
+  }, [open, followUp, markViewed])
 
   const statusConfig = STATUS_CONFIG[followUp.status] || STATUS_CONFIG.assigned
 
@@ -89,6 +99,14 @@ export function FollowUpDetailDialog({ followUp, open, onClose }: FollowUpDetail
             <p className="text-sm mt-1">
               {followUp.note || 'No note provided'}
             </p>
+          </div>
+
+          <div className="border-t pt-3">
+            <MessageThread
+              messages={messages}
+              assignee_name={assignee_name || followUp.assigned_to_email || ''}
+              loading={messagesLoading}
+            />
           </div>
 
           <div className="border-t pt-3 space-y-2">

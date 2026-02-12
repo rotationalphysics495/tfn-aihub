@@ -12,7 +12,7 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 from fastapi.security import HTTPAuthorizationCredentials
 from supabase import create_client
 
@@ -21,7 +21,10 @@ from app.core.security import get_current_user, security
 from app.models.user import CurrentUser
 from app.schemas.action import (
     FollowUpCreateRequest,
+    FollowUpMessageListResponse,
+    FollowUpMessageResponse,
     FollowUpResponse,
+    FollowUpViewedResponse,
     TokenResponseRequest,
     TokenContextResponse,
     TokenResponseResult,
@@ -267,4 +270,160 @@ async def submit_followup_response(
         raise HTTPException(
             status_code=500,
             detail="Failed to submit response. Please try again.",
+        )
+
+
+@router.get("/{followup_id}/messages", response_model=FollowUpMessageListResponse)
+async def get_followup_messages(
+    followup_id: str = Path(
+        ...,
+        pattern=r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+        description="Follow-up UUID",
+    ),
+    current_user: CurrentUser = Depends(get_current_user),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """
+    Get the chronological message thread for a follow-up.
+
+    Story 15.4 AC#1, AC#3, AC#4, AC#5:
+    - Returns messages sorted by sent_at ascending
+    - Includes follow-up context wrapper with assignee info
+    - Computes has_unread server-side
+    - Application-level access control (assigner or assignee only)
+    """
+    settings = get_settings()
+    user_token = credentials.credentials
+
+    try:
+        client = create_client(settings.supabase_url, user_token)
+
+        # Fetch the follow-up record for context and access control
+        followup_result = (
+            client.table("action_followups")
+            .select("*")
+            .eq("id", followup_id)
+            .execute()
+        )
+
+        if not followup_result.data:
+            raise HTTPException(status_code=404, detail="Follow-up not found")
+
+        followup = followup_result.data[0]
+
+        # Application-level access control: user must be assigner or assignee
+        if (followup.get("assigned_by") != current_user.id and
+                followup.get("assigned_to") != current_user.id):
+            raise HTTPException(status_code=404, detail="Follow-up not found")
+
+        # Fetch messages sorted chronologically
+        messages_result = (
+            client.table("followup_messages")
+            .select("id, direction, message_type, sender_email, subject, body, sent_at")
+            .eq("followup_id", followup_id)
+            .order("sent_at")
+            .execute()
+        )
+
+        messages_data = messages_result.data or []
+
+        # Compute has_unread: any inbound message with sent_at > last_viewed_at
+        last_viewed_at = followup.get("last_viewed_at")
+        has_unread = False
+        for msg in messages_data:
+            if msg.get("direction") == "inbound":
+                if last_viewed_at is None:
+                    has_unread = True
+                    break
+                elif msg.get("sent_at", "") > last_viewed_at:
+                    has_unread = True
+                    break
+
+        messages = [FollowUpMessageResponse(**msg) for msg in messages_data]
+
+        return FollowUpMessageListResponse(
+            followup_id=followup.get("id", followup_id),
+            action_summary=followup.get("action_summary", ""),
+            assignee_name=followup.get("assignee_name"),
+            assignee_email=followup.get("assigned_to_email"),
+            status=followup.get("status", ""),
+            messages=messages,
+            has_unread=has_unread,
+            last_viewed_at=followup.get("last_viewed_at"),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get followup messages: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to retrieve messages.",
+        )
+
+
+@router.patch("/{followup_id}/viewed", response_model=FollowUpViewedResponse)
+async def mark_followup_viewed(
+    followup_id: str = Path(
+        ...,
+        pattern=r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+        description="Follow-up UUID",
+    ),
+    current_user: CurrentUser = Depends(get_current_user),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """
+    Mark a follow-up as viewed, updating last_viewed_at to now.
+
+    Story 15.4 AC#2: Updates last_viewed_at for unread indicator clearing.
+    """
+    settings = get_settings()
+    user_token = credentials.credentials
+
+    try:
+        client = create_client(settings.supabase_url, user_token)
+
+        # Fetch the follow-up for access control
+        followup_result = (
+            client.table("action_followups")
+            .select("*")
+            .eq("id", followup_id)
+            .execute()
+        )
+
+        if not followup_result.data:
+            raise HTTPException(status_code=404, detail="Follow-up not found")
+
+        followup = followup_result.data[0]
+
+        # Application-level access control
+        if (followup.get("assigned_by") != current_user.id and
+                followup.get("assigned_to") != current_user.id):
+            raise HTTPException(status_code=404, detail="Follow-up not found")
+
+        # Update last_viewed_at
+        now = datetime.now(timezone.utc).isoformat()
+        update_result = (
+            client.table("action_followups")
+            .update({"last_viewed_at": now})
+            .eq("id", followup_id)
+            .execute()
+        )
+
+        viewed_at = now
+        if update_result.data:
+            viewed_at = update_result.data[0].get("last_viewed_at", now)
+
+        return FollowUpViewedResponse(
+            success=True,
+            last_viewed_at=viewed_at,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to mark followup as viewed: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to update viewed status.",
         )
