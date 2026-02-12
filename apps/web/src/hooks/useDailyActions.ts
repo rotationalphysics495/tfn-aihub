@@ -59,6 +59,8 @@ export interface ActionItem {
     consecutive_days: number
     week_over_week_change: number | null
   } | null
+  // Story 17.4: Shift attribution for single-shift misses
+  shift_attribution?: string | null
 }
 
 export interface ActionListResponse {

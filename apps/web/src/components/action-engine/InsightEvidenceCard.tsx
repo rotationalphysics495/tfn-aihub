@@ -100,6 +100,7 @@ export function InsightEvidenceCard({
                 onAcknowledge={onAcknowledge ? () => onAcknowledge(item.id) : undefined}
                 followUp={followUp}
                 trendData={item.trendData}
+                shiftAttribution={item.shiftAttribution}
               />
             </div>
 

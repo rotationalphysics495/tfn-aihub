@@ -27,9 +27,10 @@ import { cn } from '@/lib/utils'
 interface InsightEvidenceCardListProps {
   className?: string
   reportDate?: string
+  selectedShift?: string
 }
 
-export function InsightEvidenceCardList({ className, reportDate: reportDateProp }: InsightEvidenceCardListProps) {
+export function InsightEvidenceCardList({ className, reportDate: reportDateProp, selectedShift }: InsightEvidenceCardListProps) {
   const {
     data,
     isLoading,
@@ -42,6 +43,15 @@ export function InsightEvidenceCardList({ className, reportDate: reportDateProp 
     if (!data?.actions) return []
     return transformAPIActionItems(data.actions)
   }, [data?.actions])
+
+  // Story 17.4 AC#2: Filter action items by selected shift
+  const filteredItems = useMemo(() => {
+    if (!selectedShift || selectedShift === 'all') return transformedItems
+    return transformedItems.filter(item => {
+      if (!item.shiftAttribution) return true // systemic items always shown
+      return item.shiftAttribution.toLowerCase().includes(selectedShift)
+    })
+  }, [transformedItems, selectedShift])
 
   // Build acknowledgment input items from transformed data
   const ackItems = useMemo(() => {
@@ -65,14 +75,14 @@ export function InsightEvidenceCardList({ className, reportDate: reportDateProp 
 
   // Merge acknowledgment state back into items for rendering
   const itemsWithAckState = useMemo(() => {
-    return transformedItems.map(item => {
+    return filteredItems.map(item => {
       const ack = getAcknowledgment(item.id)
       return {
         ...item,
         acknowledgment: ack,
       }
     })
-  }, [transformedItems, getAcknowledgment])
+  }, [filteredItems, getAcknowledgment])
 
   const allReviewed = acknowledgedCount === totalCount && totalCount > 0
 

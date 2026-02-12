@@ -9,10 +9,14 @@ import { WorkcenterRow } from './WorkcenterRow'
 interface WorkcenterScorecardProps {
   className?: string
   date?: string
+  selectedShift?: string
 }
 
-export function WorkcenterScorecard({ className, date }: WorkcenterScorecardProps) {
-  const { data, isLoading, error, refetch } = useWorkcenterSummary(date ? { date } : {})
+export function WorkcenterScorecard({ className, date, selectedShift }: WorkcenterScorecardProps) {
+  const hookOptions: { date?: string; shift?: string } = {}
+  if (date) hookOptions.date = date
+  if (selectedShift && selectedShift !== 'all') hookOptions.shift = selectedShift
+  const { data, isLoading, error, refetch } = useWorkcenterSummary(hookOptions)
 
   // Loading state
   if (isLoading && !data) {

@@ -11,6 +11,15 @@ export interface AssetDetail {
   downtime_minutes: number | null
 }
 
+export interface ShiftBreakdown {
+  shift: string
+  actual_output: number
+  target_output: number
+  attainment_pct: number
+  oee: number | null
+  downtime_minutes: number | null
+}
+
 export interface WorkcenterEntry {
   workcenter_name: string
   total_actual: number
@@ -20,6 +29,7 @@ export interface WorkcenterEntry {
   assets_missed: number
   total_assets: number
   assets: AssetDetail[]
+  shift_breakdown?: ShiftBreakdown[] | null
 }
 
 export interface WorkcenterSummaryResponse {
@@ -41,6 +51,7 @@ interface UseWorkcenterSummaryOptions {
   autoFetch?: boolean
   apiUrl?: string
   date?: string
+  shift?: string
 }
 
 export interface UseWorkcenterSummaryReturn extends WorkcenterSummaryState {
@@ -64,7 +75,7 @@ function getYesterday(): string {
 export function useWorkcenterSummary(
   options: UseWorkcenterSummaryOptions = {}
 ): UseWorkcenterSummaryReturn {
-  const { autoFetch = true, apiUrl = API_BASE_URL, date } = options
+  const { autoFetch = true, apiUrl = API_BASE_URL, date, shift } = options
 
   const [state, setState] = useState<WorkcenterSummaryState>({
     data: null,
@@ -96,7 +107,8 @@ export function useWorkcenterSummary(
       }
 
       const queryDate = date || getYesterday()
-      const url = `${apiUrl}/api/v1/production/workcenter-summary?date=${queryDate}`
+      const shiftParam = shift && shift !== 'all' ? `&shift=${shift}` : ''
+      const url = `${apiUrl}/api/v1/production/workcenter-summary?date=${queryDate}${shiftParam}`
 
       const response = await fetch(url, {
         method: 'GET',
@@ -167,7 +179,7 @@ export function useWorkcenterSummary(
         error: message,
       }))
     }
-  }, [apiUrl, date])
+  }, [apiUrl, date, shift])
 
   useEffect(() => {
     mountedRef.current = true

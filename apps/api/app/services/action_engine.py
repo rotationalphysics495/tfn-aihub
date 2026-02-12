@@ -558,6 +558,84 @@ class ActionEngine:
 
         return max(count, 1)  # Minimum 1 since the item is on today's list
 
+    async def _load_shift_summaries(
+        self, target_date: date, asset_ids: List[str]
+    ) -> Dict[str, List[dict]]:
+        """
+        Load shift summaries for shift attribution calculation.
+
+        Story 17.4 AC#3: Batch-query shift_summaries for a date/asset set.
+
+        Args:
+            target_date: The report date
+            asset_ids: List of asset UUIDs to query
+
+        Returns:
+            Dictionary mapping asset_id to list of shift_summary rows
+        """
+        if not asset_ids:
+            return {}
+
+        try:
+            client = self._get_client()
+            response = (
+                client.table("shift_summaries")
+                .select("asset_id, shift, oee, downtime_minutes, units_produced")
+                .in_("asset_id", asset_ids)
+                .eq("date", target_date.isoformat())
+                .execute()
+            )
+
+            result: Dict[str, List[dict]] = {}
+            for row in response.data or []:
+                aid = row.get("asset_id")
+                if aid:
+                    result.setdefault(aid, []).append(row)
+
+            logger.debug(
+                f"Loaded shift summaries for {len(result)} assets on {target_date}"
+            )
+            return result
+
+        except Exception as e:
+            logger.error(f"Failed to load shift summaries: {e}")
+            return {}
+
+    def _get_shift_attribution(
+        self, asset_id: str, shift_data: List[dict]
+    ) -> Optional[str]:
+        """
+        Determine if one shift accounts for >60% of total downtime.
+
+        Story 17.4 AC#3: Single-shift attribution when one shift dominates.
+        Story 17.4 AC#4: Returns None for systemic issues (no shift >60%).
+
+        Args:
+            asset_id: The asset UUID
+            shift_data: List of shift_summary rows for this asset+date
+
+        Returns:
+            Attribution string (e.g., "afternoon shift — 58 min downtime") or None
+        """
+        if not shift_data or len(shift_data) < 2:
+            return None
+
+        total_downtime = sum(s.get("downtime_minutes") or 0 for s in shift_data)
+        if total_downtime == 0:
+            return None
+
+        # Find the shift with the highest downtime
+        max_shift = max(shift_data, key=lambda s: s.get("downtime_minutes") or 0)
+        max_downtime = max_shift.get("downtime_minutes") or 0
+        max_shift_name = max_shift.get("shift", "unknown")
+
+        # Check >60% threshold
+        ratio = max_downtime / total_downtime
+        if ratio <= 0.6:
+            return None
+
+        return f"{max_shift_name} shift — {max_downtime} min downtime"
+
     def _generate_action_id(self, category: ActionCategory, asset_id: str) -> str:
         """Generate a unique action item ID."""
         return f"action-{category.value}-{uuid.uuid4().hex[:12]}"
@@ -1102,6 +1180,22 @@ class ActionEngine:
                         action, target_date, trailing_summaries,
                         trailing_safety_counts, effective_config
                     )
+
+                # Story 17.4: Enrich OEE/financial actions with shift attribution
+                non_safety_ids = list({
+                    a.asset_id for a in merged
+                    if a.category in (ActionCategory.OEE, ActionCategory.FINANCIAL)
+                })
+                if non_safety_ids:
+                    shift_summaries_map = await self._load_shift_summaries(
+                        target_date, non_safety_ids
+                    )
+                    for action in merged:
+                        if action.category in (ActionCategory.OEE, ActionCategory.FINANCIAL):
+                            shift_rows = shift_summaries_map.get(action.asset_id, [])
+                            action.shift_attribution = self._get_shift_attribution(
+                                action.asset_id, shift_rows
+                            )
 
             # Count by category (before limiting)
             counts = {

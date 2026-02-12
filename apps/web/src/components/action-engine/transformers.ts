@@ -212,6 +212,7 @@ export function transformAPIActionItem(item: APIActionItem): InsightActionItem {
       consecutiveDays: item.trend_data.consecutive_days,
       weekOverWeekChange: item.trend_data.week_over_week_change,
     } as TrendData : undefined,
+    shiftAttribution: item.shift_attribution ?? undefined,
   }
 }
 

@@ -111,6 +111,7 @@ export interface ActionItem {
   timestamp: string               // When insight was generated (ISO string)
   acknowledgment?: AcknowledgmentInfo | null
   trendData?: TrendData
+  shiftAttribution?: string | null  // Story 17.4: Shift attribution for single-shift misses
 }
 
 /**

@@ -7,7 +7,7 @@ import { SafetyAlertsSection } from '@/components/dashboard'
 import { MorningSummarySection, MyAssignmentsPanel } from '@/components/action-list'
 import { InsightEvidenceCardList } from '@/components/action-engine'
 import { Breadcrumb } from '@/components/navigation'
-import { WorkcenterScorecard, ScheduleAttainment } from '@/components/production'
+import { WorkcenterScorecard, ScheduleAttainment, ShiftTabs } from '@/components/production'
 import { useDailyActions } from '@/hooks/useDailyActions'
 
 function getYesterday(): Date {
@@ -40,13 +40,28 @@ export function MorningReportClient() {
     [selectedDate]
   )
 
+  // Story 17.4: Shift filter state synced with URL
+  const [selectedShift, setSelectedShift] = useState<string>(
+    () => searchParams.get('shift') || 'all'
+  )
+
   const handleDateChange = useCallback(
     (newDate: Date) => {
       setSelectedDate(newDate)
       const formatted = format(newDate, 'yyyy-MM-dd')
-      router.push(`${pathname}?date=${formatted}`, { scroll: false })
+      const shiftParam = selectedShift !== 'all' ? `&shift=${selectedShift}` : ''
+      router.push(`${pathname}?date=${formatted}${shiftParam}`, { scroll: false })
     },
-    [router, pathname]
+    [router, pathname, selectedShift]
+  )
+
+  const handleShiftChange = useCallback(
+    (shift: string) => {
+      setSelectedShift(shift)
+      const shiftParam = shift !== 'all' ? `&shift=${shift}` : ''
+      router.push(`${pathname}?date=${reportDate}${shiftParam}`, { scroll: false })
+    },
+    [router, pathname, reportDate]
   )
 
   // Empty state detection: use useDailyActions to check if data exists for the selected date
@@ -103,8 +118,11 @@ export function MorningReportClient() {
           {/* My Assignments Panel */}
           <MyAssignmentsPanel />
 
+          {/* Story 17.4: Shift filter tabs */}
+          <ShiftTabs value={selectedShift} onValueChange={handleShiftChange} />
+
           {/* Workcenter Production Scorecard */}
-          <WorkcenterScorecard date={reportDate} />
+          <WorkcenterScorecard date={reportDate} selectedShift={selectedShift} />
 
           {/* Schedule Attainment */}
           <ScheduleAttainment date={reportDate} />
@@ -114,7 +132,7 @@ export function MorningReportClient() {
             <h2 className="section-header text-foreground mb-4">
               Action Items
             </h2>
-            <InsightEvidenceCardList reportDate={reportDate} />
+            <InsightEvidenceCardList reportDate={reportDate} selectedShift={selectedShift} />
           </section>
         </div>
       )}

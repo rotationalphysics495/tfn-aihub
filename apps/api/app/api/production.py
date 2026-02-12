@@ -22,6 +22,7 @@ from app.schemas.production import (
     AssetDetail,
     ProductAttainment,
     ScheduleAttainmentResponse,
+    ShiftBreakdown,
     VarianceCallout,
     WorkcenterEntry,
     WorkcenterScheduleAttainment,
@@ -373,22 +374,36 @@ async def get_workcenter_summary(
         alias="date",
         description="Report date (YYYY-MM-DD). Defaults to yesterday (T-1).",
     ),
+    shift: Optional[str] = Query(
+        None,
+        description="Optional shift filter (morning, afternoon, night). Returns only that shift's data.",
+    ),
     current_user: CurrentUser = Depends(get_current_user),
 ) -> WorkcenterSummaryResponse:
     """
     Get production summary grouped by workcenter (area).
 
-    Queries assets, daily_summaries, and shift_targets, then aggregates
-    by asset area to produce per-workcenter totals and per-asset breakdowns.
+    Queries assets, daily_summaries, shift_targets, and optionally shift_summaries,
+    then aggregates by asset area to produce per-workcenter totals and per-asset breakdowns.
 
     Story 11.1 AC#1: Workcenter-grouped response with aggregations
     Story 11.1 AC#2: Empty data returns 200 with message
     Story 11.1 AC#3: Date defaults to T-1
+    Story 17.4 AC#1: shift_breakdown array with per-shift metrics
+    Story 17.4 AC#2: Optional shift filter parameter
     """
     try:
         # AC#3: Default to yesterday if no date provided
         if report_date is None:
             report_date = date.today() - timedelta(days=1)
+
+        # Validate shift parameter if provided
+        valid_shifts = {"morning", "afternoon", "night"}
+        if shift is not None and shift not in valid_shifts:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid shift value '{shift}'. Must be one of: {', '.join(sorted(valid_shifts))}",
+            )
 
         client = await get_supabase_client()
 
@@ -418,6 +433,16 @@ async def get_workcenter_summary(
             .execute()
         )
 
+        # Query 4 (Story 17.4): Fetch shift_summaries for shift breakdown
+        shift_query = (
+            client.table("shift_summaries")
+            .select("asset_id, shift, oee, downtime_minutes, units_produced")
+            .eq("date", report_date.isoformat())
+        )
+        if shift:
+            shift_query = shift_query.eq("shift", shift)
+        shift_summaries_response = shift_query.execute()
+
         # Build lookup maps
         # Assets: id -> {name, area}
         assets_map: Dict[str, dict] = {}
@@ -440,6 +465,37 @@ async def get_workcenter_summary(
         for target in (targets_response.data or []):
             asset_id = target["asset_id"]
             targets_map[asset_id] = targets_map.get(asset_id, 0) + (target.get("target_units") or 0)
+
+        # Shift summaries: asset_id -> list of shift records
+        shift_data_map: Dict[str, List[dict]] = {}
+        for row in (shift_summaries_response.data or []):
+            aid = row.get("asset_id")
+            if aid:
+                shift_data_map.setdefault(aid, []).append(row)
+
+        # When a specific shift is selected, use shift data as primary metrics
+        if shift:
+            if shift_data_map:
+                # Override summaries_map with shift-specific data
+                for asset_id, shift_rows in shift_data_map.items():
+                    if shift_rows:
+                        sr = shift_rows[0]  # One row per shift per asset
+                        summaries_map[asset_id] = {
+                            "asset_id": asset_id,
+                            "units_produced": sr.get("units_produced") or 0,
+                            "oee": sr.get("oee"),
+                            "downtime_minutes": sr.get("downtime_minutes"),
+                        }
+            else:
+                # No shift data available for this filter — zero out daily summaries
+                # so we don't misleadingly show daily aggregates as shift data
+                for asset_id in list(summaries_map.keys()):
+                    summaries_map[asset_id] = {
+                        "asset_id": asset_id,
+                        "units_produced": 0,
+                        "oee": None,
+                        "downtime_minutes": None,
+                    }
 
         # Group by workcenter (area)
         workcenters: Dict[str, List[AssetDetail]] = {}
@@ -478,6 +534,53 @@ async def get_workcenter_summary(
             assets_hit = sum(1 for a in asset_details if a.hit_target)
             assets_missed = len(asset_details) - assets_hit
 
+            # Story 17.4 AC#1: Build shift_breakdown when not filtering by shift
+            wc_shift_breakdown: Optional[List[ShiftBreakdown]] = None
+            if not shift:
+                # Aggregate shift data across all assets in this workcenter
+                shift_agg: Dict[str, dict] = {}
+                for ad in asset_details:
+                    asset_shifts = shift_data_map.get(ad.asset_id, [])
+                    for sr in asset_shifts:
+                        s_name = sr.get("shift", "unknown")
+                        if s_name not in shift_agg:
+                            shift_agg[s_name] = {
+                                "actual": 0,
+                                "target": 0,
+                                "oee_sum": 0.0,
+                                "oee_count": 0,
+                                "downtime": 0,
+                            }
+                        agg = shift_agg[s_name]
+                        agg["actual"] += sr.get("units_produced") or 0
+                        agg["downtime"] += sr.get("downtime_minutes") or 0
+                        oee_v = sr.get("oee")
+                        if oee_v is not None:
+                            agg["oee_sum"] += float(oee_v)
+                            agg["oee_count"] += 1
+
+                # Build per-shift target: divide workcenter target evenly across shifts with data
+                num_shifts = len(shift_agg) if shift_agg else 1
+
+                if shift_agg:
+                    breakdown_list = []
+                    for s_name in ["morning", "afternoon", "night"]:
+                        if s_name not in shift_agg:
+                            continue
+                        agg = shift_agg[s_name]
+                        s_actual = agg["actual"]
+                        s_target = total_target // num_shifts
+                        s_oee = round(agg["oee_sum"] / agg["oee_count"], 2) if agg["oee_count"] > 0 else None
+                        breakdown_list.append(ShiftBreakdown(
+                            shift=s_name,
+                            actual_output=s_actual,
+                            target_output=s_target,
+                            attainment_pct=calculate_percentage(s_actual, s_target),
+                            oee=s_oee,
+                            downtime_minutes=agg["downtime"],
+                        ))
+                    wc_shift_breakdown = breakdown_list if breakdown_list else None
+
             entry = WorkcenterEntry(
                 workcenter=area_name,
                 total_actual=total_actual,
@@ -486,6 +589,7 @@ async def get_workcenter_summary(
                 assets_hit=assets_hit,
                 assets_missed=assets_missed,
                 assets=asset_details,
+                shift_breakdown=wc_shift_breakdown,
             )
             workcenter_entries.append(entry)
 

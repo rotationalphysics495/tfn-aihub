@@ -38,6 +38,7 @@ interface InsightSectionProps {
   trendData?: TrendData
   isLoading?: boolean
   className?: string
+  shiftAttribution?: string | null
 }
 
 // Format financial impact for display
@@ -86,6 +87,7 @@ export function InsightSection({
   trendData,
   isLoading,
   className,
+  shiftAttribution,
 }: InsightSectionProps) {
   const router = useRouter()
 
@@ -130,6 +132,16 @@ export function InsightSection({
       <h3 className="text-xl md:text-2xl font-semibold text-foreground leading-tight">
         {recommendation.text}
       </h3>
+
+      {/* Story 17.4 AC#3: Shift attribution badge */}
+      {shiftAttribution && (
+        <span
+          className="inline-flex items-center rounded-md bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1 text-sm font-medium text-blue-700 dark:text-blue-300 ring-1 ring-inset ring-blue-200 dark:ring-blue-800 w-fit"
+          data-testid="shift-attribution-badge"
+        >
+          {shiftAttribution}
+        </span>
+      )}
 
       {/* Context row: Asset and timestamp (AC #2) */}
       <div className="flex flex-wrap items-center gap-4 text-base text-muted-foreground">

@@ -237,6 +237,12 @@ class ActionItem(BaseModel):
         description="7-day trend data for this action item's asset+metric"
     )
 
+    # Story 17.4: Shift attribution for single-shift misses
+    shift_attribution: Optional[str] = Field(
+        default=None,
+        description="Shift attribution string when one shift accounts for >60% of total miss (e.g., 'afternoon shift — 58 min mechanical')"
+    )
+
     # Story 3.2 AC#7: Computed fields for alias compatibility
     @computed_field
     @property
