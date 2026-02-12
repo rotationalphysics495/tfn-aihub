@@ -66,6 +66,84 @@ const localStorageMock = {
 }
 Object.defineProperty(window, 'localStorage', { value: localStorageMock })
 
+// Mock useActionPlans hook (Story 16.3)
+const LINKED_PLANS: Record<string, { id: string; title: string; status: string }> = {
+  'fu-123': { id: 'ap-456', title: 'Action Plan: Fix valve leak', status: 'open' },
+  'fu-link-nav': { id: 'ap-456', title: 'Action Plan: Fix valve leak', status: 'open' },
+  'fu-1': { id: 'ap-456', title: 'Action Plan: Fix valve leak', status: 'open' },
+  'fu-with-plan': { id: 'ap-789', title: 'Action Plan: Repair pump', status: 'open' },
+}
+
+const mockGetLinkedActionPlan = vi.fn(async (followUpId: string) => {
+  return LINKED_PLANS[followUpId] || null
+})
+
+const mockCreateActionPlan = vi.fn()
+
+vi.mock('@/hooks/useActionPlans', () => ({
+  useActionPlans: () => ({
+    getLinkedActionPlan: mockGetLinkedActionPlan,
+    createActionPlan: mockCreateActionPlan,
+    isLoading: false,
+    error: null,
+  }),
+}))
+
+// Mock ActionPlanForm component (Story 16.3) — lightweight mock using real Dialog for portal support
+vi.mock('@/components/action-plans', async () => {
+  const { Dialog, DialogContent } = await import('@/components/ui/dialog')
+  return {
+    ActionPlanForm: ({
+      open,
+      onClose,
+      onSuccess,
+      prefill,
+    }: {
+      open: boolean
+      onClose: () => void
+      onSuccess?: (plan: { id: string; title: string; status: string }) => void
+      prefill: { followUpId: string; actionSummary: string; assetName: string | null; responseText: string; category: string | null }
+    }) => {
+      return (
+        <Dialog open={open} onOpenChange={(isOpen: boolean) => { if (!isOpen) onClose() }}>
+          <DialogContent>
+            <div data-testid="action-plan-form-dialog">
+              <label htmlFor="ap-title">Title</label>
+              <input id="ap-title" defaultValue={`Action Plan: ${prefill.actionSummary}`} />
+              <label htmlFor="ap-root-cause">Root Cause</label>
+              <textarea id="ap-root-cause" defaultValue={prefill.responseText} />
+              <button onClick={onClose}>Cancel</button>
+              <button
+                onClick={() => {
+                  if (onSuccess) {
+                    onSuccess({ id: 'ap-new', title: 'Action Plan: Fix valve leak', status: 'open' })
+                  }
+                }}
+              >
+                Create Action Plan Submit
+              </button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )
+    },
+  }
+})
+
+// Mock Supabase client (for useActionPlans and ActionPlanForm asset lookup)
+vi.mock('@/lib/supabase/client', () => ({
+  createClient: () => ({
+    auth: { getSession: vi.fn().mockResolvedValue({ data: { session: { access_token: 'mock-token', user: { id: 'user-123' } } } }) },
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          single: () => ({ data: { id: 'asset-uuid-123' }, error: null }),
+        }),
+      }),
+    }),
+  }),
+}))
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
@@ -491,6 +569,351 @@ describe('Feature: FollowUpDetailDialog Component (Story 13.5)', () => {
           />
         )
       }).not.toThrow()
+    })
+  })
+
+  // =========================================================================
+  // Story 16.3: Create Action Plan from Follow-Up
+  // =========================================================================
+
+  // =========================================================================
+  // AC2: Linked Action Plan Visible on Follow-Up Detail
+  // =========================================================================
+  describe('Story 16.3 - AC2: Linked Action Plan Visible on Follow-Up Detail', () => {
+    it('16-3-create-action-plan-from-followup-INT-004: Follow-up detail shows linked action plan when one exists', async () => {
+      // Given: A follow-up with id='fu-123' has a linked action plan
+      //        (queried via getLinkedActionPlan where source_followup_id='fu-123'),
+      //        and the action plan has id='ap-456' and title='Action Plan: Fix valve leak'
+      const followUp = createMockFollowUp({
+        id: 'fu-123',
+        status: 'in_progress',
+      })
+
+      // Note: The FollowUpDetailDialog must be enhanced to query for linked
+      // action plans via useActionPlans.getLinkedActionPlan — this import/mock
+      // does not exist yet and the test will fail until Story 16.3 is implemented.
+
+      // When: The FollowUpDetailDialog opens for this follow-up
+      render(
+        <FollowUpDetailDialog
+          followUp={followUp}
+          open={true}
+          onClose={vi.fn()}
+        />
+      )
+
+      // Then: A link or badge displaying "Action Plan: Fix valve leak" is visible
+      await waitFor(() => {
+        expect(screen.getByText(/action plan: fix valve leak/i)).toBeInTheDocument()
+      })
+
+      // And: The "Create Action Plan" button is NOT shown
+      expect(screen.queryByRole('button', { name: /create action plan/i })).not.toBeInTheDocument()
+    })
+
+    it('16-3-create-action-plan-from-followup-INT-005: Linked action plan link navigates to action plan detail', async () => {
+      // Given: A FollowUpDetailDialog shows a linked action plan with id='ap-456'
+      const followUp = createMockFollowUp({
+        id: 'fu-link-nav',
+        status: 'in_progress',
+      })
+
+      render(
+        <FollowUpDetailDialog
+          followUp={followUp}
+          open={true}
+          onClose={vi.fn()}
+        />
+      )
+
+      // When: The manager clicks the action plan link
+      // Then: Navigation is triggered to '/action-plans/ap-456'
+      //       (or the link element has href='/action-plans/ap-456')
+      await waitFor(() => {
+        const actionPlanLink = screen.getByRole('link', { name: /action plan/i })
+        expect(actionPlanLink).toHaveAttribute('href', '/action-plans/ap-456')
+      })
+    })
+
+    it('16-3-create-action-plan-from-followup-INT-006: Follow-up detail dialog shows both "Create Action Plan" button and linked plan correctly across states', async () => {
+      // Given: Two follow-ups exist: fu-1 has a linked action plan, fu-2 does not
+      const followUp1 = createMockFollowUp({
+        id: 'fu-1',
+        status: 'in_progress',
+      })
+
+      const followUp2 = createMockFollowUp({
+        id: 'fu-2',
+        status: 'in_progress',
+      })
+
+      // When: The detail dialog opens for fu-1
+      const { unmount } = render(
+        <FollowUpDetailDialog
+          followUp={followUp1}
+          open={true}
+          onClose={vi.fn()}
+        />
+      )
+
+      // Then: For fu-1, the linked plan link is shown and
+      //       "Create Action Plan" is hidden
+      await waitFor(() => {
+        expect(screen.queryByText(/action plan:/i)).toBeInTheDocument()
+      })
+      expect(screen.queryByRole('button', { name: /create action plan/i })).not.toBeInTheDocument()
+
+      unmount()
+
+      // When: Dialog opens for fu-2 (no linked plan, but has a response)
+      render(
+        <FollowUpDetailDialog
+          followUp={followUp2}
+          open={true}
+          onClose={vi.fn()}
+        />
+      )
+
+      // Then: For fu-2, the "Create Action Plan" button is shown
+      //       and no linked plan link is visible
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /create action plan/i })).toBeInTheDocument()
+      })
+      expect(screen.queryByText(/action plan:/i)).not.toBeInTheDocument()
+    })
+  })
+
+  // =========================================================================
+  // AC3: "Create Action Plan" Button Hidden When No Response
+  // =========================================================================
+  describe('Story 16.3 - AC3: "Create Action Plan" Button Visibility', () => {
+    it('16-3-create-action-plan-from-followup-INT-007: "Create Action Plan" button is hidden when follow-up status is assigned', () => {
+      // Given: A FollowUpDetailDialog is open for a follow-up with
+      //        status='assigned' (no response yet)
+      const followUp = createMockFollowUp({ status: 'assigned' })
+
+      // When: The dialog renders
+      render(
+        <FollowUpDetailDialog
+          followUp={followUp}
+          open={true}
+          onClose={vi.fn()}
+        />
+      )
+
+      // Then: No "Create Action Plan" button is present in the dialog
+      expect(screen.queryByRole('button', { name: /create action plan/i })).not.toBeInTheDocument()
+    })
+
+    it('16-3-create-action-plan-from-followup-INT-008: "Create Action Plan" button is shown when follow-up status is in_progress', async () => {
+      // Given: A FollowUpDetailDialog is open for a follow-up with
+      //        status='in_progress' (has engagement from assignee),
+      //        and no linked action plan exists
+      const followUp = createMockFollowUp({ status: 'in_progress' })
+
+      // When: The dialog renders
+      render(
+        <FollowUpDetailDialog
+          followUp={followUp}
+          open={true}
+          onClose={vi.fn()}
+        />
+      )
+
+      // Then: A "Create Action Plan" button is visible in the dialog
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /create action plan/i })).toBeInTheDocument()
+      })
+    })
+
+    it('16-3-create-action-plan-from-followup-INT-009: "Create Action Plan" button is shown when follow-up status is resolved', async () => {
+      // Given: A FollowUpDetailDialog is open for a follow-up with
+      //        status='resolved', and no linked action plan exists
+      const followUp = createMockFollowUp({ status: 'resolved' })
+
+      // When: The dialog renders
+      render(
+        <FollowUpDetailDialog
+          followUp={followUp}
+          open={true}
+          onClose={vi.fn()}
+        />
+      )
+
+      // Then: A "Create Action Plan" button is visible in the dialog
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /create action plan/i })).toBeInTheDocument()
+      })
+    })
+
+    it('16-3-create-action-plan-from-followup-INT-010: "Create Action Plan" button is hidden when linked plan already exists', async () => {
+      // Given: A FollowUpDetailDialog is open for a follow-up with
+      //        status='in_progress' and a linked action plan already exists
+      const followUp = createMockFollowUp({
+        id: 'fu-with-plan',
+        status: 'in_progress',
+      })
+
+      // When: The dialog renders
+      render(
+        <FollowUpDetailDialog
+          followUp={followUp}
+          open={true}
+          onClose={vi.fn()}
+        />
+      )
+
+      // Then: The "Create Action Plan" button is NOT shown
+      await waitFor(() => {
+        expect(screen.queryByRole('button', { name: /create action plan/i })).not.toBeInTheDocument()
+      })
+
+      // And: Instead the linked action plan link/badge is displayed
+      expect(screen.queryByText(/action plan:/i)).toBeInTheDocument()
+    })
+  })
+
+  // =========================================================================
+  // AC1 Integration: Create Action Plan button opens form
+  // =========================================================================
+  describe('Story 16.3 - AC1: Create Action Plan from Follow-Up Detail', () => {
+    it('16-3-create-action-plan-from-followup-INT-002: FollowUpDetailDialog extracts response text from inbound messages for pre-fill', async () => {
+      // Given: A FollowUpDetailDialog is open and useFollowUpMessages returns
+      //        messages including an inbound message with direction='inbound',
+      //        message_type='response', body='Investigated and found worn bearing causing vibration'
+      const followUp = createMockFollowUp({
+        id: 'fu-extract-response',
+        status: 'in_progress',
+      })
+
+      mockUseFollowUpMessagesReturn = {
+        ...mockUseFollowUpMessagesReturn,
+        messages: [
+          {
+            id: 'msg-outbound',
+            direction: 'outbound',
+            message_type: 'assignment',
+            sender_email: 'manager@plant.com',
+            subject: 'Follow-up assignment',
+            body: 'Please investigate',
+            sent_at: '2026-02-09T08:00:00Z',
+          },
+          {
+            id: 'msg-inbound',
+            direction: 'inbound',
+            message_type: 'response',
+            sender_email: 'jane@company.com',
+            subject: null,
+            body: 'Investigated and found worn bearing causing vibration',
+            sent_at: '2026-02-10T10:00:00Z',
+          },
+        ],
+      }
+
+      render(
+        <FollowUpDetailDialog
+          followUp={followUp}
+          open={true}
+          onClose={vi.fn()}
+        />
+      )
+
+      // When: The manager clicks "Create Action Plan"
+      const createButton = await screen.findByRole('button', { name: /create action plan/i })
+      fireEvent.click(createButton)
+
+      // Then: The ActionPlanForm opens with root_cause pre-filled with the
+      //       inbound response message body text
+      await waitFor(() => {
+        const rootCauseField = screen.getByLabelText(/root cause/i) as HTMLTextAreaElement
+        expect(rootCauseField.value).toBe('Investigated and found worn bearing causing vibration')
+      })
+    })
+  })
+
+  // =========================================================================
+  // AC5: Follow-Up Updates Without Full Page Reload
+  // =========================================================================
+  describe('Story 16.3 - AC5: Follow-Up Updates After Creation', () => {
+    it('16-3-create-action-plan-from-followup-INT-012: Follow-up detail updates to show linked plan after successful creation without reload', async () => {
+      // Given: A FollowUpDetailDialog is open showing a "Create Action Plan" button
+      //        (no linked plan exists)
+      const followUp = createMockFollowUp({
+        id: 'fu-live-update',
+        status: 'in_progress',
+      })
+
+      render(
+        <FollowUpDetailDialog
+          followUp={followUp}
+          open={true}
+          onClose={vi.fn()}
+        />
+      )
+
+      // Then: Initially, the "Create Action Plan" button is visible
+      const createButton = await screen.findByRole('button', { name: /create action plan/i })
+      expect(createButton).toBeInTheDocument()
+
+      // When: The manager clicks "Create Action Plan" to open the form
+      fireEvent.click(createButton)
+
+      // And: The ActionPlanForm opens — click the submit button in the mock form
+      //      which triggers onSuccess with the created plan data
+      await waitFor(() => {
+        expect(screen.getByText(/create action plan submit/i)).toBeInTheDocument()
+      })
+      fireEvent.click(screen.getByText(/create action plan submit/i))
+
+      // Then: The FollowUpDetailDialog immediately updates to show
+      //       "Action Plan: Fix valve leak" as a link/badge
+      await waitFor(() => {
+        const planLink = screen.queryByText(/action plan: fix valve leak/i)
+        expect(planLink).toBeInTheDocument()
+      })
+    })
+
+    it('16-3-create-action-plan-from-followup-UNIT-020: FollowUpDetailDialog manages ActionPlanForm dialog state correctly', async () => {
+      // Given: A FollowUpDetailDialog is rendered with a follow-up that has
+      //        status='in_progress' and no linked plan
+      const followUp = createMockFollowUp({
+        id: 'fu-dialog-state',
+        status: 'in_progress',
+      })
+
+      render(
+        <FollowUpDetailDialog
+          followUp={followUp}
+          open={true}
+          onClose={vi.fn()}
+        />
+      )
+
+      // When: The manager clicks "Create Action Plan"
+      const createButton = await screen.findByRole('button', { name: /create action plan/i })
+      fireEvent.click(createButton)
+
+      // Then: The ActionPlanForm dialog opens (has form fields)
+      await waitFor(() => {
+        expect(screen.getByLabelText(/title/i)).toBeInTheDocument()
+      })
+
+      // When: The manager closes the ActionPlanForm without submitting
+      //       (e.g., clicks X or presses Escape)
+      const closeButtons = screen.getAllByRole('button', { name: /close|cancel/i })
+      const formCloseButton = closeButtons[closeButtons.length - 1] // last close is the form's
+      fireEvent.click(formCloseButton)
+
+      // Then: The ActionPlanForm dialog closes
+      await waitFor(() => {
+        expect(screen.queryByLabelText(/title/i)).not.toBeInTheDocument()
+      })
+
+      // And: The FollowUpDetailDialog remains open
+      expect(screen.getByText(/investigate pressure anomaly/i)).toBeInTheDocument()
+
+      // And: The "Create Action Plan" button is still visible
+      expect(screen.getByRole('button', { name: /create action plan/i })).toBeInTheDocument()
     })
   })
 })
