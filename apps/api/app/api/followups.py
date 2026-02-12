@@ -30,6 +30,7 @@ from app.schemas.action import (
     TokenResponseResult,
 )
 from app.services.email import get_notification_service, get_token_service
+from app.services.notifications import get_teams_client, build_followup_assignment_card
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +113,31 @@ async def create_followup(
             )
         except Exception as e:
             logger.error(f"Failed to dispatch notification: {e}")
+
+        # Fire-and-forget Teams notification (Story 18.4)
+        try:
+            if settings.teams_configured:
+                assigner_name = (current_user.email or "").split("@")[0] or "Unknown"
+
+                teams_followup_data = {
+                    "action_summary": body.action_summary,
+                    "asset_name": body.asset_name,
+                    "category": body.category,
+                    "assigner_name": assigner_name,
+                    "note": body.note,
+                    "report_date": body.report_date,
+                }
+
+                card = build_followup_assignment_card(teams_followup_data, settings.app_base_url)
+                teams_client = get_teams_client()
+
+                asyncio.create_task(
+                    teams_client.send_card(card)
+                )
+            else:
+                logger.debug("Teams notification skipped: webhook not configured")
+        except Exception as e:
+            logger.error(f"Failed to dispatch Teams notification: {e}")
 
         return FollowUpResponse(**record)
 

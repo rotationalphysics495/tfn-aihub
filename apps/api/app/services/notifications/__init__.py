@@ -12,6 +12,7 @@ Components:
 from app.services.notifications.teams import (
     TeamsWebhookClient,
     build_all_clear_card,
+    build_followup_assignment_card,
     build_morning_summary_card,
 )
 
@@ -24,6 +25,7 @@ def get_teams_client() -> TeamsWebhookClient:
 __all__ = [
     "TeamsWebhookClient",
     "build_all_clear_card",
+    "build_followup_assignment_card",
     "build_morning_summary_card",
     "get_teams_client",
 ]

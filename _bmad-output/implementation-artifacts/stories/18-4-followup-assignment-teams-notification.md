@@ -1,6 +1,6 @@
 # Story 18.4: Follow-Up Assignment Teams Notification
 
-Status: ready-for-dev
+Status: done
 
 ## Story
 
@@ -283,10 +283,118 @@ RLS: SELECT for assigned_to/assigned_by, INSERT for assigned_by=auth.uid(), UPDA
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.6
 
-### Debug Log References
+### Implementation Summary
 
-### Completion Notes List
+Added Teams notification dispatch to the follow-up assignment endpoint. When a follow-up is assigned and Teams is configured, an Adaptive Card is built with the assignment details (action summary, asset name, category, assigner name, optional note) and posted to the configured Teams webhook channel asynchronously via `asyncio.create_task()`.
 
-### File List
+### Files Created
+- apps/api/tests/services/notifications/test_followup_assignment_card.py - Unit tests for card builder and webhook error handling (12 tests)
+- apps/api/tests/test_followup_teams_notification.py - Integration tests for Teams notification dispatch in create_followup endpoint (10 tests)
+
+### Files Modified
+- apps/api/app/services/notifications/teams.py - Added `build_followup_assignment_card()` function
+- apps/api/app/services/notifications/__init__.py - Added `build_followup_assignment_card` to imports and `__all__`
+- apps/api/app/api/followups.py - Added Teams notification dispatch block in `create_followup()` endpoint
+
+### Key Decisions
+- Called `build_followup_assignment_card()` and `get_teams_client()` synchronously before `asyncio.create_task()` to keep card building observable for testing, while `send_card()` remains async fire-and-forget
+- Used `asyncio.create_task(teams_client.send_card(card))` directly rather than wrapping in a nested async helper, matching the email notification pattern
+- Resolved assignee display name via `get_service_role_client().auth.admin.get_user_by_id()` in the synchronous path before task dispatch, with "Unknown" fallback on failure
+- Used `category` field instead of `priority` since `action_followups` table has `category` (safety/oee/financial) not a separate priority field
+
+### Tests Added
+- apps/api/tests/services/notifications/test_followup_assignment_card.py - 12 tests (UNIT-001 to UNIT-012): Card structure, header, FactSet fields, note omission, URL construction, trailing slash handling, send_card not-configured, timeout/HTTP/connect/unexpected errors
+- apps/api/tests/test_followup_teams_notification.py - 10 tests (INT-001 to INT-010): Dispatch on assignment, assigner name extraction, assignee name resolution, skip when not configured, debug log, webhook failure resilience, exception handling, fire-and-forget via create_task, immediate API response, both email+Teams dispatched
+
+### Notes for Reviewer
+- All 22 story-specific tests pass
+- No regressions in full test suite (2356 passed, pre-existing failures unrelated)
+- The Teams notification goes to the channel, not as a DM (Teams Incoming Webhooks limitation)
+
+### Test Results
+```
+22 passed, 0 failed (tests/services/notifications/test_followup_assignment_card.py + tests/test_followup_teams_notification.py)
+Full suite: 2356 passed, 50 pre-existing failures, 43 pre-existing errors (all unrelated to this story)
+```
+
+### Acceptance Criteria Status
+- [x] AC1 - Teams notification on follow-up assignment: Adaptive Card built with header, FactSet (action, asset, category, assigner, note), "View in App" button - implemented in teams.py:build_followup_assignment_card() and followups.py:create_followup()
+- [x] AC2 - Graceful degradation when Teams not configured: settings.teams_configured check with debug log skip - implemented in followups.py:create_followup()
+- [x] AC3 - Graceful failure on webhook error: TeamsWebhookClient.send_card() handles all error types, outer try/except in followups.py prevents propagation - implemented in teams.py and followups.py
+- [x] AC4 - Fire-and-forget delivery: asyncio.create_task() dispatches Teams notification, API returns immediately - implemented in followups.py:create_followup()
+
+## Code Review Record
+
+**Reviewer**: Code Review Agent
+**Date**: 2026-02-12
+**Diff Size**: 1229 lines (+1224, -5)
+
+### Checklist Results
+- Acceptance Criteria: PASS
+- Code Quality: PASS (after fixes)
+- Test Coverage: PASS
+- Security: PASS
+
+### Issues Found
+
+| # | Description | Severity | Status |
+|---|-------------|----------|--------|
+| 1 | `assigned_to_name` resolved via blocking Supabase call but never used by `build_followup_assignment_card()` — dead code with unnecessary network call | MEDIUM | Fixed |
+| 2 | AC#1 spec requires summary message `"{assigner_name} assigned you a follow-up: {action_summary} on {asset_name}"` — missing from card | MEDIUM | Fixed |
+| 3 | Synchronous blocking `get_service_role_client()` + `get_user_by_id()` in async endpoint delays API response (conflicts with AC#4 fire-and-forget) | MEDIUM | Fixed (removed with #1) |
+| 4 | `__init__.py` module docstring doesn't mention `build_followup_assignment_card` | LOW | Documented |
+| 5 | f-string logging with exception objects (pre-existing pattern) | LOW | Documented |
+| 6 | Test file uses `os.environ.setdefault` at module level (pre-existing pattern) | LOW | Documented |
+
+**Totals**: 0 HIGH, 3 MEDIUM, 3 LOW
+
+### Fixes Applied
+
+| Issue # | Fix Description | Verified |
+|---------|-----------------|----------|
+| 1 | Removed unused `assigned_to_name` resolution block from `followups.py` (lines 121-128), removed `assigned_to_name` from `teams_followup_data` dict | Tests pass (22/22) |
+| 2 | Added summary message TextBlock `"{assigner_name} assigned you a follow-up: {action_summary} on {asset_name}"` to `build_followup_assignment_card()` in `teams.py` | Tests pass (22/22) |
+| 3 | Resolved by fix #1 — removing the unused assignee lookup also removes the blocking network call | Tests pass (22/22) |
+| - | Updated INT-003 test to verify followup_data fields instead of removed `assigned_to_name`; cleaned up unused test helpers `_mock_assignee_lookup` and `ASSIGNEE_EMAIL` | Tests pass (22/22) |
+
+### Remaining Issues (Low Severity)
+- `__init__.py` docstring doesn't mention `build_followup_assignment_card` (cosmetic)
+- f-string logging with exception objects is a pre-existing pattern across the codebase
+- Module-level `os.environ.setdefault` in test file is a pre-existing test pattern
+
+### Final Status
+Approved with fixes
+
+## Test Quality Review
+
+**Quality Score**: 96/100 (A)
+**Tests Reviewed**: 22 (12 unit, 10 integration)
+**Reviewer**: TEA (Test Architect)
+**Date**: 2026-02-12
+
+### Criteria Results
+
+| # | Criterion | Result | Notes |
+|---|-----------|--------|-------|
+| 1 | BDD Format (Given-When-Then) | PASS | All 22 tests have explicit GWT docstrings |
+| 2 | Test ID Conventions | PASS | UNIT-001..012, INT-001..010 all present |
+| 3 | Hard Waits Detection | PASS | No sleep/delay/waitForTimeout found |
+| 4 | Determinism | PASS | No conditionals, random values, or try/catch abuse |
+| 5 | Isolation & Cleanup | PASS | Context-managed mocks auto-cleanup, no shared state |
+| 6 | Explicit Assertions | PASS | Every test has explicit assert statements |
+| 7 | Test Length | WARN | Unit: 382 lines (acceptable), Integration: 710 lines (over 500 threshold) |
+| 8 | Test Duration | PASS | All 22 tests complete in 0.12s total |
+| 9 | Fixture Patterns | PASS | pytest fixtures for client/JWT/payload, helper functions for mock setup |
+| 10 | Data Factories | PASS | `_make_followup_data(**overrides)` factory with override pattern |
+| 11 | Network-First Pattern | N/A | No browser/navigation tests — all mocked |
+| 12 | Flakiness Patterns | PASS | No tight timeouts, race conditions, or timing dependencies |
+
+### Issues Found
+- 0 Critical
+- 0 High (file length concern downgraded — splitting 710-line file would break AC-based organization and add complexity without readability benefit)
+- 2 Medium: integration test file length (710 lines), repetitive mock nesting pattern (project-wide convention)
+
+### Fixes Applied
+- None required — no critical or high issues to fix

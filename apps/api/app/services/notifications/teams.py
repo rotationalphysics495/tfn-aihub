@@ -124,6 +124,63 @@ def build_all_clear_card(report_date: date, base_url: str) -> dict:
     }
 
 
+def build_followup_assignment_card(followup_data: dict, base_url: str) -> dict:
+    """Build an Adaptive Card for a follow-up assignment notification.
+
+    Story 18.4 AC#1: Card includes header, FactSet with action/asset/category/assigner/note,
+    and a "View in App" button linking to the morning report page.
+    """
+    base_url = base_url.rstrip("/")
+    report_date = str(followup_data.get("report_date", ""))
+    report_url = f"{base_url}/morning-report?date={report_date}"
+
+    assigner_name = followup_data.get("assigner_name", "Someone")
+    action_summary = followup_data.get("action_summary", "")
+    asset_name = followup_data.get("asset_name", "")
+    summary_message = f"{assigner_name} assigned you a follow-up: {action_summary} on {asset_name}"
+
+    facts = [
+        {"title": "Action:", "value": action_summary},
+        {"title": "Asset:", "value": asset_name},
+        {"title": "Category:", "value": followup_data.get("category", "")},
+        {"title": "Assigned by:", "value": assigner_name},
+    ]
+
+    note = followup_data.get("note")
+    if note:
+        facts.append({"title": "Note:", "value": note})
+
+    return {
+        "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+        "type": "AdaptiveCard",
+        "version": "1.4",
+        "body": [
+            {
+                "type": "TextBlock",
+                "text": "Follow-Up Assigned",
+                "weight": "Bolder",
+                "size": "Medium",
+            },
+            {
+                "type": "TextBlock",
+                "text": summary_message,
+                "wrap": True,
+            },
+            {
+                "type": "FactSet",
+                "facts": facts,
+            },
+        ],
+        "actions": [
+            {
+                "type": "Action.OpenUrl",
+                "title": "View in App",
+                "url": report_url,
+            }
+        ],
+    }
+
+
 class TeamsWebhookClient:
     """Client for posting Adaptive Cards to Microsoft Teams via Incoming Webhooks."""
 
