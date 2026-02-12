@@ -18,6 +18,7 @@ export { EvidenceSection } from './EvidenceSection'
 export { PriorityBadge, getPriorityBorderColor, getPriorityAccentBg } from './PriorityBadge'
 export { TrendIndicator } from './TrendIndicator'
 export { RepeatOffenderBadge } from './RepeatOffenderBadge'
+export { DowntimePareto, DowntimeParetoSkeleton } from './DowntimePareto'
 
 // Types
 export type { PriorityType } from './PriorityBadge'

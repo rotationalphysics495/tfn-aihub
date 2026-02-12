@@ -108,6 +108,8 @@ export function InsightEvidenceCard({
               <EvidenceSection
                 evidence={item.evidence}
                 defaultExpanded={defaultEvidenceExpanded}
+                assetId={item.asset.id}
+                reportDate={reportDate}
               />
             </div>
           </div>

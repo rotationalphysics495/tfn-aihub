@@ -11,6 +11,8 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { useDowntimePareto } from '@/hooks/useDowntimePareto'
+import { DowntimePareto, DowntimeParetoSkeleton } from './DowntimePareto'
 import type {
   Evidence,
   SafetyEvidence,
@@ -38,6 +40,8 @@ interface EvidenceSectionProps {
   evidence: Evidence
   className?: string
   defaultExpanded?: boolean
+  assetId?: string
+  reportDate?: string
 }
 
 // Format currency for display
@@ -201,8 +205,18 @@ export function EvidenceSection({
   evidence,
   className,
   defaultExpanded = false,
+  assetId,
+  reportDate,
 }: EvidenceSectionProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
+
+  // Determine if evidence is OEE type for Pareto chart integration
+  const isOEE = 'targetOEE' in evidence.data && 'actualOEE' in evidence.data
+  const { data: paretoData, isLoading: paretoLoading } = useDowntimePareto({
+    assetId: assetId || '',
+    reportDate: reportDate || '',
+    enabled: isOEE && !!assetId && !!reportDate,
+  })
 
   // Determine which evidence display to render
   const renderEvidenceContent = () => {
@@ -259,6 +273,19 @@ export function EvidenceSection({
         <div className="p-4 space-y-4">
           {/* Evidence display */}
           {renderEvidenceContent()}
+
+          {/* Downtime Pareto Chart - only for OEE evidence (Story 14.5) */}
+          {isOEE && (paretoLoading ? (
+            <div className="pt-3 border-t border-border">
+              <p className="text-sm font-medium text-muted-foreground mb-2">Downtime Breakdown</p>
+              <DowntimeParetoSkeleton />
+            </div>
+          ) : paretoData && paretoData.items.length > 0 ? (
+            <div className="pt-3 border-t border-border">
+              <p className="text-sm font-medium text-muted-foreground mb-2">Downtime Breakdown</p>
+              <DowntimePareto data={paretoData} />
+            </div>
+          ) : null)}
 
           {/* Source citation - NFR1 compliance (AC #5) */}
           <div className="pt-3 border-t border-border">
