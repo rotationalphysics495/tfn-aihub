@@ -1,0 +1,27 @@
+epic_id: "17"
+execution:
+  start_time: "2026-02-12T11:40:10Z"
+  end_time: "2026-02-12T14:00:59Z"
+  duration_seconds: 8449
+stories:
+  total: 4
+  completed: 4
+  failed: 0
+  skipped: 0
+fix_loop:
+  total_fix_attempts: 1
+  stories_requiring_fixes: 0
+  max_retries_hit: 0
+validation:
+  gate_executed: true
+  gate_status: "FAIL"
+issues:
+  - story: 17-4-shift-breakdown-api-ui
+    type: static_analysis_failed
+    message: Static analysis gate failed with 2 issue(s)
+    timestamp: "2026-02-12T13:41:56Z"
+story_details:
+  - story: 17-4-shift-breakdown-api-ui
+    fix_attempt: 1
+    outcome: success
+    timestamp: "2026-02-12T13:46:51Z"
