@@ -1,0 +1,35 @@
+epic_id: "16"
+execution:
+  start_time: "2026-02-12T05:57:24Z"
+  end_time: "2026-02-12T10:42:34Z"
+  duration_seconds: 17110
+stories:
+  total: 6
+  completed: 6
+  failed: 0
+  skipped: 0
+fix_loop:
+  total_fix_attempts: 2
+  stories_requiring_fixes: 0
+  max_retries_hit: 0
+validation:
+  gate_executed: true
+  gate_status: "FAIL"
+issues:
+  - story: 16-3-create-action-plan-from-followup
+    type: static_analysis_failed
+    message: Static analysis gate failed with 1 issue(s)
+    timestamp: "2026-02-12T07:33:40Z"
+  - story: 16-5-action-plans-dashboard
+    type: static_analysis_failed
+    message: Static analysis gate failed with 1 issue(s)
+    timestamp: "2026-02-12T09:51:31Z"
+story_details:
+  - story: 16-3-create-action-plan-from-followup
+    fix_attempt: 1
+    outcome: success
+    timestamp: "2026-02-12T07:37:35Z"
+  - story: 16-5-action-plans-dashboard
+    fix_attempt: 1
+    outcome: success
+    timestamp: "2026-02-12T09:53:42Z"
