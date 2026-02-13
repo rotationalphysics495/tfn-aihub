@@ -5,9 +5,9 @@ execution:
   duration_seconds: 0
 stories:
   total: 0
-  completed: 0
+  completed: 1
   failed: 0
-  skipped: 0
+  skipped: 2
 fix_loop:
   total_fix_attempts: 0
   stories_requiring_fixes: 0

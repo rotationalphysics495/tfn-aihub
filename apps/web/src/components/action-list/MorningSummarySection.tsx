@@ -12,6 +12,7 @@ import { useDailyActions } from '@/hooks/useDailyActions'
 import { useSmartSummary } from '@/hooks/useSmartSummary'
 import { DateNavigation } from '@/components/report'
 import { useChatContext } from '@/components/chat'
+import { SuggestedQuestions } from './SuggestedQuestions'
 import { SummarySkeleton } from './ActionListSkeleton'
 import { cn } from '@/lib/utils'
 import { linkifyAssetNames, extractAssetNames } from '@/lib/linkifyAssets'
@@ -85,7 +86,7 @@ function getPerformanceLabel(selectedDate?: Date): string {
 export function MorningSummarySection({ className, reportDate: reportDateProp, onDateChange, selectedDate }: MorningSummarySectionProps) {
   const { data, isLoading, summary } = useDailyActions(reportDateProp ? { reportDate: reportDateProp } : {})
   const { data: smartSummary, isLoading: isSummaryLoading, isGenerating, error: summaryError, refetch: refetchSummary, regenerate: regenerateSummary, generate: generateSummary, hasSummary, canGenerate } = useSmartSummary(reportDateProp ? { reportDate: reportDateProp, autoGenerate: false } : {})
-  const { openChatWithContext } = useChatContext()
+  const { openChatWithContext, openChatWithQuestion } = useChatContext()
 
   // Story 19.2: Extract asset names and build lookup map for asset linkification
   const assetNames = useMemo(
@@ -392,6 +393,22 @@ export function MorningSummarySection({ className, reportDate: reportDateProp, o
                       Ask about this
                     </Button>
                   </div>
+                  {/* Story 19.3: Contextual follow-up suggestion chips */}
+                  <SuggestedQuestions
+                    actionItems={data?.actions ?? []}
+                    summaryText={cleanSummaryText(smartSummary?.summary_text ?? '')}
+                    reportDate={data?.report_date ?? ''}
+                    onQuestionSelect={(question) =>
+                      openChatWithQuestion(
+                        {
+                          summaryText: cleanSummaryText(smartSummary?.summary_text ?? ''),
+                          actionItems: (data?.actions ?? []) as unknown as Array<Record<string, unknown>>,
+                          reportDate: data?.report_date ?? '',
+                        },
+                        question
+                      )
+                    }
+                  />
                 </div>
               )}
 

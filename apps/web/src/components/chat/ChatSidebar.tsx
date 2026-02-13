@@ -121,8 +121,9 @@ export function ChatSidebar({
   requestTimeout = 30000,
 }: ChatSidebarProps) {
   // Story 19.1: Use context provider for isOpen and reportContext state
+  // Story 19.3: Also destructure pendingQuestion and clearPendingQuestion
   const chatContext = useChatContext()
-  const { isOpen, reportContext, open: handleOpen, close: handleClose, setIsOpen, clearReportContext } = chatContext
+  const { isOpen, reportContext, pendingQuestion, open: handleOpen, close: handleClose, setIsOpen, clearReportContext, clearPendingQuestion } = chatContext
 
   // Local state
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE])
@@ -414,6 +415,33 @@ export function ChatSidebar({
 
     setIsLoading(false)
   }, [isLoading, lastFailedMessage, sendMessage])
+
+  // Story 19.3 AC#2: Consume pendingQuestion and auto-send it
+  useEffect(() => {
+    if (!pendingQuestion || !isOpen) return
+
+    // Use a small delay to ensure the report context intro message has been set
+    const timer = setTimeout(() => {
+      // Add the question as a user message and send it
+      const userMessage: Message = {
+        id: `user-${Date.now()}`,
+        role: 'user',
+        content: pendingQuestion,
+        timestamp: new Date(),
+      }
+      setMessages((prev) => [...prev, userMessage])
+      setIsLoading(true)
+
+      sendMessage(pendingQuestion).then(() => {
+        setIsLoading(false)
+      })
+
+      // Clear the pending question after consumption
+      clearPendingQuestion()
+    }, 50)
+
+    return () => clearTimeout(timer)
+  }, [pendingQuestion, isOpen, sendMessage, clearPendingQuestion])
 
   return (
     <>
