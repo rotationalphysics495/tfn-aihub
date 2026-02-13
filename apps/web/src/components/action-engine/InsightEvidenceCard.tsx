@@ -61,6 +61,8 @@ export function InsightEvidenceCard({
     <>
       <Card
         mode="retrospective"
+        data-asset-name={item.asset.name}
+        id={`action-${item.id}`}
         className={cn(
           // Base card styling
           'overflow-hidden transition-all duration-200',

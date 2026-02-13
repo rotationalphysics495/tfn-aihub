@@ -1,5 +1,6 @@
 'use client'
 
+import { useMemo, useCallback, type ReactNode } from 'react'
 import { AlertTriangle, TrendingDown, Gauge, Calendar, Sparkles, RefreshCw, AlertCircle, Wand2, MessageSquare } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -13,6 +14,7 @@ import { DateNavigation } from '@/components/report'
 import { useChatContext } from '@/components/chat'
 import { SummarySkeleton } from './ActionListSkeleton'
 import { cn } from '@/lib/utils'
+import { linkifyAssetNames, extractAssetNames } from '@/lib/linkifyAssets'
 
 /**
  * Morning Summary Section Component
@@ -84,6 +86,93 @@ export function MorningSummarySection({ className, reportDate: reportDateProp, o
   const { data, isLoading, summary } = useDailyActions(reportDateProp ? { reportDate: reportDateProp } : {})
   const { data: smartSummary, isLoading: isSummaryLoading, isGenerating, error: summaryError, refetch: refetchSummary, regenerate: regenerateSummary, generate: generateSummary, hasSummary, canGenerate } = useSmartSummary(reportDateProp ? { reportDate: reportDateProp, autoGenerate: false } : {})
   const { openChatWithContext } = useChatContext()
+
+  // Story 19.2: Extract asset names and build lookup map for asset linkification
+  const assetNames = useMemo(
+    () => extractAssetNames((data?.actions ?? []).map((a) => ({ asset_name: a.asset_name }))),
+    [data?.actions]
+  )
+
+  const assetNameToId = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const action of data?.actions ?? []) {
+      const key = action.asset_name?.toLowerCase()
+      if (key && !map.has(key)) {
+        map.set(key, action.id)
+      }
+    }
+    return map
+  }, [data?.actions])
+
+  // Story 19.2: Scroll to and highlight a target action card
+  const scrollToAsset = useCallback((assetName: string) => {
+    const target = document.querySelector(`[data-asset-name="${CSS.escape(assetName)}"]`)
+    target?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    if (target) {
+      target.classList.add('highlight-flash')
+      setTimeout(() => {
+        target.classList.remove('highlight-flash')
+      }, 1500)
+    }
+  }, [])
+
+  // Story 19.2: Process React children to replace [[ASSET:name]] tokens with clickable buttons
+  const processTextChildren = useCallback(
+    (children: ReactNode): ReactNode => {
+      if (!children) return children
+      const childArray = Array.isArray(children) ? children : [children]
+      return childArray.map((child, i) => {
+        if (typeof child === 'string') {
+          const parts = child.split(/\[\[ASSET:(.*?)\]\]/g)
+          if (parts.length === 1) return child
+          return parts.map((part, j) => {
+            if (j % 2 === 1) {
+              // This is the captured asset name
+              const assetName = part
+              return (
+                <button
+                  key={`asset-${i}-${j}`}
+                  type="button"
+                  className="text-info-blue hover:underline cursor-pointer inline bg-transparent border-none p-0 text-left text-[length:inherit] [font-family:inherit]"
+                  onClick={(e) => {
+                    if (e.metaKey || e.ctrlKey) {
+                      const actionId = assetNameToId.get(assetName.toLowerCase())
+                      if (actionId) {
+                        window.open(`/morning-report/action/${actionId}`, '_blank')
+                      }
+                    } else {
+                      scrollToAsset(assetName)
+                    }
+                  }}
+                >
+                  {assetName}
+                </button>
+              )
+            }
+            return part || null
+          })
+        }
+        // For React elements, recursively process their children
+        if (child && typeof child === 'object' && 'props' in child) {
+          const { children: nestedChildren, ...restProps } = child.props
+          return { ...child, props: { ...restProps, children: processTextChildren(nestedChildren) }, key: child.key ?? `wrap-${i}` }
+        }
+        return child
+      })
+    },
+    [assetNameToId, scrollToAsset]
+  )
+
+  // Story 19.2: Custom ReactMarkdown component overrides for asset link rendering
+  const markdownComponents = useMemo(
+    () => ({
+      p: ({ children }: { children?: ReactNode }) => <p>{processTextChildren(children)}</p>,
+      li: ({ children }: { children?: ReactNode }) => <li>{processTextChildren(children)}</li>,
+      strong: ({ children }: { children?: ReactNode }) => <strong>{processTextChildren(children)}</strong>,
+      em: ({ children }: { children?: ReactNode }) => <em>{processTextChildren(children)}</em>,
+    }),
+    [processTextChildren]
+  )
 
   // Loading state
   if (isLoading && !data) {
@@ -280,8 +369,8 @@ export function MorningSummarySection({ className, reportDate: reportDateProp, o
               {!isSummaryLoading && !isGenerating && !summaryError && hasSummary && (
                 <div>
                   <div className="text-sm text-foreground space-y-2 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:space-y-0.5 [&_li]:text-sm [&_strong]:font-semibold [&_strong]:text-foreground [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:mt-3 [&_h2]:mb-1 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-1 [&_p]:my-0">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {cleanSummaryText(smartSummary?.summary_text ?? '')}
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                      {linkifyAssetNames(cleanSummaryText(smartSummary?.summary_text ?? ''), assetNames)}
                     </ReactMarkdown>
                   </div>
                   <div className="flex items-center justify-between mt-2">

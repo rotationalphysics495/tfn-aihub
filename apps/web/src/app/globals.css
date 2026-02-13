@@ -266,4 +266,9 @@
   .touch-target {
     @apply min-h-[44px] min-w-[44px];
   }
+
+  /* Story 19.2: Brief highlight flash when scrolling to an action card */
+  .highlight-flash {
+    @apply ring-2 ring-info-blue ring-offset-2 transition-shadow duration-300;
+  }
 }

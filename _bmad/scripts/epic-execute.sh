@@ -1420,7 +1420,7 @@ Do NOT use 'git add -A' or 'git add .' - only stage files you created or modifie
 
     # Execute in isolated context
     local result
-    result=$(claude --dangerously-skip-permissions -p "$dev_prompt" 2>&1) || true
+    result=$(env -u CLAUDECODE claude --dangerously-skip-permissions -p "$dev_prompt" 2>&1) || true
 
     echo "$result" >> "$LOG_FILE"
 
@@ -1560,7 +1560,7 @@ Stage any fixes with explicit file paths: git add <file1> <file2> ..."
 
     # Execute in isolated context
     local result
-    result=$(claude --dangerously-skip-permissions -p "$review_prompt" 2>&1) || true
+    result=$(env -u CLAUDECODE claude --dangerously-skip-permissions -p "$review_prompt" 2>&1) || true
 
     echo "$result" >> "$LOG_FILE"
 
@@ -1808,7 +1808,7 @@ Address all review findings now. This is attempt $attempt_num of 3."
             return 0
         fi
 
-        result=$(claude --dangerously-skip-permissions -f "$temp_prompt_file" 2>&1) || true
+        result=$(env -u CLAUDECODE claude --dangerously-skip-permissions -f "$temp_prompt_file" 2>&1) || true
         rm -f "$temp_prompt_file"
     else
         if [ "$DRY_RUN" = true ]; then
@@ -1817,7 +1817,7 @@ Address all review findings now. This is attempt $attempt_num of 3."
         fi
 
         # Execute in isolated context
-        result=$(claude --dangerously-skip-permissions -p "$fix_prompt" 2>&1) || true
+        result=$(env -u CLAUDECODE claude --dangerously-skip-permissions -p "$fix_prompt" 2>&1) || true
     fi
 
     echo "$result" >> "$LOG_FILE"
@@ -2274,7 +2274,7 @@ Stage any fixes with: git add <file1> <file2> ..."
     fi
 
     local result
-    result=$(claude --dangerously-skip-permissions -p "$arch_prompt" 2>&1) || true
+    result=$(env -u CLAUDECODE claude --dangerously-skip-permissions -p "$arch_prompt" 2>&1) || true
 
     echo "$result" >> "$LOG_FILE"
 
@@ -2351,7 +2351,7 @@ Stage any fixes with: git add <file1> <file2> ..."
     fi
 
     local result
-    result=$(claude --dangerously-skip-permissions -p "$quality_prompt" 2>&1) || true
+    result=$(env -u CLAUDECODE claude --dangerously-skip-permissions -p "$quality_prompt" 2>&1) || true
 
     echo "$result" >> "$LOG_FILE"
 
@@ -2486,7 +2486,7 @@ Analyze traceability now. Read story files on-demand as needed."
     fi
 
     local result
-    result=$(claude --dangerously-skip-permissions -p "$trace_prompt" 2>&1) || true
+    result=$(env -u CLAUDECODE claude --dangerously-skip-permissions -p "$trace_prompt" 2>&1) || true
 
     echo "$result" >> "$LOG_FILE"
 
@@ -2564,7 +2564,7 @@ Generate missing tests now."
     fi
 
     local result
-    result=$(claude --dangerously-skip-permissions -p "$fix_prompt" 2>&1) || true
+    result=$(env -u CLAUDECODE claude --dangerously-skip-permissions -p "$fix_prompt" 2>&1) || true
 
     echo "$result" >> "$LOG_FILE"
 
@@ -2918,7 +2918,7 @@ Generate the UAT document now. Read story files on-demand as needed."
     fi
 
     local result
-    result=$(claude --dangerously-skip-permissions -p "$uat_prompt" 2>&1) || true
+    result=$(env -u CLAUDECODE claude --dangerously-skip-permissions -p "$uat_prompt" 2>&1) || true
 
     echo "$result" >> "$LOG_FILE"
 
