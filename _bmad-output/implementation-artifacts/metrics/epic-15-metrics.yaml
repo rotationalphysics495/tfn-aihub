@@ -1,0 +1,35 @@
+epic_id: "15"
+execution:
+  start_time: "2026-02-12T03:04:12Z"
+  end_time: "2026-02-12T05:57:24Z"
+  duration_seconds: 10392
+stories:
+  total: 4
+  completed: 4
+  failed: 0
+  skipped: 0
+fix_loop:
+  total_fix_attempts: 2
+  stories_requiring_fixes: 0
+  max_retries_hit: 0
+validation:
+  gate_executed: true
+  gate_status: "FAIL"
+issues:
+  - story: 15-3-response-capture-via-token-link
+    type: static_analysis_failed
+    message: Static analysis gate failed with 2 issue(s)
+    timestamp: "2026-02-12T04:45:59Z"
+  - story: 15-4-message-thread-ui
+    type: static_analysis_failed
+    message: Static analysis gate failed with 1 issue(s)
+    timestamp: "2026-02-12T05:41:18Z"
+story_details:
+  - story: 15-3-response-capture-via-token-link
+    fix_attempt: 1
+    outcome: success
+    timestamp: "2026-02-12T04:47:13Z"
+  - story: 15-4-message-thread-ui
+    fix_attempt: 1
+    outcome: success
+    timestamp: "2026-02-12T05:42:56Z"
