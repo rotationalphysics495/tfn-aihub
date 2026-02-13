@@ -1,0 +1,43 @@
+epic_id: "13"
+execution:
+  start_time: "2026-02-11T20:06:06Z"
+  end_time: "2026-02-11T23:31:09Z"
+  duration_seconds: 12303
+stories:
+  total: 5
+  completed: 5
+  failed: 0
+  skipped: 0
+fix_loop:
+  total_fix_attempts: 3
+  stories_requiring_fixes: 0
+  max_retries_hit: 0
+validation:
+  gate_executed: true
+  gate_status: "FAIL"
+issues:
+  - story: 13-2-action-acknowledgment-ui
+    type: static_analysis_failed
+    message: Static analysis gate failed with 1 issue(s)
+    timestamp: "2026-02-11T21:20:39Z"
+  - story: 13-4-assignment-badge-on-action-cards
+    type: static_analysis_failed
+    message: Static analysis gate failed with 2 issue(s)
+    timestamp: "2026-02-11T22:27:32Z"
+  - story: 13-4-assignment-badge-on-action-cards
+    type: static_analysis_failed
+    message: Static analysis gate failed with 1 issue(s)
+    timestamp: "2026-02-11T22:32:13Z"
+story_details:
+  - story: 13-2-action-acknowledgment-ui
+    fix_attempt: 1
+    outcome: success
+    timestamp: "2026-02-11T21:21:38Z"
+  - story: 13-4-assignment-badge-on-action-cards
+    fix_attempt: 1
+    outcome: success
+    timestamp: "2026-02-11T22:29:59Z"
+  - story: 13-4-assignment-badge-on-action-cards
+    fix_attempt: 2
+    outcome: success
+    timestamp: "2026-02-11T22:34:12Z"
