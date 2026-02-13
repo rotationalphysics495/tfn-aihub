@@ -1,0 +1,27 @@
+epic_id: "19"
+execution:
+  start_time: "2026-02-12T17:25:09Z"
+  end_time: ""
+  duration_seconds: 0
+stories:
+  total: 0
+  completed: 0
+  failed: 0
+  skipped: 0
+fix_loop:
+  total_fix_attempts: 1
+  stories_requiring_fixes: 0
+  max_retries_hit: 0
+validation:
+  gate_executed: false
+  gate_status: "PENDING"
+issues:
+  - story: 19-1-ask-about-this-button-on-smart-summary
+    type: static_analysis_failed
+    message: Static analysis gate failed with 1 issue(s)
+    timestamp: "2026-02-12T18:13:49Z"
+story_details:
+  - story: 19-1-ask-about-this-button-on-smart-summary
+    fix_attempt: 1
+    outcome: success
+    timestamp: "2026-02-12T18:21:24Z"

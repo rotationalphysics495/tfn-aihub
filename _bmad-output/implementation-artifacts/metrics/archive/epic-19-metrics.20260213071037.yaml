@@ -1,0 +1,19 @@
+epic_id: "19"
+execution:
+  start_time: "2026-02-13T12:49:43Z"
+  end_time: "2026-02-13T12:55:51Z"
+  duration_seconds: 368
+stories:
+  total: 3
+  completed: 0
+  failed: 2
+  skipped: 1
+fix_loop:
+  total_fix_attempts: 0
+  stories_requiring_fixes: 0
+  max_retries_hit: 0
+validation:
+  gate_executed: false
+  gate_status: "PENDING"
+issues: []
+story_details: []
