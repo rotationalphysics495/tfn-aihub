@@ -340,11 +340,36 @@ class ChatMessage(BaseModel):
     )
 
 
+class ReportContext(BaseModel):
+    """
+    Morning report context for contextual follow-up questions.
+
+    Story 19.1: Passed from the frontend "Ask about this" button
+    to enable the agent to answer questions about a specific morning report.
+    """
+
+    summary_text: str = Field(
+        ...,
+        max_length=10000,
+        description="Cleaned AI summary text from the morning report"
+    )
+    action_items: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        max_length=50,
+        description="Action items from the daily report (max 50)"
+    )
+    report_date: str = Field(
+        ...,
+        description="Date of the report (e.g., '2026-02-10')"
+    )
+
+
 class AgentChatRequest(BaseModel):
     """
     Request body for POST /api/agent/chat endpoint.
 
     AC#7: Agent Chat Endpoint
+    Story 19.1: Extended with optional report_context
     """
 
     model_config = ConfigDict(
@@ -380,6 +405,10 @@ class AgentChatRequest(BaseModel):
     force_refresh: bool = Field(
         default=False,
         description="Bypass cache and fetch fresh data (Story 5.8 AC#5)"
+    )
+    report_context: Optional[ReportContext] = Field(
+        None,
+        description="Optional morning report context for follow-up questions (Story 19.1)"
     )
 
 

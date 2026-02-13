@@ -15,7 +15,7 @@
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { Bot, X, Loader2 } from 'lucide-react'
+import { Bot, X, Loader2, XCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -29,8 +29,9 @@ import {
 import { MessageList } from './MessageList'
 import { ChatInput } from './ChatInput'
 import { ChatTrigger } from './ChatTrigger'
+import { useChatContext } from './ChatContextProvider'
 import { WELCOME_MESSAGE } from './mockData'
-import type { Message, Citation } from './types'
+import type { Message, Citation, ReportContext } from './types'
 
 /**
  * API Response format from /api/chat/query endpoint
@@ -58,6 +59,28 @@ interface ChatApiResponse {
   }
 }
 
+/**
+ * API Response format from /api/agent/chat endpoint (Story 19.1)
+ */
+interface AgentApiResponse {
+  content: string
+  tool_used?: string | null
+  citations: Array<{
+    source: string
+    query: string
+    timestamp: string
+    table?: string
+    record_id?: string
+    asset_id?: string
+    confidence: number
+    display_text: string
+  }>
+  suggested_questions: string[]
+  execution_time_ms: number
+  meta: Record<string, unknown>
+  error?: string | null
+}
+
 interface ChatSidebarProps {
   /** Optional custom class name */
   className?: string
@@ -79,17 +102,35 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
  * - Handles errors with retry capability
  * - Preserves chat history in local state
  */
+/**
+ * Create the system intro message for report context.
+ * Story 19.1 AC#2: Inject a system message when report context is active.
+ */
+function createReportContextIntroMessage(reportDate: string): Message {
+  return {
+    id: 'report-context-intro',
+    role: 'assistant',
+    content: `I have the morning report context for ${reportDate}. Ask me anything about it.`,
+    timestamp: new Date(),
+  }
+}
+
 export function ChatSidebar({
   className,
   apiBaseUrl = API_BASE_URL,
   requestTimeout = 30000,
 }: ChatSidebarProps) {
-  // State management
-  const [isOpen, setIsOpen] = useState(false)
+  // Story 19.1: Use context provider for isOpen and reportContext state
+  const chatContext = useChatContext()
+  const { isOpen, reportContext, open: handleOpen, close: handleClose, setIsOpen, clearReportContext } = chatContext
+
+  // Local state
   const [messages, setMessages] = useState<Message[]>([WELCOME_MESSAGE])
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [lastFailedMessage, setLastFailedMessage] = useState<string | null>(null)
+  // Track the active report context to detect changes
+  const activeReportContextRef = useRef<ReportContext | null>(null)
 
   // Ref for focusing input when sidebar opens
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -107,6 +148,15 @@ export function ChatSidebar({
     }
   }, [isOpen])
 
+  // Story 19.1 AC#2: When report context changes, reset messages with intro
+  useEffect(() => {
+    if (reportContext && reportContext !== activeReportContextRef.current) {
+      activeReportContextRef.current = reportContext
+      setMessages([createReportContextIntroMessage(reportContext.reportDate)])
+      setLastFailedMessage(null)
+    }
+  }, [reportContext])
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -116,18 +166,16 @@ export function ChatSidebar({
     }
   }, [])
 
-  // Handle opening the sidebar
-  const handleOpen = useCallback(() => {
-    setIsOpen(true)
-  }, [])
-
-  // Handle closing the sidebar
-  const handleClose = useCallback(() => {
-    setIsOpen(false)
-  }, [])
+  // Handle clearing report context and resetting to default state
+  const handleClearContext = useCallback(() => {
+    clearReportContext()
+    activeReportContextRef.current = null
+    setMessages([WELCOME_MESSAGE])
+    setLastFailedMessage(null)
+  }, [clearReportContext])
 
   /**
-   * Transform API citations to frontend Citation format
+   * Transform API citations to frontend Citation format (chat/query endpoint)
    */
   const transformCitations = (apiCitations: ChatApiResponse['citations']): Citation[] => {
     return apiCitations.map((c, index) => ({
@@ -143,8 +191,26 @@ export function ChatSidebar({
   }
 
   /**
+   * Transform agent API citations to frontend Citation format (agent/chat endpoint)
+   * Story 19.1 AC#2: Handle agent response format
+   */
+  const transformAgentCitations = (agentCitations: AgentApiResponse['citations']): Citation[] => {
+    return agentCitations.map((c, index) => ({
+      source: c.source,
+      dataPoint: c.display_text,
+      timestamp: c.timestamp,
+      id: `cit-${index}`,
+      sourceType: 'database' as const,
+      recordId: c.record_id,
+      confidence: c.confidence,
+      displayText: c.display_text,
+    }))
+  }
+
+  /**
    * Send message to the chat API
    * Story 5.7 AC#1: Routes to agent endpoint
+   * Story 19.1: Routes to /api/agent/chat when report context is active
    */
   const sendMessage = useCallback(async (messageContent: string): Promise<void> => {
     // Cancel any existing request
@@ -158,6 +224,9 @@ export function ChatSidebar({
       abortControllerRef.current?.abort()
     }, requestTimeout)
 
+    // Determine if we should use the agent endpoint (when report context is active)
+    const currentReportContext = activeReportContextRef.current
+
     try {
       // Get Supabase session for authentication
       const supabase = createClient()
@@ -167,39 +236,82 @@ export function ChatSidebar({
         throw new Error('Authentication required. Please log in again.')
       }
 
-      const response = await fetch(`${apiBaseUrl}/api/chat/query`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          question: messageContent,
-        }),
-        signal: abortControllerRef.current.signal,
-      })
+      let assistantMessage: Message
 
-      clearTimeout(timeoutId)
+      if (currentReportContext) {
+        // Story 19.1: Route to agent endpoint with report_context
+        const response = await fetch(`${apiBaseUrl}/api/agent/chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            message: messageContent,
+            report_context: {
+              summary_text: currentReportContext.summaryText,
+              action_items: currentReportContext.actionItems,
+              report_date: currentReportContext.reportDate,
+            },
+          }),
+          signal: abortControllerRef.current.signal,
+        })
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }))
-        throw new Error(errorData.detail || `HTTP ${response.status}`)
-      }
+        clearTimeout(timeoutId)
 
-      const data: ChatApiResponse = await response.json()
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }))
+          throw new Error(errorData.detail || `HTTP ${response.status}`)
+        }
 
-      // Story 5.7 AC#2, AC#7: Create assistant message with citations and follow-ups
-      const assistantMessage: Message = {
-        id: `assistant-${Date.now()}`,
-        role: 'assistant',
-        content: data.answer,
-        timestamp: new Date(),
-        citations: transformCitations(data.citations),
-        groundingScore: data.meta?.grounding_score,
-        ungroundedClaims: data.meta?.ungrounded_claims,
-        followUpQuestions: data.meta?.follow_up_questions || data.suggestions,
-        toolUsed: data.meta?.agent_tool,
-        isError: data.error,
+        const data: AgentApiResponse = await response.json()
+
+        assistantMessage = {
+          id: `assistant-${Date.now()}`,
+          role: 'assistant',
+          content: data.content,
+          timestamp: new Date(),
+          citations: transformAgentCitations(data.citations),
+          followUpQuestions: data.suggested_questions,
+          toolUsed: data.tool_used ?? undefined,
+          isError: !!data.error,
+        }
+      } else {
+        // Default: Route to chat/query endpoint
+        const response = await fetch(`${apiBaseUrl}/api/chat/query`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            question: messageContent,
+          }),
+          signal: abortControllerRef.current.signal,
+        })
+
+        clearTimeout(timeoutId)
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }))
+          throw new Error(errorData.detail || `HTTP ${response.status}`)
+        }
+
+        const data: ChatApiResponse = await response.json()
+
+        // Story 5.7 AC#2, AC#7: Create assistant message with citations and follow-ups
+        assistantMessage = {
+          id: `assistant-${Date.now()}`,
+          role: 'assistant',
+          content: data.answer,
+          timestamp: new Date(),
+          citations: transformCitations(data.citations),
+          groundingScore: data.meta?.grounding_score,
+          ungroundedClaims: data.meta?.ungrounded_claims,
+          followUpQuestions: data.meta?.follow_up_questions || data.suggestions,
+          toolUsed: data.meta?.agent_tool,
+          isError: data.error,
+        }
       }
 
       setMessages((prev) => [...prev, assistantMessage])
@@ -349,19 +461,33 @@ export function ChatSidebar({
                     id="chat-sidebar-description"
                     className="text-left text-xs"
                   >
-                    {isLoading ? 'Thinking...' : 'Ask about production data'}
+                    {isLoading ? 'Thinking...' : reportContext ? `Report context: ${reportContext.reportDate}` : 'Ask about production data'}
                   </SheetDescription>
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={handleClose}
-                className="h-8 w-8"
-                aria-label="Close chat"
-              >
-                <X className="h-4 w-4" />
-              </Button>
+              <div className="flex items-center gap-1">
+                {reportContext && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleClearContext}
+                    className="h-8 gap-1 text-xs text-muted-foreground hover:text-foreground"
+                    aria-label="Clear report context"
+                  >
+                    <XCircle className="h-3.5 w-3.5" />
+                    Clear context
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleClose}
+                  className="h-8 w-8"
+                  aria-label="Close chat"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </SheetHeader>
 

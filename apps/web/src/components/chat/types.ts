@@ -74,6 +74,21 @@ export interface Message {
 }
 
 /**
+ * Report context passed from MorningSummarySection to ChatSidebar.
+ * Contains the morning report data for contextual follow-up questions.
+ *
+ * @see Story 19.1 - Ask About This Button on Smart Summary
+ */
+export interface ReportContext {
+  /** Cleaned AI summary text */
+  summaryText: string
+  /** Action items from the daily report */
+  actionItems: Array<Record<string, unknown>>
+  /** Date of the report (e.g., "2026-02-10") */
+  reportDate: string
+}
+
+/**
  * Chat sidebar open/close state for context management.
  */
 export interface ChatState {

@@ -10,6 +10,7 @@
 
 export { ChatSidebar } from './ChatSidebar'
 export { ChatTrigger } from './ChatTrigger'
+export { ChatContextProvider, useChatContext } from './ChatContextProvider'
 export { ChatMessage } from './ChatMessage'
 export { MessageList } from './MessageList'
 export { ChatInput } from './ChatInput'
@@ -22,7 +23,7 @@ export type { CitationData, SourceType } from './CitationLink'
 export { CitationPanel } from './CitationPanel'
 
 // Types
-export type { Message, Citation, ChatState } from './types'
+export type { Message, Citation, ChatState, ReportContext } from './types'
 
 // Mock data (for development)
 export { MOCK_MESSAGES, WELCOME_MESSAGE } from './mockData'

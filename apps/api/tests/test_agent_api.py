@@ -1,5 +1,5 @@
 """
-Tests for Agent API Endpoints (Story 5.1)
+Tests for Agent API Endpoints (Story 5.1, Story 19.1)
 
 AC#7: Agent Chat Endpoint
 - POST request to /api/agent/chat
@@ -9,6 +9,8 @@ AC#7: Agent Chat Endpoint
 AC#8: Error Handling and Logging
 - Errors are logged with full context
 - User receives helpful error messages
+
+Story 19.1: report_context field support
 """
 
 import pytest
@@ -434,3 +436,118 @@ class TestResponseFormat:
             assert "timestamp" in citation
             assert "confidence" in citation
             assert "display_text" in citation
+
+
+class TestReportContext:
+    """Tests for Story 19.1: report_context field support."""
+
+    def test_chat_accepts_report_context(self, client, mock_verify_jwt):
+        """Story 19.1 AC#3: /api/agent/chat accepts report_context field."""
+        with patch('app.api.agent.get_manufacturing_agent') as mock_agent:
+            agent_instance = MagicMock()
+            agent_instance.is_configured = True
+            agent_instance.is_initialized = True
+            agent_instance.process_message = AsyncMock(return_value=MagicMock(
+                content="Based on the morning report, Grinder 5 had low OEE.",
+                tool_used=None,
+                citations=[],
+                suggested_questions=["What was the root cause?"],
+                execution_time_ms=500,
+                meta={},
+                error=None,
+            ))
+            mock_agent.return_value = agent_instance
+
+            from app.api.agent import _rate_limit_store
+            _rate_limit_store.clear()
+
+            response = client.post(
+                "/api/agent/chat",
+                json={
+                    "message": "What happened with Grinder 5?",
+                    "report_context": {
+                        "summary_text": "Production was at 85% OEE. Grinder 5 had downtime.",
+                        "action_items": [
+                            {"asset_name": "Grinder 5", "category": "oee", "primary_metric_value": "72%"}
+                        ],
+                        "report_date": "2026-02-10",
+                    },
+                },
+                headers={"Authorization": "Bearer test-token"},
+            )
+
+            assert response.status_code == 200
+            data = response.json()
+            assert "content" in data
+
+    def test_chat_passes_report_context_to_agent(self, client, mock_verify_jwt):
+        """Story 19.1 AC#3: report_context is passed to agent.process_message()."""
+        with patch('app.api.agent.get_manufacturing_agent') as mock_agent:
+            agent_instance = MagicMock()
+            agent_instance.is_configured = True
+            agent_instance.is_initialized = True
+            agent_instance.process_message = AsyncMock(return_value=MagicMock(
+                content="Response",
+                tool_used=None,
+                citations=[],
+                suggested_questions=[],
+                execution_time_ms=100,
+                meta={},
+                error=None,
+            ))
+            mock_agent.return_value = agent_instance
+
+            from app.api.agent import _rate_limit_store
+            _rate_limit_store.clear()
+
+            client.post(
+                "/api/agent/chat",
+                json={
+                    "message": "Tell me about the summary",
+                    "report_context": {
+                        "summary_text": "All good today.",
+                        "action_items": [],
+                        "report_date": "2026-02-10",
+                    },
+                },
+                headers={"Authorization": "Bearer test-token"},
+            )
+
+            # Verify report_context was passed to process_message
+            agent_instance.process_message.assert_called_once()
+            call_kwargs = agent_instance.process_message.call_args[1]
+            assert call_kwargs["report_context"] is not None
+            assert call_kwargs["report_context"].summary_text == "All good today."
+            assert call_kwargs["report_context"].report_date == "2026-02-10"
+
+    def test_chat_without_report_context(self, client, mock_verify_jwt):
+        """Story 19.1 AC#5: Normal behavior when no report_context."""
+        with patch('app.api.agent.get_manufacturing_agent') as mock_agent:
+            agent_instance = MagicMock()
+            agent_instance.is_configured = True
+            agent_instance.is_initialized = True
+            agent_instance.process_message = AsyncMock(return_value=MagicMock(
+                content="Normal response",
+                tool_used=None,
+                citations=[],
+                suggested_questions=[],
+                execution_time_ms=100,
+                meta={},
+                error=None,
+            ))
+            mock_agent.return_value = agent_instance
+
+            from app.api.agent import _rate_limit_store
+            _rate_limit_store.clear()
+
+            response = client.post(
+                "/api/agent/chat",
+                json={"message": "What is the plant OEE?"},
+                headers={"Authorization": "Bearer test-token"},
+            )
+
+            assert response.status_code == 200
+
+            # Verify report_context is None
+            call_kwargs = agent_instance.process_message.call_args[1]
+            assert call_kwargs["report_context"] is None

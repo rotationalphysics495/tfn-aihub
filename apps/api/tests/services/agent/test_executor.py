@@ -382,3 +382,109 @@ class TestAgentError:
 
         assert error.message == "Simple error"
         assert error.details == {}
+
+
+class TestReportContextInjection:
+    """Tests for Story 19.1: Report context injection into agent input."""
+
+    def setup_method(self):
+        """Reset agent and registry before each test."""
+        reset_agent()
+        registry = get_tool_registry()
+        registry.clear()
+
+    def test_build_report_context_prefix(self):
+        """Story 19.1 AC#4: Context block is built correctly."""
+        agent = ManufacturingAgent()
+
+        # Create a mock report context (duck-typed)
+        class MockReportContext:
+            summary_text = "Production was at 85% OEE."
+            action_items = [
+                {"asset_name": "Grinder 5", "category": "oee", "primary_metric_value": "72%", "recommendation_text": "Investigate downtime"},
+            ]
+            report_date = "2026-02-10"
+
+        prefix = agent._build_report_context_prefix(MockReportContext())
+
+        assert "MORNING REPORT CONTEXT" in prefix
+        assert "2026-02-10" in prefix
+        assert "Production was at 85% OEE." in prefix
+        assert "Grinder 5" in prefix
+        assert "72%" in prefix
+        assert "Investigate downtime" in prefix
+        assert "If the user's question is unrelated to the morning report" in prefix
+
+    def test_build_report_context_prefix_caps_items(self):
+        """Story 19.1: Action items are capped at 20."""
+        agent = ManufacturingAgent()
+
+        class MockReportContext:
+            summary_text = "Summary"
+            action_items = [{"asset_name": f"Asset {i}", "category": "oee"} for i in range(30)]
+            report_date = "2026-02-10"
+
+        prefix = agent._build_report_context_prefix(MockReportContext())
+
+        # Should only contain up to Asset 19 (0-indexed, 20 items)
+        assert "Asset 19" in prefix
+        assert "Asset 20" not in prefix
+
+    @pytest.mark.asyncio
+    async def test_process_message_with_report_context(self):
+        """Story 19.1 AC#4: report_context is prepended to the agent input."""
+        with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}, clear=True):
+            agent = ManufacturingAgent(config=AgentConfig())
+
+            mock_result = {
+                "output": "Based on the report, OEE was 85%.",
+                "intermediate_steps": [],
+            }
+
+            class MockReportContext:
+                summary_text = "Production was at 85% OEE."
+                action_items = [{"asset_name": "Grinder 5", "category": "oee"}]
+                report_date = "2026-02-10"
+
+            with patch.object(agent, "_executor") as mock_executor:
+                mock_executor.ainvoke = AsyncMock(return_value=mock_result)
+                agent._initialized = True
+
+                await agent.process_message(
+                    message="What was the OEE?",
+                    user_id="test-user",
+                    report_context=MockReportContext(),
+                )
+
+                # Verify the input contains the context prefix
+                call_args = mock_executor.ainvoke.call_args[0][0]
+                input_text = call_args["input"]
+                assert "MORNING REPORT CONTEXT" in input_text
+                assert "2026-02-10" in input_text
+                assert "What was the OEE?" in input_text
+
+    @pytest.mark.asyncio
+    async def test_process_message_without_report_context(self):
+        """Story 19.1 AC#5: Without report_context, input is unchanged."""
+        with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}, clear=True):
+            agent = ManufacturingAgent(config=AgentConfig())
+
+            mock_result = {
+                "output": "Normal response",
+                "intermediate_steps": [],
+            }
+
+            with patch.object(agent, "_executor") as mock_executor:
+                mock_executor.ainvoke = AsyncMock(return_value=mock_result)
+                agent._initialized = True
+
+                await agent.process_message(
+                    message="What is the plant OEE?",
+                    user_id="test-user",
+                )
+
+                # Verify the input is just the message
+                call_args = mock_executor.ainvoke.call_args[0][0]
+                input_text = call_args["input"]
+                assert input_text == "What is the plant OEE?"
+                assert "MORNING REPORT CONTEXT" not in input_text

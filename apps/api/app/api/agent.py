@@ -29,6 +29,7 @@ from app.models.agent import (
     AgentResponse,
     AgentCitation,
     AgentServiceStatus,
+    ReportContext,
 )
 from app.services.agent.executor import (
     ManufacturingAgent,
@@ -171,11 +172,13 @@ async def chat(
 
         # Process message through agent
         # AC#5 (Story 5.8): Pass force_refresh to bypass cache
+        # Story 19.1: Pass report_context for morning report follow-up questions
         result = await agent.process_message(
             message=request.message,
             user_id=current_user.id,
             chat_history=chat_history,
             force_refresh=request.force_refresh,
+            report_context=request.report_context,
         )
 
         # Convert internal response to API response format

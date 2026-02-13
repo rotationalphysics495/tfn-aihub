@@ -32,6 +32,7 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
+from app.models.agent import ReportContext
 from app.services.agent.base import Citation, ToolResult
 from app.services.agent.registry import get_tool_registry
 
@@ -257,12 +258,49 @@ class ManufacturingAgent:
 
         return "\n".join(descriptions)
 
+    def _build_report_context_prefix(self, report_context: ReportContext) -> str:
+        """
+        Build a context prefix string from report_context to prepend to user input.
+
+        Story 19.1 AC#4, AC#5: Inject morning report context as additive context.
+        The context is prepended to the input message so the LLM has the summary
+        and action items available. The agent retains full tool access.
+        """
+        lines = [
+            "---",
+            f"MORNING REPORT CONTEXT (for {report_context.report_date}):",
+            "",
+            "SUMMARY:",
+            report_context.summary_text,
+            "",
+            "ACTION ITEMS:",
+        ]
+
+        for item in report_context.action_items[:20]:  # Cap at 20 items
+            asset = item.get("asset_name", "Unknown")
+            category = item.get("category", "")
+            metric = item.get("primary_metric_value", "")
+            recommendation = item.get("recommendation_text", "")
+            lines.append(f"- {asset} ({category}): {metric}. {recommendation}")
+
+        lines.extend([
+            "",
+            "Use the above morning report context when answering follow-up questions. "
+            "Reference specific data points, asset names, and metrics from this context. "
+            "If the user's question is unrelated to the morning report, use your standard tools to answer.",
+            "---",
+            "",
+        ])
+
+        return "\n".join(lines)
+
     async def process_message(
         self,
         message: str,
         user_id: str,
         chat_history: Optional[List[Dict[str, str]]] = None,
         force_refresh: bool = False,
+        report_context: Optional[ReportContext] = None,
     ) -> AgentResponse:
         """
         Process a user message and return an agent response.
@@ -270,12 +308,14 @@ class ManufacturingAgent:
         AC#4: Agent processes the message and selects appropriate tool.
         AC#5: Response includes tool output with citations.
         AC#6: Handles unknown intents gracefully.
+        Story 19.1: When report_context is provided, prepends morning report data to input.
 
         Args:
             message: User's natural language message
             user_id: User identifier for logging
             chat_history: Optional conversation history
             force_refresh: Bypass cache and fetch fresh data (Story 5.8 AC#5)
+            report_context: Optional morning report context (Story 19.1)
 
         Returns:
             AgentResponse with content, citations, and metadata
@@ -298,13 +338,19 @@ class ManufacturingAgent:
                     start_time
                 )
 
+        # Story 19.1 AC#4: Prepend report context to input when available
+        agent_input = message
+        if report_context is not None:
+            context_prefix = self._build_report_context_prefix(report_context)
+            agent_input = context_prefix + message
+
         try:
             # Convert chat history to LangChain format
             lc_chat_history = self._convert_chat_history(chat_history)
 
             # Invoke the agent
             result = await self._executor.ainvoke({
-                "input": message,
+                "input": agent_input,
                 "chat_history": lc_chat_history,
             })
 

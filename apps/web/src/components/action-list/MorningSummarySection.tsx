@@ -1,6 +1,6 @@
 'use client'
 
-import { AlertTriangle, TrendingDown, Gauge, Calendar, Sparkles, RefreshCw, AlertCircle, Wand2 } from 'lucide-react'
+import { AlertTriangle, TrendingDown, Gauge, Calendar, Sparkles, RefreshCw, AlertCircle, Wand2, MessageSquare } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { format, subDays, startOfDay } from 'date-fns'
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { useDailyActions } from '@/hooks/useDailyActions'
 import { useSmartSummary } from '@/hooks/useSmartSummary'
 import { DateNavigation } from '@/components/report'
+import { useChatContext } from '@/components/chat'
 import { SummarySkeleton } from './ActionListSkeleton'
 import { cn } from '@/lib/utils'
 
@@ -82,6 +83,7 @@ function getPerformanceLabel(selectedDate?: Date): string {
 export function MorningSummarySection({ className, reportDate: reportDateProp, onDateChange, selectedDate }: MorningSummarySectionProps) {
   const { data, isLoading, summary } = useDailyActions(reportDateProp ? { reportDate: reportDateProp } : {})
   const { data: smartSummary, isLoading: isSummaryLoading, isGenerating, error: summaryError, refetch: refetchSummary, regenerate: regenerateSummary, generate: generateSummary, hasSummary, canGenerate } = useSmartSummary(reportDateProp ? { reportDate: reportDateProp, autoGenerate: false } : {})
+  const { openChatWithContext } = useChatContext()
 
   // Loading state
   if (isLoading && !data) {
@@ -279,12 +281,28 @@ export function MorningSummarySection({ className, reportDate: reportDateProp, o
                 <div>
                   <div className="text-sm text-foreground space-y-2 [&_ul]:list-disc [&_ul]:pl-4 [&_ul]:space-y-0.5 [&_li]:text-sm [&_strong]:font-semibold [&_strong]:text-foreground [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:mt-3 [&_h2]:mb-1 [&_h3]:text-sm [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-1 [&_p]:my-0">
                     <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {cleanSummaryText(smartSummary!.summary_text)}
+                      {cleanSummaryText(smartSummary?.summary_text ?? '')}
                     </ReactMarkdown>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Powered by AI analysis
-                  </p>
+                  <div className="flex items-center justify-between mt-2">
+                    <p className="text-xs text-muted-foreground">
+                      Powered by AI analysis
+                    </p>
+                    {/* Story 19.1 AC#1: "Ask about this" button */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-1.5 text-xs h-7 border-info-blue/30 text-info-blue hover:bg-info-blue/10 hover:text-info-blue"
+                      onClick={() => openChatWithContext({
+                        summaryText: cleanSummaryText(smartSummary?.summary_text ?? ''),
+                        actionItems: (data?.actions ?? []) as unknown as Array<Record<string, unknown>>,
+                        reportDate: data?.report_date ?? '',
+                      })}
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      Ask about this
+                    </Button>
+                  </div>
                 </div>
               )}
 

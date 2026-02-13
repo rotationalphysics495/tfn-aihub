@@ -52,6 +52,20 @@ vi.mock('@/components/report', () => ({
   DateNavigation: () => <div data-testid="date-navigation">DateNavigation</div>,
 }))
 
+// Mock useChatContext (Story 19.1)
+const mockOpenChatWithContext = vi.fn()
+vi.mock('@/components/chat', () => ({
+  useChatContext: () => ({
+    openChatWithContext: mockOpenChatWithContext,
+    isOpen: false,
+    reportContext: null,
+    open: vi.fn(),
+    close: vi.fn(),
+    setIsOpen: vi.fn(),
+    clearReportContext: vi.fn(),
+  }),
+}))
+
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
@@ -323,6 +337,137 @@ describe('Feature: MorningSummarySection On-Demand Generation (Story 17.2)', () 
       fireEvent.click(retryButton)
 
       expect(mockRefetch).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  // =========================================================================
+  // Story 19.1: "Ask about this" button
+  // =========================================================================
+  describe('Story 19.1: "Ask about this" button', () => {
+    it('Renders "Ask about this" button when hasSummary=true', () => {
+      mockUseDailyActions.mockReturnValue(
+        createMockDailyActionsReturn({
+          data: {
+            report_date: '2026-02-10',
+            actions: [{ asset_name: 'Grinder 5', category: 'oee' }],
+          },
+        })
+      )
+      mockUseSmartSummary.mockReturnValue(
+        createMockSmartSummaryReturn({
+          data: {
+            id: 'summary-001',
+            date: '2026-02-10',
+            summary_text: 'Production ran at 95% OEE.',
+            citations: [],
+            model_used: 'gpt-4o',
+            prompt_tokens: 100,
+            completion_tokens: 50,
+            generation_duration_ms: 2000,
+            is_fallback: false,
+            created_at: '2026-02-10T08:00:00Z',
+          },
+          hasSummary: true,
+          canGenerate: false,
+        })
+      )
+
+      render(<MorningSummarySection reportDate="2026-02-10" />)
+
+      expect(screen.getByRole('button', { name: /ask about this/i })).toBeInTheDocument()
+    })
+
+    it('Does NOT render "Ask about this" button when hasSummary=false', () => {
+      mockUseSmartSummary.mockReturnValue(
+        createMockSmartSummaryReturn({
+          hasSummary: false,
+          canGenerate: true,
+        })
+      )
+
+      render(<MorningSummarySection reportDate="2026-02-10" />)
+
+      expect(screen.queryByRole('button', { name: /ask about this/i })).not.toBeInTheDocument()
+    })
+
+    it('Does NOT render "Ask about this" button when loading', () => {
+      mockUseSmartSummary.mockReturnValue(
+        createMockSmartSummaryReturn({
+          isLoading: true,
+          hasSummary: false,
+        })
+      )
+
+      render(<MorningSummarySection reportDate="2026-02-10" />)
+
+      expect(screen.queryByRole('button', { name: /ask about this/i })).not.toBeInTheDocument()
+    })
+
+    it('Does NOT render "Ask about this" button when generating', () => {
+      mockUseSmartSummary.mockReturnValue(
+        createMockSmartSummaryReturn({
+          isGenerating: true,
+          hasSummary: false,
+        })
+      )
+
+      render(<MorningSummarySection reportDate="2026-02-10" />)
+
+      expect(screen.queryByRole('button', { name: /ask about this/i })).not.toBeInTheDocument()
+    })
+
+    it('Does NOT render "Ask about this" button when error', () => {
+      mockUseSmartSummary.mockReturnValue(
+        createMockSmartSummaryReturn({
+          error: 'Some error',
+          hasSummary: false,
+        })
+      )
+
+      render(<MorningSummarySection reportDate="2026-02-10" />)
+
+      expect(screen.queryByRole('button', { name: /ask about this/i })).not.toBeInTheDocument()
+    })
+
+    it('Clicking "Ask about this" calls openChatWithContext with correct data', () => {
+      mockUseDailyActions.mockReturnValue(
+        createMockDailyActionsReturn({
+          data: {
+            report_date: '2026-02-10',
+            actions: [{ asset_name: 'Grinder 5', category: 'oee' }],
+          },
+        })
+      )
+      mockUseSmartSummary.mockReturnValue(
+        createMockSmartSummaryReturn({
+          data: {
+            id: 'summary-001',
+            date: '2026-02-10',
+            summary_text: 'Production ran at 95% OEE. [Source: daily_summaries, 2026-02-10]',
+            citations: [],
+            model_used: 'gpt-4o',
+            prompt_tokens: 100,
+            completion_tokens: 50,
+            generation_duration_ms: 2000,
+            is_fallback: false,
+            created_at: '2026-02-10T08:00:00Z',
+          },
+          hasSummary: true,
+          canGenerate: false,
+        })
+      )
+
+      render(<MorningSummarySection reportDate="2026-02-10" />)
+
+      const button = screen.getByRole('button', { name: /ask about this/i })
+      fireEvent.click(button)
+
+      expect(mockOpenChatWithContext).toHaveBeenCalledTimes(1)
+      expect(mockOpenChatWithContext).toHaveBeenCalledWith({
+        summaryText: 'Production ran at 95% OEE.',  // Citation tags cleaned
+        actionItems: [{ asset_name: 'Grinder 5', category: 'oee' }],
+        reportDate: '2026-02-10',
+      })
     })
   })
 })

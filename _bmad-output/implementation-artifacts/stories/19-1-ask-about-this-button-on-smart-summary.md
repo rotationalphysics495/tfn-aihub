@@ -1,6 +1,6 @@
 # Story 19.1: "Ask About This" Button on Smart Summary
 
-Status: ready-for-dev
+Status: Done
 
 <!-- Note: Validation is optional. Run validate-create-story for quality check before dev-story. -->
 
@@ -181,10 +181,148 @@ This approach keeps the context additive and non-restrictive per AC #5.
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 4.6
+
+### Implementation Summary
+
+Implemented the "Ask about this" button on the MorningSummarySection that opens the ChatSidebar pre-loaded with morning report context. Created a ChatContextProvider for cross-component communication, modified the ChatSidebar to support dual API routing (chat/query for normal queries, agent/chat when report context is active), and extended the backend agent to accept and inject report context into the LLM input.
+
+### Files Created
+- `apps/web/src/components/chat/ChatContextProvider.tsx` - React Context provider for chat state and report context
+- `apps/web/src/components/chat/__tests__/ChatContextProvider.test.tsx` - Tests for the context provider (6 tests)
+
+### Files Modified
+- `apps/web/src/components/chat/types.ts` - Added ReportContext interface
+- `apps/web/src/components/chat/index.ts` - Exported ChatContextProvider, useChatContext, ReportContext
+- `apps/web/src/app/layout.tsx` - Wrapped app with ChatContextProvider
+- `apps/web/src/components/chat/ChatSidebar.tsx` - Lifted isOpen to context, dual API routing, agent response mapping, report context intro message, clear context button
+- `apps/web/src/components/action-list/MorningSummarySection.tsx` - Added "Ask about this" button with MessageSquare icon
+- `apps/api/app/models/agent.py` - Added ReportContext Pydantic model and report_context field to AgentChatRequest
+- `apps/api/app/api/agent.py` - Pass report_context to agent.process_message()
+- `apps/api/app/services/agent/executor.py` - Accept report_context, prepend morning report context block to input
+
+### Key Decisions
+- Used React Context (ChatContextProvider) rather than lifting state props through the component tree, following the existing ThemeProvider pattern in the codebase
+- Report context is prepended to the agent input message (not injected into the system prompt) to keep it additive and not require dynamic system prompt modification
+- Dual API routing: when reportContext is active, ChatSidebar calls /api/agent/chat (full agent with tools), otherwise /api/chat/query (text-to-SQL). This follows the design plan's recommendation
+- Action items capped at 20 in the context block to prevent excessive prompt size
+- Added "Clear context" button in the chat header so users can start a fresh conversation
+
+### Tests Added
+- `apps/web/src/components/chat/__tests__/ChatContextProvider.test.tsx` - 6 tests: default state, open/close, openChatWithContext, clearReportContext, error outside provider
+- `apps/web/src/components/action-list/__tests__/MorningSummarySection.test.tsx` - 6 new tests: button renders when hasSummary, hidden when loading/generating/error/no summary, click calls openChatWithContext with correct data
+- `apps/api/tests/test_agent_api.py` - 3 new tests: API accepts report_context, passes it to agent, normal behavior without report_context
+- `apps/api/tests/services/agent/test_executor.py` - 4 new tests: context prefix building, item capping, process_message with report_context, process_message without report_context
+
+### Notes for Reviewer
+- The ChatContextProvider now provides safe no-op defaults when used outside the provider, so existing tests don't need wrapping. This was fixed in the review fix pass to resolve 22 test failures caused by the original throw-on-missing-provider approach.
+- The existing 308 TypeScript errors in the codebase are pre-existing and not introduced by this change. Our files have zero new TS errors.
+- The `isOpen` state was successfully lifted from ChatSidebar local state to ChatContextProvider without breaking the ChatTrigger toggle behavior.
+- MorningSummarySection uses defensive `smartSummary?.summary_text ?? ''` instead of non-null assertion to prevent runtime errors when summary_text is undefined.
+
+### Test Results
+- Frontend: 22 tests passed (6 ChatContextProvider + 16 MorningSummarySection)
+- Backend: 45 tests passed (including 7 new Story 19.1 tests)
+- TypeScript: No new errors introduced
+
+### Acceptance Criteria Status
+- [x] AC1: "Ask about this" button visible on summary section - implemented in MorningSummarySection.tsx (Button with MessageSquare icon, Industrial Clarity styling)
+- [x] AC2: Chat sidebar opens with report context - implemented in ChatContextProvider.tsx + ChatSidebar.tsx (openChatWithContext, system intro message, dual API routing)
+- [x] AC3: Backend accepts optional report_context - implemented in models/agent.py (ReportContext model) + api/agent.py (pass-through)
+- [x] AC4: Agent responds using report context - implemented in executor.py (context prefix prepended to input with summary, action items, date)
+- [x] AC5: Unrelated queries unaffected - implemented in executor.py (context is additive, agent retains tools, explicit instruction to use standard tools for unrelated questions)
+- [x] AC6: Button state handling - button only renders inside hasSummary && !isSummaryLoading && !isGenerating && !summaryError block
+
+### Review Fix Notes (Attempt 1)
+- **Fixed 22 new test failures** all caused by `useChatContext must be used within a ChatContextProvider`
+- **Root cause**: `useChatContext()` threw an error when used outside `ChatContextProvider`, breaking all existing tests that render `MorningSummarySection` or components containing it (MorningReportClient, page tests, action-list tests)
+- **Fix 1**: Changed `ChatContext` default from `null` to a safe no-op default object, and removed the throw in `useChatContext()`. Components rendered without the provider now get harmless no-op functions.
+- **Fix 2**: Updated `ChatContextProvider.test.tsx` to verify the no-op default behavior instead of expecting a throw.
+- **Fix 3**: Fixed `cleanSummaryText(smartSummary!.summary_text)` crash by using `smartSummary?.summary_text ?? ''` to prevent TypeError when summary_text is undefined.
+- **Files changed**: `ChatContextProvider.tsx`, `ChatContextProvider.test.tsx`, `MorningSummarySection.tsx`
 
 ### Debug Log References
 
 ### Completion Notes List
 
 ### File List
+- apps/web/src/components/chat/ChatContextProvider.tsx
+- apps/web/src/components/chat/__tests__/ChatContextProvider.test.tsx
+- apps/web/src/components/chat/types.ts
+- apps/web/src/components/chat/index.ts
+- apps/web/src/components/chat/ChatSidebar.tsx
+- apps/web/src/app/layout.tsx
+- apps/web/src/components/action-list/MorningSummarySection.tsx
+- apps/web/src/components/action-list/__tests__/MorningSummarySection.test.tsx
+- apps/api/app/models/agent.py
+- apps/api/app/api/agent.py
+- apps/api/app/services/agent/executor.py
+- apps/api/tests/test_agent_api.py
+- apps/api/tests/services/agent/test_executor.py
+
+## Code Review Record
+
+**Reviewer**: Code Review Agent
+**Date**: 2026-02-12
+**Diff Size**: 948 lines added, 70 lines removed (14 files)
+
+### Checklist Results
+- Acceptance Criteria: PASS
+- Code Quality: PASS (after fixes)
+- Test Coverage: PASS
+- Security: PASS (after fixes)
+
+### Issues Found
+
+| # | Description | Severity | Status |
+|---|-------------|----------|--------|
+| 1 | `_build_report_context_prefix` and `process_message` use `report_context: Any` instead of `ReportContext` type | MEDIUM | Fixed |
+| 2 | `ReportContext.summary_text` has no `max_length` constraint, allowing arbitrarily large payloads | MEDIUM | Fixed |
+| 3 | `ReportContext.action_items` list has no `max_length`, allowing unbounded list sizes in request | MEDIUM | Fixed |
+| 4 | `ReportContext.report_date` is unvalidated string (no date format check) — consistent with codebase | LOW | Documented |
+| 5 | Unused `ReportContext` import in `apps/api/app/api/agent.py` (already deserialized by Pydantic) | LOW | Documented |
+| 6 | Adjacent JSDoc comments before `ChatSidebar` function reduce readability slightly | LOW | Documented |
+| 7 | `sendMessage` uses `activeReportContextRef.current` which could theoretically be stale in same-render-cycle | LOW | Documented |
+| 8 | `as unknown as Array<Record<string, unknown>>` type assertion bypasses TypeScript safety | LOW | Documented |
+
+**Totals**: 0 HIGH, 3 MEDIUM (all fixed), 5 LOW (documented only)
+
+### Fixes Applied
+
+| Issue # | Fix Description | Verified |
+|---------|-----------------|----------|
+| 1 | Imported `ReportContext` from `app.models.agent` in executor.py; changed `Any` type to `ReportContext` and `Optional[ReportContext]` | 45 tests pass |
+| 2 | Added `max_length=10000` to `ReportContext.summary_text` field | 45 tests pass |
+| 3 | Added `max_length=50` to `ReportContext.action_items` field | 45 tests pass |
+
+### Remaining Issues (Low Severity)
+- #4: `report_date` string format validation — add in future cleanup if needed
+- #5: Unused `ReportContext` import in agent.py — cosmetic, not worth the risk of removing
+- #6: Adjacent JSDoc comments — readability nit, no functional impact
+- #7: Ref staleness in same-render-cycle — theoretical only, user must type+submit after button click
+- #8: TypeScript `as unknown as` cast — pragmatic workaround for action item types
+
+### Final Status
+Approved with fixes
+
+## Test Quality Review
+
+**Quality Score**: 100/100 (A+)
+**Tests Reviewed**: 19 (6 ChatContextProvider + 6 MorningSummarySection + 3 test_agent_api + 4 test_executor)
+
+### Issues Found
+- 0 Critical
+- 0 High (1 test ID convention issue documented, not blocking — test names already reference story ACs)
+- 0 Medium
+- 1 Low: No explicit Given/When/Then comments (documented only)
+
+### Fixes Applied
+- None required — all tests are deterministic, isolated, use factories, and have explicit assertions
+
+### Quality Details
+- **Determinism**: All 19 tests are fully deterministic with no conditionals, random values, or timing dependencies
+- **Isolation**: Excellent — each test suite properly resets mocks/state in beforeEach/setup_method
+- **Fixtures**: Factory functions with overrides (createMockDailyActionsReturn, createMockSmartSummaryReturn)
+- **Assertions**: Every test has explicit expect()/assert statements
+- **Performance**: All tests run in <1 second combined (frontend: 105ms, backend: 0.04s)
+- **Flakiness**: No flaky patterns detected
