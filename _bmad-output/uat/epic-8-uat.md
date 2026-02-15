@@ -556,11 +556,12 @@ Screenshot: [Attached if available]
 
 ### Issues Requiring Resolution (if any)
 
-| Issue # | Description | Severity | Resolution Required By |
-|---------|-------------|----------|----------------------|
-| | | | |
-| | | | |
-| | | | |
+| Issue # | Description | Severity | Status |
+|---------|-------------|----------|--------|
+| E8-001 | **Onboarding scroll overflow**: Area Order step not scrollable, Continue button cut off on smaller viewports. Fixed 2026-02-14 (commit f174e7d). | High | Resolved |
+| E8-002 | **Preferences API URL**: OnboardingFlow and usePreferences used relative `/api/v1/preferences` URL hitting Next.js instead of FastAPI backend. Fixed 2026-02-14 (commit f174e7d). | Critical | Resolved |
+| E8-003 | **Preferences API NoneType crash**: `maybe_single().execute()` returns None in current supabase-py, causing AttributeError on `.data` access in GET/POST/PUT handlers. Fixed 2026-02-14 (commit 6dcbd13). | Critical | Resolved |
+| E8-004 | **Supervisor asset scoping not wired to endpoints**: Backend services (`generate_supervisor_briefing()`, `CurrentUserWithRole`, `get_supervisor_assignments()`) are fully implemented but NOT connected to the actual API endpoints. Briefing, OEE, and daily actions endpoints still use basic `CurrentUser` and return ALL assets regardless of supervisor assignments. Requires swapping `get_current_user` to `get_current_user_with_role` in briefing/OEE/actions endpoints and routing supervisors to `generate_supervisor_briefing()`. | High | Open |
 
 *Severity Levels: Critical / High / Medium / Low*
 *Status: Open / In Progress / Resolved / Deferred*
