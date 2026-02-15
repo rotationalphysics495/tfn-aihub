@@ -82,7 +82,7 @@ async def get_preferences(
             "user_id", current_user.id
         ).maybe_single().execute()
 
-        if not result.data:
+        if not result or not result.data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Preferences not found. Please complete onboarding.",
@@ -122,7 +122,7 @@ async def create_preferences(
             "user_id", current_user.id
         ).maybe_single().execute()
 
-        if existing.data:
+        if existing and existing.data:
             # Update existing preferences instead of creating new
             update_data = {
                 "role": request.role.value,
@@ -219,7 +219,7 @@ async def update_preferences(
             "user_id", current_user.id
         ).maybe_single().execute()
 
-        if not existing.data:
+        if not existing or not existing.data:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Preferences not found. Please complete onboarding first.",
