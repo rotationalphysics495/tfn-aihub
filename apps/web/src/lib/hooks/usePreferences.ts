@@ -19,6 +19,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
 export interface UserPreferences {
   userId: string
   role: 'plant_manager' | 'supervisor'
@@ -91,7 +93,7 @@ export function usePreferences(
         throw new Error(ERROR_MESSAGES.AUTH_ERROR)
       }
 
-      const response = await fetch('/api/v1/preferences', {
+      const response = await fetch(`${API_BASE_URL}/api/v1/preferences`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -189,7 +191,7 @@ export function usePreferences(
       if (prefs.eodReminderTime !== undefined) requestBody.eod_reminder_time = prefs.eodReminderTime
       if (prefs.userTimezone !== undefined) requestBody.user_timezone = prefs.userTimezone
 
-      const response = await fetch('/api/v1/preferences', {
+      const response = await fetch(`${API_BASE_URL}/api/v1/preferences`, {
         method,
         headers: {
           'Authorization': `Bearer ${session.access_token}`,

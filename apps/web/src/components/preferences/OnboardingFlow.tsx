@@ -31,6 +31,8 @@ import { PreferencesStep, type PreferencesData } from '@/components/onboarding/P
 import { DEFAULT_AREA_ORDER } from '@/components/preferences/AreaOrderSelector'
 import { createClient } from '@/lib/supabase/client'
 
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+
 export interface OnboardingData {
   role: UserRole | null
   areaOrder: string[]
@@ -123,7 +125,7 @@ export function OnboardingFlow({
         throw new Error('Not authenticated')
       }
 
-      const response = await fetch('/api/v1/preferences', {
+      const response = await fetch(`${API_BASE_URL}/api/v1/preferences`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -175,7 +177,7 @@ export function OnboardingFlow({
     const { data: { session } } = await supabase.auth.getSession()
 
     if (session?.access_token) {
-      await fetch('/api/v1/preferences', {
+      await fetch(`${API_BASE_URL}/api/v1/preferences`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -349,11 +351,11 @@ export function OnboardingFlow({
   return (
     <div
       className={cn(
-        'fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/95 backdrop-blur-sm',
+        'fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/95 backdrop-blur-sm overflow-y-auto',
         className
       )}
     >
-      <div className="w-full max-w-2xl">
+      <div className="w-full max-w-2xl my-auto">
         {/* Header with dismiss button */}
         <div className="flex items-center justify-between mb-4">
           <div className="text-sm text-muted-foreground">
