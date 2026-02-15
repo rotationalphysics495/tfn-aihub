@@ -461,39 +461,39 @@ All of the following must work for Epic 8 to be accepted. These map directly to 
 
 | # | Criterion | NFR/FR | Verified |
 |---|-----------|--------|----------|
-| 1 | ElevenLabs TTS begins playback within 2 seconds | NFR9 | ☐ |
-| 2 | Push-to-talk transcription completes within 2 seconds | NFR10 | ☐ |
-| 3 | Briefing generation completes within 30 seconds | NFR8 | ☐ |
-| 4 | Plant Managers see all 7 production areas | FR14-FR17 | ☐ |
-| 5 | Supervisors see only their assigned assets | FR15 | ☐ |
-| 6 | Numbers formatted for voice (e.g., "2.1 million" not "2,130,500") | FR19 | ☐ |
-| 7 | Users can pause and ask follow-up questions with cited answers | FR20 | ☐ |
-| 8 | Onboarding completes in under 2 minutes | FR43 | ☐ |
-| 9 | Preferences persist across sessions via Supabase + Mem0 | FR40 | ☐ |
-| 10 | Voice gracefully degrades to text-only if ElevenLabs unavailable | NFR22 | ☐ |
-| 11 | Q&A interactions complete within 2 seconds | NFR7 | ☐ |
+| 1 | ElevenLabs TTS begins playback within 2 seconds | NFR9 | N/A - Voice excluded from UAT |
+| 2 | Push-to-talk transcription completes within 2 seconds | NFR10 | N/A - Voice excluded from UAT |
+| 3 | Briefing generation completes within 30 seconds | NFR8 | PASS |
+| 4 | Plant Managers see all 7 production areas | FR14-FR17 | PASS |
+| 5 | Supervisors see only their assigned assets | FR15 | FAIL - E8-004 |
+| 6 | Numbers formatted for voice (e.g., "2.1 million" not "2,130,500") | FR19 | N/A - Voice excluded from UAT |
+| 7 | Users can pause and ask follow-up questions with cited answers | FR20 | N/A - Voice excluded from UAT |
+| 8 | Onboarding completes in under 2 minutes | FR43 | PASS |
+| 9 | Preferences persist across sessions via Supabase + Mem0 | FR40 | PASS |
+| 10 | Voice gracefully degrades to text-only if ElevenLabs unavailable | NFR22 | PASS |
+| 11 | Q&A interactions complete within 2 seconds | NFR7 | N/A - Voice excluded from UAT |
 
 ### Should Pass (Important)
 
 | # | Criterion | Verified |
 |---|-----------|----------|
-| 1 | Q&A responses include citations to data sources (FR20) | ☐ |
-| 2 | Silence detection auto-continues after 3-4 seconds (FR12) | ☐ |
-| 3 | Areas delivered in user's preferred order (FR36) | ☐ |
-| 4 | Detail level matches user's preference (FR37) | ☐ |
-| 5 | Progress stepper accurately reflects briefing status | ☐ |
-| 6 | Keyboard shortcuts work (Space for pause, Arrow for skip) | ☐ |
-| 7 | Preferences sync to Mem0 within 5 seconds for AI context | ☐ |
-| 8 | Briefing content includes synthesized insights, not raw data | ☐ |
+| 1 | Q&A responses include citations to data sources (FR20) | N/A - Voice excluded from UAT |
+| 2 | Silence detection auto-continues after 3-4 seconds (FR12) | N/A - Voice excluded from UAT |
+| 3 | Areas delivered in user's preferred order (FR36) | PASS |
+| 4 | Detail level matches user's preference (FR37) | PASS |
+| 5 | Progress stepper accurately reflects briefing status | PASS |
+| 6 | Keyboard shortcuts work (Space for pause, Arrow for skip) | PASS |
+| 7 | Preferences sync to Mem0 within 5 seconds for AI context | PASS |
+| 8 | Briefing content includes synthesized insights, not raw data | PASS |
 
 ### Nice to Have (Enhancements)
 
 | # | Criterion | Verified |
 |---|-----------|----------|
-| 1 | Transcript auto-scrolls to current content | ☐ |
-| 2 | Visual audio level indicator during recording | ☐ |
-| 3 | Countdown timer visible during silence detection | ☐ |
-| 4 | AI can describe user's current preferences when asked | ☐ |
+| 1 | Transcript auto-scrolls to current content | N/A - Voice excluded from UAT |
+| 2 | Visual audio level indicator during recording | N/A - Voice excluded from UAT |
+| 3 | Countdown timer visible during silence detection | N/A - Voice excluded from UAT |
+| 4 | AI can describe user's current preferences when asked | N/A - Voice excluded from UAT |
 
 ---
 
@@ -550,9 +550,11 @@ Screenshot: [Attached if available]
 
 ☐ **APPROVED** - All critical criteria pass. Epic 8 is ready for production.
 
-☐ **CONDITIONALLY APPROVED** - Minor issues exist but do not block deployment. Issues documented below.
+☒ **CONDITIONALLY APPROVED** - Minor issues exist but do not block deployment. Issues documented below.
 
 ☐ **NOT APPROVED** - Critical issues must be resolved before deployment. Issues documented below.
+
+**Conditions**: Voice/ElevenLabs features excluded from this UAT round (text briefings assessed instead). Supervisor asset scoping (E8-004, E8-005) must be resolved before full production deployment.
 
 ### Issues Requiring Resolution (if any)
 
@@ -561,39 +563,58 @@ Screenshot: [Attached if available]
 | E8-001 | **Onboarding scroll overflow**: Area Order step not scrollable, Continue button cut off on smaller viewports. Fixed 2026-02-14 (commit f174e7d). | High | Resolved |
 | E8-002 | **Preferences API URL**: OnboardingFlow and usePreferences used relative `/api/v1/preferences` URL hitting Next.js instead of FastAPI backend. Fixed 2026-02-14 (commit f174e7d). | Critical | Resolved |
 | E8-003 | **Preferences API NoneType crash**: `maybe_single().execute()` returns None in current supabase-py, causing AttributeError on `.data` access in GET/POST/PUT handlers. Fixed 2026-02-14 (commit 6dcbd13). | Critical | Resolved |
-| E8-004 | **Supervisor asset scoping not wired to endpoints**: Backend services (`generate_supervisor_briefing()`, `CurrentUserWithRole`, `get_supervisor_assignments()`) are fully implemented but NOT connected to the actual API endpoints. Briefing, OEE, and daily actions endpoints still use basic `CurrentUser` and return ALL assets regardless of supervisor assignments. Requires swapping `get_current_user` to `get_current_user_with_role` in briefing/OEE/actions endpoints and routing supervisors to `generate_supervisor_briefing()`. | High | Open |
+| E8-004 | **Supervisor asset scoping not wired to endpoints**: Backend services (`generate_supervisor_briefing()`, `CurrentUserWithRole`, `get_supervisor_assignments()`) are fully implemented but NOT connected to the actual API endpoints. Briefing, OEE, and daily actions endpoints still use basic `CurrentUser` and return ALL assets regardless of supervisor assignments. Requires swapping `get_current_user` to `get_current_user_with_role` in briefing/OEE/actions endpoints and routing supervisors to `generate_supervisor_briefing()`. Blocks Scenarios 4, 9 (step 6), 12. | High | Open |
+| E8-005 | **Supervisor with no assets gets plant-wide briefing**: When a supervisor has no assigned assets, they receive a full plant-wide briefing instead of an error message directing them to contact their administrator. Related to E8-004 — supervisor scoping not active. | Medium | Open |
 
 *Severity Levels: Critical / High / Medium / Low*
 *Status: Open / In Progress / Resolved / Deferred*
 
 ### Test Summary
 
-| Category | Total Tests | Passed | Failed | Blocked |
-|----------|-------------|--------|--------|---------|
-| Onboarding (Scenarios 1-2) | 2 | | | |
-| Morning Briefing (Scenarios 3-4) | 2 | | | |
-| Push-to-Talk & Q&A (Scenario 5) | 1 | | | |
-| Briefing Controls (Scenario 6) | 1 | | | |
-| Voice Number Formatting (Scenario 7) | 1 | | | |
-| Graceful Degradation (Scenario 8) | 1 | | | |
-| Preferences Management (Scenario 9) | 1 | | | |
-| Edge Cases (Scenarios 10-12) | 3 | | | |
-| Performance (Scenario 13) | 1 | | | |
-| AI Context (Scenario 14) | 1 | | | |
-| Content Quality (Scenario 15) | 1 | | | |
-| **TOTAL** | **15** | | | |
+| Category | Total Tests | Passed | Failed | Blocked | N/A |
+|----------|-------------|--------|--------|---------|-----|
+| Onboarding (Scenarios 1-2) | 2 | 2 | 0 | 0 | 0 |
+| Morning Briefing (Scenarios 3-4) | 2 | 1 | 0 | 1 | 0 |
+| Push-to-Talk & Q&A (Scenario 5) | 1 | 0 | 0 | 0 | 1 |
+| Briefing Controls (Scenario 6) | 1 | 1 | 0 | 0 | 0 |
+| Voice Number Formatting (Scenario 7) | 1 | 0 | 0 | 0 | 1 |
+| Graceful Degradation (Scenario 8) | 1 | 1 | 0 | 0 | 0 |
+| Preferences Management (Scenario 9) | 1 | 1 | 0 | 0 | 0 |
+| Edge Cases (Scenarios 10-12) | 3 | 1 | 1 | 1 | 0 |
+| Performance (Scenario 13) | 1 | 1 | 0 | 0 | 0 |
+| AI Context (Scenario 14) | 1 | 0 | 0 | 0 | 1 |
+| Content Quality (Scenario 15) | 1 | 0 | 0 | 0 | 1 |
+| **TOTAL** | **15** | **8** | **1** | **2** | **4** |
 
 ### Additional Notes
 
-_Space for any additional comments from testers or stakeholders._
+**Voice Feature Exclusion**: ElevenLabs voice features (TTS playback, push-to-talk, speech-to-text) are tentatively excluded from this UAT round. Text-based briefings were assessed instead. Scenarios 5, 7, 11, 14, and 15 are marked N/A. Voice-specific UAT will be conducted separately.
 
-```
-Observations, concerns, or feedback:
+**Scenario-Level Results (2026-02-14)**:
 
+| Scenario | Result | Notes |
+|----------|--------|-------|
+| 1 - PM Onboarding | PASS | All steps pass |
+| 2 - Supervisor Onboarding | PASS | All steps pass |
+| 3 - PM Morning Briefing | PASS (partial) | Steps 1-6 pass. Steps 7-8 (voice Q&A pause) excluded from UAT |
+| 4 - Supervisor Briefing | BLOCKED | Supervisor asset scoping not wired (E8-004) |
+| 5 - Push-to-Talk | N/A | Voice features excluded from UAT |
+| 6 - Briefing Controls | PASS | Steps 1, 4, 5, 6 pass. Steps 2-3 (audio pause/resume) - controls trigger but audio excluded |
+| 7 - Voice Number Formatting | N/A | Voice features excluded from UAT |
+| 8 - Text-Only Mode | PASS | All steps pass |
+| 9 - Modify Preferences | PASS (partial) | All steps pass except step 6 - supervisor scoping bug (E8-004) |
+| 10 - Onboarding Abandonment | PASS | All steps pass (fixed during UAT session) |
+| 11 - No Speech Detection | N/A | Voice features excluded from UAT |
+| 12 - Supervisor No Assets | FAIL | Supervisor with no assigned assets gets plant-wide briefing instead of error message (E8-005) |
+| 13 - Performance | PASS (partial) | Step 1 (briefing generation) passes. Other steps N/A - voice excluded |
+| 14 - AI Preference Context | N/A | Voice features excluded from UAT |
+| 15 - Briefing Content Quality | N/A | Voice features excluded from UAT |
 
-
-
-```
+**Bugs Fixed During UAT Session**:
+- E8-001: Onboarding scroll overflow (resolved in-session)
+- E8-002: Preferences API URL misconfiguration (resolved in-session)
+- E8-003: Preferences API NoneType crash (resolved in-session)
+- Onboarding dismiss behavior (resolved in-session - now applies defaults and lets user through)
 
 ---
 
@@ -603,6 +624,7 @@ Observations, concerns, or feedback:
 |---------|------|--------|---------|
 | 1.0 | January 17, 2026 | QA Specialist | Initial UAT document creation |
 | 1.1 | January 17, 2026 | QA Specialist | Enhanced coverage, added test summary table |
+| 1.2 | February 14, 2026 | UAT Tester | UAT execution results. 8 passed, 1 failed, 2 blocked, 4 N/A. Voice features excluded. 4 bugs fixed during session. Conditionally approved. |
 
 ---
 

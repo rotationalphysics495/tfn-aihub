@@ -16,7 +16,7 @@
  * - [Source: prd-voice-briefing-context.md#Onboarding Flow Summary]
  */
 
-import { useCallback } from 'react'
+import { useCallback, useState } from 'react'
 import { useOnboardingRequired } from '@/lib/hooks/useOnboardingRequired'
 import { OnboardingFlow } from '@/components/preferences/OnboardingFlow'
 
@@ -27,6 +27,7 @@ interface OnboardingGateProps {
 
 export function OnboardingGate({ children }: OnboardingGateProps) {
   const { isRequired, isLoading, originalDestination, userId, recheck } = useOnboardingRequired()
+  const [dismissed, setDismissed] = useState(false)
 
   const handleComplete = useCallback(() => {
     // Recheck status and reload to clear any stale state
@@ -37,9 +38,10 @@ export function OnboardingGate({ children }: OnboardingGateProps) {
   }, [recheck])
 
   const handleDismiss = useCallback(() => {
-    // On dismiss, navigate to dashboard with defaults applied
-    // The next visit will trigger onboarding again since onboarding_complete=false
-    window.location.href = '/dashboard'
+    // Let the user through for this session with default settings.
+    // OnboardingFlow saves defaults with onboarding_complete=false,
+    // so onboarding will re-trigger on next login/page load.
+    setDismissed(true)
   }, [])
 
   // Show loading state while checking
@@ -54,8 +56,8 @@ export function OnboardingGate({ children }: OnboardingGateProps) {
     )
   }
 
-  // Show onboarding flow if required
-  if (isRequired && userId) {
+  // Show onboarding flow if required (unless dismissed this session)
+  if (isRequired && userId && !dismissed) {
     return (
       <>
         {/* Render children in background (dimmed) */}
