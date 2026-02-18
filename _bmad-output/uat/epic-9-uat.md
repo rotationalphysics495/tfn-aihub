@@ -1,9 +1,9 @@
 # User Acceptance Testing Document
 # Epic 9: Shift Handoff & EOD Summary
 
-**Version:** 1.0
+**Version:** 1.1
 **Date:** January 18, 2026
-**Last Updated:** January 18, 2026
+**Last Updated:** February 17, 2026
 **Prepared For:** Plant Managers, Supervisors, and Administrators
 **Test Environment:** TFN AI Hub - Shift Handoff & EOD System
 **Document Status:** Ready for Testing
@@ -946,11 +946,29 @@ Observations, concerns, or feedback:
 
 ---
 
+### Testing Progress (2026-02-17)
+
+| Scenario | Status | Notes |
+|----------|--------|-------|
+| 1 - Creating a Shift Handoff | Pass | |
+| 2 - Adding Voice Notes to Handoff | Pass | |
+| 3 - Voice Note Limit Enforcement | Pass | |
+| 4 - No Assets Assigned Error | Pass | |
+| 5 - Duplicate Handoff Prevention | In Progress | Testing paused - to be resumed |
+| 6 - Viewing Pending Handoffs | Not Started | |
+| 7 - Reviewing Handoff Details | Not Started | |
+| 8 - Asking Follow-Up Questions (Q&A) | Not Started | |
+| 9 - Acknowledging a Handoff | Not Started | |
+| 10 - Acknowledgment Notification | Not Started | |
+| 11 - Viewing Handoffs Offline | Not Started | |
+| 12 - Offline Acknowledgment Queuing | Not Started | |
+
 ### Document History
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | January 18, 2026 | QA Specialist | Initial UAT document creation |
+| 1.1 | February 17, 2026 | Dmitri | UAT testing session - Scenarios 1-4 Pass, Scenario 5 in progress |
 
 ---
 

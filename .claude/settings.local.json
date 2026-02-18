@@ -66,7 +66,10 @@
       "Bash(/tmp/seed_morning_briefing.py:*)",
       "Bash(git pull origin uat)",
       "Bash(git stash:*)",
-      "Bash(git stash pop:*)"
+      "Bash(git stash pop:*)",
+      "Bash(git -C \"/Users/dmitri/Desktop/Heimdall GitHub Repos/tfn-aihub\" status)",
+      "Bash(git -C \"/Users/dmitri/Desktop/Heimdall GitHub Repos/tfn-aihub\" diff --stat)",
+      "Bash(git -C \"/Users/dmitri/Desktop/Heimdall GitHub Repos/tfn-aihub\" log --oneline -5)"
     ]
   }
 }

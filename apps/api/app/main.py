@@ -116,7 +116,9 @@ app.include_router(briefing.router, prefix="/api/v1/briefing", tags=["Briefing"]
 # Story 8.8: User Preferences API for onboarding and settings
 app.include_router(preferences.router, prefix="/api/v1/preferences", tags=["Preferences"])
 # Story 9.1: Shift Handoff API for handoff creation and management
+# Register under both slash variants so Next.js proxy doesn't need to follow redirects
 app.include_router(handoff.router, prefix="/api/v1/handoff", tags=["Handoff"])
+app.include_router(handoff.router, prefix="/api/v1/handoff/", tags=["Handoff"])
 # Story 9.13: Admin API for asset assignment management
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 # Team API for listing team members (any authenticated user)

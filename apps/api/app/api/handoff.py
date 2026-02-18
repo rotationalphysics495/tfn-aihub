@@ -206,7 +206,7 @@ def _get_supervisor_assignments(user_id: str) -> List[SupervisorAsset]:
     try:
         # Query supervisor_assignments joined with assets
         result = supabase.table("supervisor_assignments").select(
-            "asset_id, assets(id, name, area_name)"
+            "asset_id, assets(id, name, area)"
         ).eq("user_id", user_id).execute()
 
         if result.data:
@@ -217,7 +217,7 @@ def _get_supervisor_assignments(user_id: str) -> List[SupervisorAsset]:
                     assets.append(SupervisorAsset(
                         asset_id=UUID(row["asset_id"]),
                         asset_name=asset_data.get("name", "Unknown"),
-                        area_name=asset_data.get("area_name")
+                        area_name=asset_data.get("area")
                     ))
             if assets:
                 return assets
