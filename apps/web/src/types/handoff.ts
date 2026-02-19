@@ -96,8 +96,9 @@ export interface HandoffListItem {
  */
 export interface HandoffListResponse {
   handoffs: HandoffListItem[];
-  pending_count: number;
-  acknowledged_count: number;
+  total_count?: number;
+  pending_count?: number;
+  acknowledged_count?: number;
 }
 
 /**

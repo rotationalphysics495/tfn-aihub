@@ -1,9 +1,9 @@
 # User Acceptance Testing Document
 # Epic 9: Shift Handoff & EOD Summary
 
-**Version:** 1.1
+**Version:** 1.2
 **Date:** January 18, 2026
-**Last Updated:** February 17, 2026
+**Last Updated:** February 18, 2026
 **Prepared For:** Plant Managers, Supervisors, and Administrators
 **Test Environment:** TFN AI Hub - Shift Handoff & EOD System
 **Document Status:** Ready for Testing
@@ -897,14 +897,14 @@ Screenshot: [Attached if available]
 | Supervisor Representative (Outgoing) | _______________ | ___ / ___ / 2026 | _______________ |
 | Supervisor Representative (Incoming) | _______________ | ___ / ___ / 2026 | _______________ |
 | Administrator Representative | _______________ | ___ / ___ / 2026 | _______________ |
-| QA Lead | _______________ | ___ / ___ / 2026 | _______________ |
+| QA Lead | Dmitri Spiropoulos | 18 / 02 / 2026 | Dmitri Spiropoulos |
 | Product Owner | _______________ | ___ / ___ / 2026 | _______________ |
 
 ### Approval Decision
 
 ☐ **APPROVED** - All critical criteria pass. Epic 9 is ready for production.
 
-☐ **CONDITIONALLY APPROVED** - Minor issues exist but do not block deployment. Issues documented below.
+☑ **CONDITIONALLY APPROVED** - Minor issues exist but do not block deployment. Issues documented below.
 
 ☐ **NOT APPROVED** - Critical issues must be resolved before deployment. Issues documented below.
 
@@ -912,9 +912,13 @@ Screenshot: [Attached if available]
 
 | Issue # | Description | Severity | Status | Resolution Required By |
 |---------|-------------|----------|--------|----------------------|
-| | | | | |
-| | | | | |
-| | | | | |
+| E9-001 | Scenario 6 Step 2: Notification banner does not identify who initiated the handoff — displays "You have 1 handoff awaiting review" instead of "Handoff available from [Name]" | Medium | Open | Next sprint |
+| E9-002 | Scenario 8 Steps 4-7: Q&A follow-up question section does not appear on handoff detail page | High | Open | Next sprint |
+| E9-003 | Scenario 9 Step 6: No confirmation message displayed after acknowledging a handoff | Medium | Open | Next sprint |
+| E9-004 | Scenario 9 Steps 7-8 / Scenario 10: Handoff status stuck at "Pending" after acknowledgment; outgoing supervisor not notified | High | Open | Next sprint |
+| E9-005 | Scenario 11 Steps 3-4: Handoff does not display when offline; no offline indicator banner shown | High | Open | Next sprint |
+| E9-006 | Scenario 12 Steps 4, 6-7: No pending sync indicator shown when offline; acknowledgment does not sync on reconnect; handoff status remains unchanged | High | Open | Next sprint |
+| E9-007 | Scenario 13: Stale cache warning does not appear after cache timeout (simulated at 2 minutes for UAT purposes) | Medium | Open | Next sprint |
 
 *Severity Levels: Critical / High / Medium / Low*
 *Status: Open / In Progress / Resolved / Deferred*
@@ -923,52 +927,82 @@ Screenshot: [Attached if available]
 
 | Category | Total Tests | Passed | Failed | Blocked |
 |----------|-------------|--------|--------|---------|
-| **Section A: Handoff Creation** (Scenarios 1-5) | 5 | | | |
-| **Section B: Handoff Review** (Scenarios 6-10) | 5 | | | |
-| **Section C: Offline Capabilities** (Scenarios 11-13) | 3 | | | |
-| **Section D: EOD Summary** (Scenarios 14-18) | 5 | | | |
-| **Section E: Admin Asset Assignment** (Scenarios 19-21) | 3 | | | |
-| **Section F: Admin Role Management** (Scenarios 22-25) | 4 | | | |
-| **Section G: Admin Audit Logging** (Scenarios 26-28) | 3 | | | |
-| **TOTAL** | **28** | | | |
+| **Section A: Handoff Creation** (Scenarios 1-5) | 5 | 3 | 0 | 2 |
+| **Section B: Handoff Review** (Scenarios 6-10) | 5 | 0 | 4 | 1 |
+| **Section C: Offline Capabilities** (Scenarios 11-13) | 3 | 0 | 3 | 0 |
+| **Section D: EOD Summary** (Scenarios 14-18) | 5 | 0 | 0 | 5 |
+| **Section E: Admin Asset Assignment** (Scenarios 19-21) | 3 | 0 | 0 | 3 |
+| **Section F: Admin Role Management** (Scenarios 22-25) | 4 | 0 | 0 | 4 |
+| **Section G: Admin Audit Logging** (Scenarios 26-28) | 3 | 0 | 0 | 3 |
+| **TOTAL** | **28** | **3** | **7** | **18** |
+
+> **Note on Blocked scenarios:** Scenarios 2, 3 (voice notes) were excluded per ElevenLabs testing exclusion directive. Scenarios 14-28 (Sections D-G) were not reached in this testing session and remain pending a future session.
 
 ### Additional Notes
 
-_Space for any additional comments from testers or stakeholders._
-
 ```
-Observations, concerns, or feedback:
+Testing session: 2026-02-18
+Tester: Dmitri Spiropoulos (QA)
 
+Voice note scenarios (2, 3, and voice steps in 7, 11) excluded from all testing per
+ElevenLabs integration exclusion directive. These should be retested once ElevenLabs
+testing is approved or an alternative transcription service is configured.
 
+Key finding: The acknowledgment flow (Scenarios 9-10) is not fully functional —
+acknowledgment appears to be accepted by the UI but the status does not update and
+no confirmation is shown. This blocks testing of downstream offline acknowledgment
+sync (Scenarios 11-12) and outgoing supervisor notification (Scenario 10).
 
+Offline caching (Scenarios 11-13) failed across all steps beyond initial online load,
+suggesting the service worker / IndexedDB caching pipeline is not wired up correctly
+in the current build.
 
+Sections D (EOD Summary), E (Admin Asset Assignment), F (Admin Role Management),
+and G (Admin Audit Logging) not yet tested — to be scheduled for a follow-up session.
 ```
 
 ---
 
-### Testing Progress (2026-02-17)
+### Testing Progress (2026-02-18)
 
 | Scenario | Status | Notes |
 |----------|--------|-------|
-| 1 - Creating a Shift Handoff | Pass | |
-| 2 - Adding Voice Notes to Handoff | Pass | |
-| 3 - Voice Note Limit Enforcement | Pass | |
-| 4 - No Assets Assigned Error | Pass | |
-| 5 - Duplicate Handoff Prevention | In Progress | Testing paused - to be resumed |
-| 6 - Viewing Pending Handoffs | Not Started | |
-| 7 - Reviewing Handoff Details | Not Started | |
-| 8 - Asking Follow-Up Questions (Q&A) | Not Started | |
-| 9 - Acknowledging a Handoff | Not Started | |
-| 10 - Acknowledgment Notification | Not Started | |
-| 11 - Viewing Handoffs Offline | Not Started | |
-| 12 - Offline Acknowledgment Queuing | Not Started | |
+| 1 - Creating a Shift Handoff | Pass | All steps pass |
+| 2 - Adding Voice Notes to Handoff | Blocked | Voice features omitted from testing (ElevenLabs exclusion) |
+| 3 - Voice Note Limit Enforcement | Blocked | Voice features omitted from testing (ElevenLabs exclusion) |
+| 4 - No Assets Assigned Error | Pass | All steps pass |
+| 5 - Duplicate Handoff Prevention | Pass | All steps pass |
+| 6 - Viewing Pending Handoffs | Partial Pass | Steps 1, 3-5 pass. Step 2 fail: banner does not name the initiator (E9-001) |
+| 7 - Reviewing Handoff Details | Partial Pass | Steps 1-3, 7 pass. Steps 4-6 blocked (ElevenLabs exclusion) |
+| 8 - Asking Follow-Up Questions (Q&A) | Fail | Steps 1-3 pass. Steps 4-7 fail: Q&A section does not appear (E9-002) |
+| 9 - Acknowledging a Handoff | Partial Fail | Steps 1-5 pass. Step 6 fail: no confirmation message (E9-003). Steps 7-8 fail: handoff stuck at pending (E9-004) |
+| 10 - Acknowledgment Notification | Fail | Handoff stuck at pending; not acknowledged — outgoing supervisor not notified (E9-004) |
+| 11 - Viewing Handoffs Offline | Partial Fail | Steps 1-2 pass. Step 3 fail: handoff does not display. Step 4 fail: no offline indicator (E9-005). Steps 5-6 blocked (ElevenLabs exclusion) |
+| 12 - Offline Acknowledgment Queuing | Partial Fail | Steps 1-3, 5 pass. Step 4 fail: no pending sync indicator. Steps 6-7 fail: sync never happens, status unchanged (E9-006) |
+| 13 - Stale Cache Warning | Fail | No stale warning displayed; cache timeout simulated at 2 minutes for UAT (E9-007) |
+| 14 - Triggering EOD Summary | Not Tested | Pending future session |
+| 15 - Morning vs Actual Comparison | Not Tested | Pending future session |
+| 16 - EOD Without Morning Briefing | Not Tested | Pending future session |
+| 17 - EOD Push Notification Reminder | Not Tested | Pending future session |
+| 18 - EOD Reminder - Already Viewed Skip | Not Tested | Pending future session |
+| 19 - Viewing Asset Assignment Grid | Not Tested | Pending future session |
+| 20 - Making Assignment Changes with Preview | Not Tested | Pending future session |
+| 21 - Setting Temporary Assignments | Not Tested | Pending future session |
+| 22 - Viewing User Roles | Not Tested | Pending future session |
+| 23 - Changing a User's Role | Not Tested | Pending future session |
+| 24 - Last Admin Protection | Not Tested | Pending future session |
+| 25 - New User Default Role | Not Tested | Pending future session |
+| 26 - Viewing Audit Logs | Not Tested | Pending future session |
+| 27 - Filtering Audit Logs | Not Tested | Pending future session |
+| 28 - Audit Log Integrity | Not Tested | Pending future session |
 
 ### Document History
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | January 18, 2026 | QA Specialist | Initial UAT document creation |
-| 1.1 | February 17, 2026 | Dmitri | UAT testing session - Scenarios 1-4 Pass, Scenario 5 in progress |
+| 1.1 | February 17, 2026 | Dmitri Spiropoulos | UAT testing session — Scenarios 1-4 Pass, Scenario 5 in progress |
+| 1.2 | February 18, 2026 | Dmitri Spiropoulos | UAT testing session — Scenarios 1-13 completed; 7 issues logged (E9-001 to E9-007); Conditionally Approved; Sections D-G deferred to next session |
 
 ---
 

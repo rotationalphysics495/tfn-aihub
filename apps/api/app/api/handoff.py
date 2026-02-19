@@ -63,7 +63,7 @@ from app.models.user import CurrentUser
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(redirect_slashes=False)
 
 
 # ============================================================================
@@ -87,10 +87,16 @@ class CreateHandoffRequest(BaseModel):
 class HandoffListItem(BaseModel):
     """Schema for handoff list items."""
     id: str
+    created_by: str
+    creator_name: str
     shift_date: str
     shift_type: ShiftType
     status: HandoffStatus
+    assets_covered: List[str]
+    summary_preview: Optional[str] = None
+    voice_note_count: int = 0
     created_at: str
+    submitted_at: Optional[str] = None
     asset_count: int
 
 
@@ -98,10 +104,40 @@ class HandoffListResponse(BaseModel):
     """Response schema for listing handoffs."""
     handoffs: List[HandoffListItem]
     total_count: int
+    pending_count: int = 0
+    acknowledged_count: int = 0
+
+
+class HandoffDetailBody(BaseModel):
+    """The handoff object inside the detail response."""
+    id: str
+    created_by: str
+    creator_name: str
+    creator_email: str = ""
+    shift_date: str
+    shift_type: ShiftType
+    shift_start_time: str = ""
+    shift_end_time: str = ""
+    assets_covered: List[str]
+    summary_text: Optional[str] = None
+    text_notes: Optional[str] = None
+    status: HandoffStatus
+    created_at: str
+    updated_at: str
+    submitted_at: Optional[str] = None
+    acknowledged_by: Optional[str] = None
+    acknowledged_at: Optional[str] = None
+    voice_notes: List[dict] = []
 
 
 class HandoffDetailResponse(BaseModel):
-    """Response schema for handoff details."""
+    """Response schema for handoff details - matches frontend HandoffDetailResponse type."""
+    handoff: HandoffDetailBody
+    can_acknowledge: bool = False
+
+
+class HandoffMutationResponse(BaseModel):
+    """Flat response for create/update/submit endpoints (internal wizard use)."""
     id: str
     user_id: str
     shift_date: str
@@ -158,6 +194,15 @@ def _save_handoff(handoff: dict) -> dict:
     return handoff
 
 
+def _name_from_email(email: str) -> str:
+    """Derive a display name from an email address (e.g. 'john.doe@...' -> 'John Doe')."""
+    if not email:
+        return "Supervisor"
+    local = email.split("@")[0]
+    parts = local.replace(".", " ").replace("_", " ").split()
+    return " ".join(p.capitalize() for p in parts) if parts else "Supervisor"
+
+
 def _get_supabase_client() -> Optional[Client]:
     """Get Supabase client for database operations, or None if not configured."""
     settings = get_settings()
@@ -199,7 +244,7 @@ def _get_supervisor_assignments(user_id: str) -> List[SupervisorAsset]:
     """
     supabase = _get_supabase_client()
     if supabase is None:
-        # Return mock data for development when Supabase is not configured
+        # Supabase not configured - use mock data for local development
         logger.info("Supabase not configured - returning mock supervisor assignments")
         return _get_mock_supervisor_assets()
 
@@ -209,29 +254,24 @@ def _get_supervisor_assignments(user_id: str) -> List[SupervisorAsset]:
             "asset_id, assets(id, name, area)"
         ).eq("user_id", user_id).execute()
 
-        if result.data:
-            assets = []
-            for row in result.data:
-                asset_data = row.get("assets", {})
-                if asset_data:
-                    assets.append(SupervisorAsset(
-                        asset_id=UUID(row["asset_id"]),
-                        asset_name=asset_data.get("name", "Unknown"),
-                        area_name=asset_data.get("area")
-                    ))
-            if assets:
-                return assets
-            # No real assignments found - return mock for MVP
-            logger.info(f"No supervisor assignments found for user {user_id} - returning mock data")
-            return _get_mock_supervisor_assets()
+        # Supabase is configured and query succeeded - return real results (may be empty)
+        assets = []
+        for row in (result.data or []):
+            asset_data = row.get("assets", {})
+            if asset_data:
+                assets.append(SupervisorAsset(
+                    asset_id=UUID(row["asset_id"]),
+                    asset_name=asset_data.get("name", "Unknown"),
+                    area_name=asset_data.get("area")
+                ))
 
-        # No results - return mock for MVP
-        logger.info(f"No supervisor assignments found for user {user_id} - returning mock data")
-        return _get_mock_supervisor_assets()
+        if not assets:
+            logger.info(f"No supervisor assignments found for user {user_id}")
+        return assets
 
     except Exception as e:
         logger.warning(f"Error fetching supervisor assignments for user {user_id}: {e}")
-        # Return mock data if query fails (for development)
+        # Query failed - fall back to mock so the app stays functional
         logger.info("Falling back to mock supervisor assignments due to query error")
         return _get_mock_supervisor_assets()
 
@@ -320,7 +360,8 @@ async def initiate_handoff(
     )
 
 
-@router.post("/", response_model=HandoffDetailResponse, status_code=201)
+@router.post("", response_model=HandoffMutationResponse, status_code=201)
+@router.post("/", response_model=HandoffMutationResponse, status_code=201)
 async def create_handoff(
     request: CreateHandoffRequest,
     current_user: CurrentUser = Depends(get_current_user)
@@ -393,9 +434,15 @@ async def create_handoff(
     now = datetime.now(timezone.utc)
     handoff_id = uuid4()
 
+    # Derive creator name from email (e.g. "john.doe@example.com" -> "John Doe")
+    creator_email = current_user.email or ""
+    creator_name = _name_from_email(creator_email)
+
     handoff_data = {
         "id": str(handoff_id),
         "user_id": user_id,
+        "creator_name": creator_name,
+        "creator_email": creator_email,
         "shift_date": str(shift_info.shift_date),
         "shift_type": shift_info.shift_type.value,
         "status": HandoffStatus.DRAFT.value,
@@ -408,8 +455,7 @@ async def create_handoff(
 
     _save_handoff(handoff_data)
 
-    # Return detailed response
-    return HandoffDetailResponse(
+    return HandoffMutationResponse(
         id=str(handoff_id),
         user_id=user_id,
         shift_date=handoff_data["shift_date"],
@@ -423,6 +469,7 @@ async def create_handoff(
     )
 
 
+@router.get("", response_model=HandoffListResponse)
 @router.get("/", response_model=HandoffListResponse)
 async def list_handoffs(
     current_user: CurrentUser = Depends(get_current_user),
@@ -447,18 +494,35 @@ async def list_handoffs(
     items = [
         HandoffListItem(
             id=h["id"],
+            created_by=h["user_id"],
+            creator_name=h.get("creator_name", "Supervisor"),
             shift_date=h["shift_date"],
             shift_type=ShiftType(h["shift_type"]),
             status=HandoffStatus(h["status"]),
+            assets_covered=h.get("assets_covered", []),
+            summary_preview=(h.get("summary") or "")[:120] or None,
+            voice_note_count=len(_get_voice_notes_for_handoff(h["id"])),
             created_at=h["created_at"],
+            submitted_at=h.get("updated_at") if h.get("status") != HandoffStatus.DRAFT.value else None,
             asset_count=len(h.get("assets_covered", []))
         )
         for h in paginated
     ]
 
+    pending_count = sum(
+        1 for h in all_handoffs
+        if h.get("status") == HandoffStatus.PENDING_ACKNOWLEDGMENT.value
+    )
+    acknowledged_count = sum(
+        1 for h in all_handoffs
+        if h.get("status") == HandoffStatus.ACKNOWLEDGED.value
+    )
+
     return HandoffListResponse(
         handoffs=items,
-        total_count=len(all_handoffs)
+        total_count=len(all_handoffs),
+        pending_count=pending_count,
+        acknowledged_count=acknowledged_count,
     )
 
 
@@ -562,10 +626,16 @@ async def list_pending_handoffs(
     items = [
         HandoffListItem(
             id=h["id"],
+            created_by=h["user_id"],
+            creator_name=h.get("creator_name", "Supervisor"),
             shift_date=h["shift_date"],
             shift_type=ShiftType(h["shift_type"]),
             status=HandoffStatus(h["status"]),
+            assets_covered=h.get("assets_covered", []),
+            summary_preview=(h.get("summary") or "")[:120] or None,
+            voice_note_count=len(_get_voice_notes_for_handoff(h["id"])),
             created_at=h["created_at"],
+            submitted_at=h.get("updated_at") if h.get("status") != HandoffStatus.DRAFT.value else None,
             asset_count=len(h.get("assets_covered", []))
         )
         for h in limited
@@ -633,37 +703,59 @@ async def get_handoff(
     if not handoff:
         raise HTTPException(status_code=404, detail="Handoff not found")
 
-    if handoff.get("user_id") != user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
+    # Allow access to creator OR incoming supervisors assigned to the handoff's assets
+    is_creator = handoff.get("user_id") == user_id
+    if not is_creator:
+        assigned_assets = _get_supervisor_assignments(user_id)
+        assigned_asset_ids = {str(a.asset_id) for a in assigned_assets}
+        handoff_assets = set(handoff.get("assets_covered", []))
+        if not handoff_assets.intersection(assigned_asset_ids):
+            raise HTTPException(status_code=403, detail="Access denied")
 
-    # Get asset details
-    assigned_assets = _get_supervisor_assignments(user_id)
-    asset_map = {str(a.asset_id): a for a in assigned_assets}
-
-    covered_assets = [
-        asset_map.get(asset_id, SupervisorAsset(
-            asset_id=UUID(asset_id),
-            asset_name="Unknown Asset",
-            area_name=None
-        ))
-        for asset_id in handoff.get("assets_covered", [])
+    # Get voice notes for this handoff
+    voice_note_records = _get_voice_notes_for_handoff(str(handoff_id))
+    voice_notes = [
+        {
+            "id": n["id"],
+            "duration_seconds": n["duration_seconds"],
+            "transcript": n.get("transcript"),
+            "storage_url": _get_signed_url(n["storage_path"]),
+            "sequence_order": n["sequence_order"],
+            "created_at": n["created_at"],
+        }
+        for n in voice_note_records
     ]
 
-    return HandoffDetailResponse(
-        id=handoff["id"],
-        user_id=handoff["user_id"],
-        shift_date=handoff["shift_date"],
-        shift_type=ShiftType(handoff["shift_type"]),
-        status=HandoffStatus(handoff["status"]),
-        assets_covered=covered_assets,
-        summary=handoff.get("summary"),
-        text_notes=handoff.get("text_notes"),
-        created_at=handoff["created_at"],
-        updated_at=handoff["updated_at"],
+    # Determine if current user can acknowledge
+    can_acknowledge = (
+        not is_creator
+        and handoff.get("status") == HandoffStatus.PENDING_ACKNOWLEDGMENT.value
+        and _get_acknowledgment_by_handoff(str(handoff_id)) is None
     )
 
+    handoff_body = HandoffDetailBody(
+        id=handoff["id"],
+        created_by=handoff["user_id"],
+        creator_name=handoff.get("creator_name", "Supervisor"),
+        creator_email=handoff.get("creator_email", ""),
+        shift_date=handoff["shift_date"],
+        shift_type=ShiftType(handoff["shift_type"]),
+        assets_covered=handoff.get("assets_covered", []),
+        summary_text=handoff.get("summary"),
+        text_notes=handoff.get("text_notes"),
+        status=HandoffStatus(handoff["status"]),
+        created_at=handoff["created_at"],
+        updated_at=handoff["updated_at"],
+        submitted_at=handoff.get("updated_at") if handoff.get("status") != HandoffStatus.DRAFT.value else None,
+        acknowledged_by=handoff.get("acknowledged_by"),
+        acknowledged_at=handoff.get("acknowledged_at"),
+        voice_notes=voice_notes,
+    )
 
-@router.patch("/{handoff_id}", response_model=HandoffDetailResponse)
+    return HandoffDetailResponse(handoff=handoff_body, can_acknowledge=can_acknowledge)
+
+
+@router.patch("/{handoff_id}", response_model=HandoffMutationResponse)
 async def update_handoff(
     handoff_id: UUID,
     request: ShiftHandoffUpdate,
@@ -715,7 +807,7 @@ async def update_handoff(
         for asset_id in handoff.get("assets_covered", [])
     ]
 
-    return HandoffDetailResponse(
+    return HandoffMutationResponse(
         id=handoff["id"],
         user_id=handoff["user_id"],
         shift_date=handoff["shift_date"],
@@ -729,7 +821,7 @@ async def update_handoff(
     )
 
 
-@router.post("/{handoff_id}/submit", response_model=HandoffDetailResponse)
+@router.post("/{handoff_id}/submit", response_model=HandoffMutationResponse)
 async def submit_handoff(
     handoff_id: UUID,
     current_user: CurrentUser = Depends(get_current_user)
@@ -774,7 +866,7 @@ async def submit_handoff(
         for asset_id in handoff.get("assets_covered", [])
     ]
 
-    return HandoffDetailResponse(
+    return HandoffMutationResponse(
         id=handoff["id"],
         user_id=handoff["user_id"],
         shift_date=handoff["shift_date"],

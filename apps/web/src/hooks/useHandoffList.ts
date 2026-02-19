@@ -111,14 +111,17 @@ export function useHandoffList(
       }
 
       const url = `${API_BASE_URL}/api/v1/handoff${params.toString() ? `?${params.toString()}` : ''}`;
+      const pendingUrl = `${API_BASE_URL}/api/v1/handoff/pending`;
 
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const headers = {
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      };
+
+      const [response, pendingResponse] = await Promise.all([
+        fetch(url, { method: 'GET', headers }),
+        fetch(pendingUrl, { method: 'GET', headers }),
+      ]);
 
       if (!response.ok) {
         if (response.status === 401) {
@@ -129,15 +132,30 @@ export function useHandoffList(
 
       const data: HandoffListResponse = await response.json();
 
+      // Merge incoming pending handoffs from other supervisors
+      let allHandoffs = data.handoffs;
+      if (pendingResponse.ok) {
+        const pendingData = await pendingResponse.json();
+        const incomingIds = new Set(allHandoffs.map((h) => h.id));
+        const incoming = (pendingData.handoffs ?? []).filter(
+          (h: HandoffListItem) => !incomingIds.has(h.id)
+        );
+        allHandoffs = [...allHandoffs, ...incoming];
+      }
+
       if (!mountedRef.current) return;
 
       setState({
-        data: data.handoffs,
+        data: allHandoffs,
         isLoading: false,
         error: null,
       });
-      setPendingCount(data.pending_count);
-      setAcknowledgedCount(data.acknowledged_count);
+      setPendingCount(
+        allHandoffs.filter((h) => h.status === 'pending_acknowledgment').length
+      );
+      setAcknowledgedCount(
+        allHandoffs.filter((h) => h.status === 'acknowledged').length
+      );
     } catch (error) {
       if (!mountedRef.current) return;
 
