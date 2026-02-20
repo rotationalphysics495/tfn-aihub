@@ -134,7 +134,7 @@ function AuditLogPageContent() {
     if (newFilters.actionType) params.set('action_type', newFilters.actionType)
     if (newFilters.targetUserId) params.set('target_user_id', newFilters.targetUserId)
 
-    const newUrl = params.toString() ? `?${params.toString()}` : '/admin/audit'
+    const newUrl = params.toString() ? `?${params.toString()}` : '/audit'
     router.replace(newUrl)
   }, [router])
 

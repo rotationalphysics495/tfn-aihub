@@ -1,12 +1,12 @@
 # User Acceptance Testing Document
 # Epic 9: Shift Handoff & EOD Summary
 
-**Version:** 1.5
+**Version:** 1.6
 **Date:** January 18, 2026
 **Last Updated:** February 19, 2026
 **Prepared For:** Plant Managers, Supervisors, and Administrators
 **Test Environment:** TFN AI Hub - Shift Handoff & EOD System
-**Document Status:** Ready for Testing
+**Document Status:** Testing Complete
 
 ---
 
@@ -139,11 +139,11 @@ Request test accounts from your IT administrator:
 | 12 | Click "Submit Handoff" | Success message appears, redirected to handoff list |
 
 **Pass/Fail Criteria**:
-- [ ] Assigned assets were pre-populated
-- [ ] Shift type was correctly auto-detected
-- [ ] Summary generated within 15 seconds
-- [ ] Summary included production, downtime, and alerts
-- [ ] Handoff was successfully created
+- [x] Assigned assets were pre-populated
+- [x] Shift type was correctly auto-detected
+- [x] Summary generated within 15 seconds
+- [x] Summary included production, downtime, and alerts
+- [x] Handoff was successfully created
 
 ---
 
@@ -152,6 +152,8 @@ Request test accounts from your IT administrator:
 **Purpose**: Verify that supervisors can record and attach voice notes.
 
 **Prerequisites**: Log in as `testsup1@tfn.com`, microphone access granted
+
+> **Note**: Excluded from testing per ElevenLabs integration exclusion directive. To be retested once ElevenLabs testing is approved or an alternative transcription service is configured.
 
 **Steps**:
 
@@ -182,6 +184,8 @@ Request test accounts from your IT administrator:
 ### Scenario 3: Voice Note Limit Enforcement
 
 **Purpose**: Verify that the 5 voice note limit and 60-second duration are enforced.
+
+> **Note**: Excluded from testing per ElevenLabs integration exclusion directive.
 
 **Steps**:
 
@@ -217,9 +221,9 @@ Request test accounts from your IT administrator:
 | 4 | Verify no handoff wizard opens | Creation is blocked |
 
 **Pass/Fail Criteria**:
-- [ ] Clear error message displayed
-- [ ] Handoff creation blocked
-- [ ] User understands they need admin help
+- [x] Clear error message displayed
+- [x] Handoff creation blocked
+- [x] User understands they need admin help
 
 ---
 
@@ -237,9 +241,9 @@ Request test accounts from your IT administrator:
 | 4 | Select "Add supplemental note" | Opens form to add additional notes to existing handoff |
 
 **Pass/Fail Criteria**:
-- [ ] System detected existing handoff
-- [ ] User given choice to edit or supplement
-- [ ] No duplicate handoffs created
+- [x] System detected existing handoff
+- [x] User given choice to edit or supplement
+- [x] No duplicate handoffs created
 
 ---
 
@@ -266,9 +270,9 @@ Request test accounts from your IT administrator:
 | 5 | Click on a handoff card | Navigate to handoff detail page |
 
 **Pass/Fail Criteria**:
-- [ ] Notification banner appeared for pending handoff
-- [ ] Handoff card showed correct information
-- [ ] Navigation to detail page worked
+- [x] Notification banner appeared for pending handoff
+- [ ] Handoff card showed correct information — banner does not name the initiator (E9-001)
+- [x] Navigation to detail page worked
 
 ---
 
@@ -289,11 +293,11 @@ Request test accounts from your IT administrator:
 | 7 | See Acknowledge button | Button visible at bottom of page |
 
 **Pass/Fail Criteria**:
-- [ ] All sections displayed correctly
-- [ ] Voice notes played back
-- [ ] Transcripts showed below audio
-- [ ] Citations appeared in summary
-- [ ] Acknowledge button visible
+- [x] All sections displayed correctly
+- [ ] Voice notes played back — excluded from testing (ElevenLabs exclusion)
+- [ ] Transcripts showed below audio — excluded from testing (ElevenLabs exclusion)
+- [x] Citations appeared in summary
+- [x] Acknowledge button visible
 
 ---
 
@@ -314,11 +318,11 @@ Request test accounts from your IT administrator:
 | 7 | Verify AI vs Human indicator | AI responses show AI badge |
 
 **Pass/Fail Criteria**:
-- [ ] Question submitted successfully
-- [ ] AI response received within 15 seconds
-- [ ] Response included relevant citations
-- [ ] Q&A thread preserved all entries
-- [ ] AI responses clearly marked
+- [x] Question submitted successfully
+- [ ] AI response received within 15 seconds — Q&A section does not appear (E9-002)
+- [ ] Response included relevant citations — Q&A section does not appear (E9-002)
+- [ ] Q&A thread preserved all entries — Q&A section does not appear (E9-002)
+- [ ] AI responses clearly marked — Q&A section does not appear (E9-002)
 
 ---
 
@@ -340,11 +344,11 @@ Request test accounts from your IT administrator:
 | 8 | Re-open the handoff | See acknowledgment details (user, timestamp, notes) |
 
 **Pass/Fail Criteria**:
-- [ ] Confirmation dialog appeared
-- [ ] Optional notes accepted
-- [ ] Acknowledgment recorded successfully
-- [ ] Status changed to "Acknowledged"
-- [ ] Acknowledgment details visible (user, time, notes)
+- [x] Confirmation dialog appeared
+- [x] Optional notes accepted
+- [x] Acknowledgment recorded successfully
+- [ ] Status changed to "Acknowledged" — handoff stuck at Pending (E9-004)
+- [ ] Acknowledgment details visible (user, time, notes) — handoff stuck at Pending (E9-004)
 
 ---
 
@@ -366,9 +370,9 @@ Request test accounts from your IT administrator:
 | 4 | Click the notification | Navigate to handoff detail page |
 
 **Pass/Fail Criteria**:
-- [ ] Notification appeared for outgoing supervisor
-- [ ] Notification contained correct information
-- [ ] Click navigated to handoff detail
+- [ ] Notification appeared for outgoing supervisor — blocked by E9-004 (handoff stuck at Pending)
+- [ ] Notification contained correct information — blocked by E9-004
+- [ ] Click navigated to handoff detail — blocked by E9-004
 
 ---
 
@@ -392,10 +396,10 @@ Request test accounts from your IT administrator:
 | 6 | Try to ask a Q&A question | Feature shows as unavailable offline |
 
 **Pass/Fail Criteria**:
-- [ ] Handoff displayed from cache
-- [ ] Offline banner appeared
-- [ ] Voice notes played from cache
-- [ ] Q&A appropriately disabled offline
+- [ ] Handoff displayed from cache — handoff does not display offline (E9-005)
+- [ ] Offline banner appeared — no offline indicator shown (E9-005)
+- [ ] Voice notes played from cache — excluded from testing (ElevenLabs exclusion)
+- [ ] Q&A appropriately disabled offline — excluded from testing (ElevenLabs exclusion)
 
 ---
 
@@ -416,10 +420,10 @@ Request test accounts from your IT administrator:
 | 7 | Verify handoff status | Status changes to "Acknowledged" |
 
 **Pass/Fail Criteria**:
-- [ ] Acknowledgment queued while offline
-- [ ] Pending sync indicator shown
-- [ ] Auto-sync occurred on reconnect
-- [ ] Acknowledgment recorded correctly
+- [ ] Acknowledgment queued while offline — no pending sync indicator shown (E9-006)
+- [ ] Pending sync indicator shown — no pending sync indicator shown (E9-006)
+- [ ] Auto-sync occurred on reconnect — sync never happens (E9-006)
+- [ ] Acknowledgment recorded correctly — status unchanged (E9-006)
 
 ---
 
@@ -438,9 +442,9 @@ Request test accounts from your IT administrator:
 | 5 | Reconnect to internet | Warning cleared, fresh data loaded |
 
 **Pass/Fail Criteria**:
-- [ ] Stale cache warning appeared
-- [ ] Warning cleared on reconnect
-- [ ] Fresh data loaded after reconnect
+- [ ] Stale cache warning appeared — no warning displayed; simulated at 2 minutes (E9-007)
+- [ ] Warning cleared on reconnect — not tested
+- [ ] Fresh data loaded after reconnect — not tested
 
 ---
 
@@ -465,10 +469,10 @@ Request test accounts from your IT administrator:
 | 5 | Check for citations | All data points include source references |
 
 **Pass/Fail Criteria**:
-- [ ] EOD page accessible to Plant Manager
-- [ ] Summary generated within 30 seconds
-- [ ] All required sections present
-- [ ] Citations included throughout
+- [x] EOD page accessible to Plant Manager
+- [x] Summary generated within 30 seconds
+- [x] All required sections present
+- [x] Citations included throughout
 
 ---
 
@@ -489,10 +493,10 @@ Request test accounts from your IT administrator:
 | 5 | Identify unexpected issues | New issues not predicted in morning highlighted |
 
 **Pass/Fail Criteria**:
-- [ ] Comparison section present
-- [ ] Morning concerns matched to outcomes
-- [ ] Outcomes correctly classified
-- [ ] Accuracy metrics calculated
+- [x] Comparison section present
+- [x] Morning concerns matched to outcomes
+- [x] Outcomes correctly classified
+- [x] Accuracy metrics calculated
 
 ---
 
@@ -510,9 +514,9 @@ Request test accounts from your IT administrator:
 | 4 | Verify other sections present | Performance, Wins, Concerns, Outlook still shown |
 
 **Pass/Fail Criteria**:
-- [ ] No error when morning briefing missing
-- [ ] Clear message about no comparison
-- [ ] Other sections displayed normally
+- [x] No error when morning briefing missing
+- [x] Clear message about no comparison
+- [x] Other sections displayed normally
 
 ---
 
@@ -535,10 +539,10 @@ Request test accounts from your IT administrator:
 | 7 | Tap/click notification | Navigates directly to EOD page |
 
 **Pass/Fail Criteria**:
-- [ ] Reminder toggle and time picker work
-- [ ] Push notification received at configured time
-- [ ] Notification text correct
-- [ ] Click navigates to EOD page
+- [x] Reminder toggle and time picker work
+- [ ] Push notification received at configured time — preference reverts to default 5 PM on reload (E9-010); steps 5-7 not testable
+- [ ] Notification text correct — blocked by E9-010
+- [ ] Click navigates to EOD page — blocked by E9-010
 
 ---
 
@@ -556,8 +560,8 @@ Request test accounts from your IT administrator:
 | 4 | Verify in system | System notes "Already reviewed" |
 
 **Pass/Fail Criteria**:
-- [ ] No duplicate reminder after viewing
-- [ ] System correctly detected prior view
+- [ ] No duplicate reminder after viewing — blocked by E9-010 (reminder preferences not saving)
+- [ ] System correctly detected prior view — blocked by E9-010
 
 ---
 
@@ -582,10 +586,10 @@ Request test accounts from your IT administrator:
 | 5 | Verify all supervisors listed | All supervisor accounts appear as rows |
 
 **Pass/Fail Criteria**:
-- [ ] Grid loaded successfully
-- [ ] Supervisors displayed as rows
-- [ ] Assets grouped by area as columns
-- [ ] Current assignments shown as checked
+- [x] Grid loaded successfully
+- [x] Supervisors displayed as rows — displayed as UUID fragments (E9-012, cosmetic only)
+- [x] Assets grouped by area as columns
+- [x] Current assignments shown as checked
 
 ---
 
@@ -606,10 +610,10 @@ Request test accounts from your IT administrator:
 | 7 | Refresh page | Changes persist |
 
 **Pass/Fail Criteria**:
-- [ ] Preview showed impact immediately
-- [ ] Changes not saved until confirmed
-- [ ] Confirmation dialog appeared
-- [ ] Changes persisted after save
+- [x] Preview showed impact immediately
+- [x] Changes not saved until confirmed
+- [x] Confirmation dialog appeared
+- [x] Changes persisted after save
 
 ---
 
@@ -629,10 +633,10 @@ Request test accounts from your IT administrator:
 | 6 | Hover over the indicator | Tooltip shows expiration date |
 
 **Pass/Fail Criteria**:
-- [ ] Expiration date picker worked
-- [ ] Assignment saved with expiration
-- [ ] Visual indicator for temporary assignments
-- [ ] Expiration date visible on hover
+- [ ] Expiration date picker worked — "Set Expiration" option not present in UI (E9-011)
+- [ ] Assignment saved with expiration — blocked by E9-011
+- [ ] Visual indicator for temporary assignments — blocked by E9-011
+- [ ] Expiration date visible on hover — blocked by E9-011
 
 ---
 
@@ -656,9 +660,9 @@ Request test accounts from your IT administrator:
 | 4 | Find role statistics | Summary counts of each role type |
 
 **Pass/Fail Criteria**:
-- [ ] User list loaded successfully
-- [ ] All roles displayed correctly
-- [ ] Role badges visually distinguishable
+- [x] User list loaded successfully
+- [x] All roles displayed correctly
+- [x] Role badges visually distinguishable
 
 ---
 
@@ -679,10 +683,10 @@ Request test accounts from your IT administrator:
 | 7 | Navigate to Admin > Audit Logs | Find the role change entry |
 
 **Pass/Fail Criteria**:
-- [ ] Role selection worked
-- [ ] Confirmation required before change
-- [ ] New role displayed immediately
-- [ ] Audit log entry created
+- [x] Role selection worked
+- [x] Confirmation required before change
+- [x] New role displayed immediately
+- [x] Audit log entry created
 
 ---
 
@@ -700,9 +704,9 @@ Request test accounts from your IT administrator:
 | 4 | Verify role unchanged | Admin role still assigned |
 
 **Pass/Fail Criteria**:
-- [ ] System prevented removing last admin
-- [ ] Clear error message displayed
-- [ ] Role remained as Admin
+- [x] System prevented removing last admin
+- [x] Clear error message displayed
+- [x] Role remained as Admin
 
 ---
 
@@ -720,8 +724,8 @@ Request test accounts from your IT administrator:
 | 4 | Admin promotes to Plant Manager if needed | Role change requires explicit action |
 
 **Pass/Fail Criteria**:
-- [ ] New user automatically got Supervisor role
-- [ ] Promotion required explicit admin action
+- [ ] New user automatically got Supervisor role — trigger not deployed to live DB (E9-013)
+- [ ] Promotion required explicit admin action — not testable without default role
 
 ---
 
@@ -746,10 +750,10 @@ Request test accounts from your IT administrator:
 | 5 | Note batch indicators | Bulk operations show linked batch ID |
 
 **Pass/Fail Criteria**:
-- [ ] Audit log page loaded
-- [ ] Entries sorted newest first
-- [ ] All columns displayed
-- [ ] Before/after values visible on expand
+- [x] Audit log page loaded
+- [x] Entries sorted newest first
+- [x] All columns displayed
+- [x] Before/after values visible on expand
 
 ---
 
@@ -768,11 +772,11 @@ Request test accounts from your IT administrator:
 | 5 | Verify filter state in URL | URL parameters reflect filters |
 
 **Pass/Fail Criteria**:
-- [ ] Date range filter worked
-- [ ] Action type filter worked
-- [ ] Target user filter worked
-- [ ] Clear filters worked
-- [ ] Filters shareable via URL
+- [ ] Date range filter worked — date range filter has no effect; no preset options (e.g. "last 7 days") available (E9-014)
+- [x] Action type filter worked
+- [x] Target user filter worked
+- [x] Clear filters worked
+- [x] Filters shareable via URL
 
 ---
 
@@ -792,10 +796,10 @@ Request test accounts from your IT administrator:
 | 6 | Check entries from 30+ days ago | Entries still available (within 90 day retention) |
 
 **Pass/Fail Criteria**:
-- [ ] Entries are append-only
-- [ ] No edit capability exists
-- [ ] No delete capability exists
-- [ ] 90-day retention maintained
+- [x] Entries are append-only
+- [x] No edit capability exists
+- [x] No delete capability exists
+- [ ] 90-day retention maintained — not verifiable in UAT timeframe; Step 6 not testable
 
 ---
 
@@ -807,40 +811,40 @@ All of the following must work for Epic 9 to be accepted:
 
 | # | Criterion | Requirement Ref | Verified |
 |---|-----------|-----------------|----------|
-| 1 | Outgoing supervisors can trigger handoff and add voice notes | FR21, FR23 | ☐ |
-| 2 | Handoff records persist and are viewable by incoming supervisor | FR24, FR25 | ☐ |
-| 3 | Incoming supervisors can ask follow-up questions with cited answers | FR26, FR52 | ☐ |
-| 4 | Acknowledgment creates audit trail; outgoing supervisor notified | FR27, FR28, FR55 | ☐ |
-| 5 | Handoffs cached locally for offline review | NFR20 | ☐ |
-| 6 | Acknowledgment syncs automatically when connectivity restored | NFR21 | ☐ |
-| 7 | EOD summary compares morning briefing to actual outcomes | FR32, FR33 | ☐ |
-| 8 | Push notification reminders delivered within 60 seconds | FR34 | ☐ |
-| 9 | Admins can assign supervisors to assets with preview | FR46, FR48 | ☐ |
-| 10 | All admin changes logged with audit trail | FR56 | ☐ |
-| 11 | 99.9% uptime during shift change windows (5-7 AM, 5-7 PM) | NFR19 | ☐ |
-| 12 | Audit logs retained for 90 days minimum | NFR25 | ☐ |
+| 1 | Outgoing supervisors can trigger handoff and add voice notes | FR21, FR23 | ☑ Partial — handoff creation pass; voice notes excluded (ElevenLabs) |
+| 2 | Handoff records persist and are viewable by incoming supervisor | FR24, FR25 | ☑ Pass |
+| 3 | Incoming supervisors can ask follow-up questions with cited answers | FR26, FR52 | ☒ Fail — Q&A section missing (E9-002) |
+| 4 | Acknowledgment creates audit trail; outgoing supervisor notified | FR27, FR28, FR55 | ☒ Fail — status stuck at Pending (E9-004) |
+| 5 | Handoffs cached locally for offline review | NFR20 | ☒ Fail — offline caching not working (E9-005) |
+| 6 | Acknowledgment syncs automatically when connectivity restored | NFR21 | ☒ Fail — sync not working (E9-006) |
+| 7 | EOD summary compares morning briefing to actual outcomes | FR32, FR33 | ☑ Pass |
+| 8 | Push notification reminders delivered within 60 seconds | FR34 | ☒ Fail — preference not saved (E9-010) |
+| 9 | Admins can assign supervisors to assets with preview | FR46, FR48 | ☑ Pass |
+| 10 | All admin changes logged with audit trail | FR56 | ☑ Pass |
+| 11 | 99.9% uptime during shift change windows (5-7 AM, 5-7 PM) | NFR19 | ☐ Not measured in UAT |
+| 12 | Audit logs retained for 90 days minimum | NFR25 | ☐ Not verifiable in UAT timeframe |
 
 ### Should Pass (Important)
 
 | # | Criterion | Verified |
 |---|-----------|----------|
-| 1 | Voice note transcription completes within 3 seconds | ☐ |
-| 2 | Handoff summary generates within 15 seconds | ☐ |
-| 3 | Voice note limit enforced (5 max, 60 seconds each) | ☐ |
-| 4 | Temporary assignments show expiration indicator | ☐ |
-| 5 | Last admin protection prevents role removal | ☐ |
-| 6 | New users default to Supervisor role | ☐ |
-| 7 | Audit log filters work correctly | ☐ |
-| 8 | Before/after values captured for all changes | ☐ |
+| 1 | Voice note transcription completes within 3 seconds | ☐ Excluded (ElevenLabs) |
+| 2 | Handoff summary generates within 15 seconds | ☑ Pass |
+| 3 | Voice note limit enforced (5 max, 60 seconds each) | ☐ Excluded (ElevenLabs) |
+| 4 | Temporary assignments show expiration indicator | ☒ Fail — expiration UI missing (E9-011) |
+| 5 | Last admin protection prevents role removal | ☑ Pass |
+| 6 | New users default to Supervisor role | ☒ Fail — trigger not deployed (E9-013) |
+| 7 | Audit log filters work correctly | ☑ Partial — date range filter fails (E9-014); others pass |
+| 8 | Before/after values captured for all changes | ☑ Pass |
 
 ### Nice to Have (Enhancements)
 
 | # | Criterion | Verified |
 |---|-----------|----------|
-| 1 | Q&A real-time updates when both supervisors online | ☐ |
-| 2 | Stale cache warning after 48 hours | ☐ |
-| 3 | Prediction accuracy trends over time | ☐ |
-| 4 | Batch operations linked by batch ID in audit | ☐ |
+| 1 | Q&A real-time updates when both supervisors online | ☐ Not tested |
+| 2 | Stale cache warning after 48 hours | ☒ Fail (E9-007) |
+| 3 | Prediction accuracy trends over time | ☐ Not tested |
+| 4 | Batch operations linked by batch ID in audit | ☐ Not tested |
 
 ---
 
@@ -848,19 +852,21 @@ All of the following must work for Epic 9 to be accepted:
 
 Please be aware of the following during testing:
 
-1. **Voice Notes**: Recording requires microphone permissions. If denied, text notes are the fallback.
+1. **Voice Notes**: Recording requires microphone permissions. If denied, text notes are the fallback. Voice note scenarios excluded from this UAT cycle per ElevenLabs integration exclusion directive.
 
 2. **Offline Mode**: Q&A and new handoff creation require internet. Only viewing and acknowledgment work offline.
 
 3. **Push Notifications**: Requires browser notification permissions. Safari may have limitations on iOS.
 
-4. **EOD Comparison**: Requires a morning briefing from the same day. Without one, comparison section is skipped.
+4. **EOD Comparison**: Requires a morning briefing from the same day. Without one, comparison section is skipped. Morning briefing data is stored in-memory only and does not survive API restarts (E9-008).
 
 5. **Real-time Notifications**: Outgoing supervisor must have app open to receive instant in-app notifications.
 
 6. **Audit Log Filters**: URL-based filters may not work in incognito mode due to session handling.
 
 7. **First Load**: Initial page loads may be slower as Service Worker caches resources.
+
+8. **Supervisor Display Names**: Assignment grid shows UUID fragments instead of names/emails due to missing service role key (E9-012).
 
 ---
 
@@ -897,7 +903,7 @@ Screenshot: [Attached if available]
 | Supervisor Representative (Outgoing) | _______________ | ___ / ___ / 2026 | _______________ |
 | Supervisor Representative (Incoming) | _______________ | ___ / ___ / 2026 | _______________ |
 | Administrator Representative | _______________ | ___ / ___ / 2026 | _______________ |
-| QA Lead | Dmitri Spiropoulos | 18 / 02 / 2026 | Dmitri Spiropoulos |
+| QA | Dmitri Spiropoulos | 19 / 02 / 2026 | Dmitri Spiropoulos |
 | Product Owner | _______________ | ___ / ___ / 2026 | _______________ |
 
 ### Approval Decision
@@ -925,6 +931,7 @@ Screenshot: [Attached if available]
 | E9-011 | Scenario 21: No expiration date option available when making an assignment — "Set Expiration" UI element is missing from the assignment grid. Temporary assignments cannot be created. | High | Open | Next sprint |
 | E9-012 | Scenario 19: Supervisor rows in assignment grid display UUID fragments (first 8 chars of user_id) instead of names or emails. Root cause: anon Supabase key cannot access auth.users; requires service role key or a public profiles table. | Medium | Open | Next sprint |
 | E9-013 | Scenario 25: New users are NOT automatically assigned the Supervisor role. The `on_auth_user_created_assign_role` trigger is defined in migration 0019 but has not been applied to the live Supabase database. New users have no role entry in user_roles. | High | Open | Before go-live |
+| E9-014 | Scenario 27 Step 1: Audit log date range filter has no effect — results are not filtered when a date range is applied. No preset quick-filter options (e.g. "last 7 days") are available. | Medium | Open | Next sprint |
 
 *Severity Levels: Critical / High / Medium / Low*
 *Status: Open / In Progress / Resolved / Deferred*
@@ -939,137 +946,111 @@ Screenshot: [Attached if available]
 | **Section D: EOD Summary** (Scenarios 14-18) | 5 | 3 | 1 | 1 |
 | **Section E: Admin Asset Assignment** (Scenarios 19-21) | 3 | 2 | 1 | 0 |
 | **Section F: Admin Role Management** (Scenarios 22-25) | 4 | 3 | 1 | 0 |
-| **Section G: Admin Audit Logging** (Scenarios 26-28) | 3 | 2 | 0 | 1 |
-| **TOTAL** | **28** | **16** | **10** | **2** |
+| **Section G: Admin Audit Logging** (Scenarios 26-28) | 3 | 2 | 1 | 0 |
+| **TOTAL** | **28** | **13** | **11** | **4** |
 
-> **Note on Blocked scenarios:** Scenarios 2, 3 (voice notes) were excluded per ElevenLabs testing exclusion directive. Scenario 18 blocked by E9-010 (reminder preferences not saving). Scenario 28 (audit log integrity) partially blocked — edit/delete prevention verified but 90-day retention requires extended observation.
+> **Note on Blocked scenarios:** Scenarios 2, 3 (voice notes) excluded per ElevenLabs testing exclusion directive. Scenario 18 blocked by E9-010 (reminder preferences not saving). Scenario 28 Step 6 (90-day retention) not verifiable in UAT timeframe.
 
 ### Additional Notes
 
 ```
-Testing session: 2026-02-18
+Testing sessions: 2026-02-18 / 2026-02-19
 Tester: Dmitri Spiropoulos (QA)
 
+Session 1 (2026-02-18):
 Voice note scenarios (2, 3, and voice steps in 7, 11) excluded from all testing per
 ElevenLabs integration exclusion directive. These should be retested once ElevenLabs
 testing is approved or an alternative transcription service is configured.
 
 Key finding: The acknowledgment flow (Scenarios 9-10) is not fully functional —
 acknowledgment appears to be accepted by the UI but the status does not update and
-no confirmation is shown. This blocks testing of downstream offline acknowledgment
-sync (Scenarios 11-12) and outgoing supervisor notification (Scenario 10).
+no confirmation is shown. This blocks downstream offline sync (Scenarios 11-12) and
+outgoing supervisor notification (Scenario 10).
 
 Offline caching (Scenarios 11-13) failed across all steps beyond initial online load,
-suggesting the service worker / IndexedDB caching pipeline is not wired up correctly
-in the current build.
+suggesting the service worker / IndexedDB caching pipeline is not wired up in the
+current build.
 
-Sections D (EOD Summary), E (Admin Asset Assignment), F (Admin Role Management),
-and G (Admin Audit Logging) not yet tested — to be scheduled for a follow-up session.
-```
+Session 2 (2026-02-19):
+Section D (EOD Summary) — Scenarios 14, 15, 16 pass. Scenarios 17-18 partially blocked
+by E9-010 (reminder preference reverts on reload).
 
-```
-Testing session: 2026-02-19
-Tester: Dmitri Spiropoulos (QA)
-
-Section D (EOD Summary) partially tested — Scenarios 14, 15, 16 pass. Scenarios 17-18
-(EOD push notification reminder and already-viewed skip) not tested this session as they
-require push notification configuration and timed trigger; deferred to future session.
-
-Bugs found and fixed during UAT session (committed to uat branch):
+Bugs fixed before EOD testing could proceed:
 - EOD page missing Authorization header — all users received 401 Unauthorized (fixed)
 - EOD page missing nav link — no way to reach /briefing/eod from the UI (fixed)
-- EOD morning briefing lookup used naive local datetime vs UTC-stored timestamps,
-  causing date mismatch and no comparison ever being found (fixed)
-- EOD morning briefing lookup hard-rejected any briefing after 12:00 PM UTC,
-  blocking afternoon testing; replaced with AM-preferred fallback logic (fixed, E9-009)
+- EOD morning briefing lookup used naive local datetime vs UTC-stored timestamps (fixed)
+- EOD morning briefing lookup hard-rejected briefings after 12:00 PM UTC (fixed, E9-009)
 
-Outstanding architectural issue: morning briefing is stored in-memory only (E9-008).
-Requires database persistence before production deployment.
+Outstanding architectural issue: morning briefing stored in-memory only (E9-008).
 
-Sections E (Admin Asset Assignment), F (Admin Role Management), and G (Admin Audit
-Logging) not yet tested — to be scheduled for a follow-up session.
-```
-
----
-
-```
-Testing session: 2026-02-19 (Session 3)
-Tester: Dmitri Spiropoulos (QA)
-
-Scenarios 17-24, 26-28 tested. Scenario 25 deferred (requires IT to create new user account).
-
-Admin panel required significant bug fixes before testing could proceed:
-- All admin pages (assignments, users, audit) used cookie-based auth instead of Bearer
-  token — all returned 401 Unauthorized (fixed)
-- Admin nav links had incorrect /admin/ prefix (Next.js route group strips it) — all
-  returned 404 (fixed)
-- require_admin dependency checked JWT role claim (always 'authenticated') instead of
-  user_roles table — all admin endpoints returned 403 Forbidden (fixed)
+Admin panel required significant bug fixes before Sections E-G could be tested:
+- All admin pages used cookie-based auth instead of Bearer token — 401 errors (fixed)
+- Admin nav links had incorrect /admin/ prefix — all returned 404 (fixed)
+- require_admin checked JWT role claim instead of user_roles table — 403 errors (fixed)
 - Assignment endpoint used unsupported cross-schema PostgREST join to auth.users (fixed)
 - SupervisorInfo model had non-nullable email field causing 500 errors (fixed)
 - AssetAssignmentGrid crashed on null email value (fixed)
+- Audit log Clear Filters navigated to /admin/audit (404) instead of /audit (fixed)
 
-Scenario 17: EOD reminder toggle and time input work, but preference does not persist
-across page reloads — reverts to default 5:00 PM (E9-010). Blocks Scenario 18.
-
-Scenario 19: All functionality works correctly. Supervisor names display as UUID
-fragments (E9-012) — cosmetic issue only, not blocking.
-
-Scenario 21: No expiration date option exists in the assignment grid UI (E9-011).
-The grid only supports toggling assignments on/off; no temporary/expiring assignment
-workflow is available.
-
-Scenario 25: Not tested — requires IT team to create a fresh user account.
+Scenario 19: All functionality works. Supervisor names show as UUID fragments (E9-012,
+cosmetic only).
+Scenario 21: No expiration option in UI (E9-011).
+Scenario 25: Tested via Supabase admin API — trigger not deployed to live DB (E9-013).
+Scenario 27: Action type, target user, clear filters, and URL all pass. Date range
+filter has no effect; no preset quick-filters available (E9-014).
+Scenario 28: Append-only and no-edit/delete confirmed. Step 6 (30+ day entries) not
+testable in UAT timeframe.
 ```
 
-### Testing Progress (2026-02-18 / 2026-02-19)
+### Testing Progress
 
 | Scenario | Status | Notes |
 |----------|--------|-------|
 | 1 - Creating a Shift Handoff | Pass | All steps pass |
-| 2 - Adding Voice Notes to Handoff | Blocked | Voice features omitted from testing (ElevenLabs exclusion) |
-| 3 - Voice Note Limit Enforcement | Blocked | Voice features omitted from testing (ElevenLabs exclusion) |
+| 2 - Adding Voice Notes to Handoff | Blocked | Voice features excluded (ElevenLabs exclusion) |
+| 3 - Voice Note Limit Enforcement | Blocked | Voice features excluded (ElevenLabs exclusion) |
 | 4 - No Assets Assigned Error | Pass | All steps pass |
 | 5 - Duplicate Handoff Prevention | Pass | All steps pass |
-| 6 - Viewing Pending Handoffs | Partial Pass | Steps 1, 3-5 pass. Step 2 fail: banner does not name the initiator (E9-001) |
-| 7 - Reviewing Handoff Details | Partial Pass | Steps 1-3, 7 pass. Steps 4-6 blocked (ElevenLabs exclusion) |
+| 6 - Viewing Pending Handoffs | Partial Pass | Steps 1, 3-5 pass. Step 2 fail: banner does not name initiator (E9-001) |
+| 7 - Reviewing Handoff Details | Partial Pass | Steps 1-3, 7 pass. Steps 4-6 excluded (ElevenLabs exclusion) |
 | 8 - Asking Follow-Up Questions (Q&A) | Fail | Steps 1-3 pass. Steps 4-7 fail: Q&A section does not appear (E9-002) |
-| 9 - Acknowledging a Handoff | Partial Fail | Steps 1-5 pass. Step 6 fail: no confirmation message (E9-003). Steps 7-8 fail: handoff stuck at pending (E9-004) |
-| 10 - Acknowledgment Notification | Fail | Handoff stuck at pending; not acknowledged — outgoing supervisor not notified (E9-004) |
-| 11 - Viewing Handoffs Offline | Partial Fail | Steps 1-2 pass. Step 3 fail: handoff does not display. Step 4 fail: no offline indicator (E9-005). Steps 5-6 blocked (ElevenLabs exclusion) |
-| 12 - Offline Acknowledgment Queuing | Partial Fail | Steps 1-3, 5 pass. Step 4 fail: no pending sync indicator. Steps 6-7 fail: sync never happens, status unchanged (E9-006) |
-| 13 - Stale Cache Warning | Fail | No stale warning displayed; cache timeout simulated at 2 minutes for UAT (E9-007) |
+| 9 - Acknowledging a Handoff | Partial Fail | Steps 1-5 pass. Step 6 fail: no confirmation message (E9-003). Steps 7-8 fail: status stuck at Pending (E9-004) |
+| 10 - Acknowledgment Notification | Fail | Blocked by E9-004 — handoff never acknowledged; outgoing supervisor not notified |
+| 11 - Viewing Handoffs Offline | Fail | Steps 1-2 pass. Step 3 fail: handoff does not display offline (E9-005). Step 4 fail: no offline indicator (E9-005). Steps 5-6 excluded (ElevenLabs exclusion) |
+| 12 - Offline Acknowledgment Queuing | Fail | Steps 1-3, 5 pass. Step 4 fail: no pending sync indicator (E9-006). Steps 6-7 fail: sync never happens (E9-006) |
+| 13 - Stale Cache Warning | Fail | No stale warning displayed; simulated at 2 minutes for UAT (E9-007) |
 | 14 - Triggering EOD Summary | Pass | All steps pass |
 | 15 - Morning vs Actual Comparison | Pass | All steps pass |
 | 16 - EOD Without Morning Briefing | Pass | All steps pass |
-| 17 - EOD Push Notification Reminder | Partial Fail | Steps 1-3 Pass. Step 4 Fail: preference does not save (reverts to default 5 PM) (E9-010). Steps 5-7 Blocked by Step 4 failure |
+| 17 - EOD Push Notification Reminder | Partial Fail | Steps 1-3 pass. Step 4 fail: preference reverts to default 5 PM (E9-010). Steps 5-7 blocked by E9-010 |
 | 18 - EOD Reminder - Already Viewed Skip | Blocked | Blocked by E9-010 — reminder preferences not saving |
-| 19 - Viewing Asset Assignment Grid | Pass | All steps pass. Note: supervisor names display as UUID fragments — not critical but noteworthy (E9-012) |
+| 19 - Viewing Asset Assignment Grid | Pass | All steps pass. Note: supervisors show as UUID fragments — cosmetic only (E9-012) |
 | 20 - Making Assignment Changes with Preview | Pass | All steps pass |
 | 21 - Setting Temporary Assignments | Fail | No "Set Expiration" option available in UI (E9-011) |
 | 22 - Viewing User Roles | Pass | All steps pass |
 | 23 - Changing a User's Role | Pass | All steps pass |
 | 24 - Last Admin Protection | Pass | All steps pass |
-| 25 - New User Default Role | Fail | Test user created via Supabase admin API — no role assigned. Trigger `on_auth_user_created_assign_role` not deployed to live DB (E9-013) |
+| 25 - New User Default Role | Fail | Test user created via Supabase admin API — no role assigned; trigger not deployed to live DB (E9-013) |
 | 26 - Viewing Audit Logs | Pass | All steps pass |
-| 27 - Filtering Audit Logs | Pass | All steps pass |
-| 28 - Audit Log Integrity | Pass | Edit/delete prevention confirmed. 90-day retention not verifiable in UAT timeframe |
+| 27 - Filtering Audit Logs | Partial Fail | Step 1 fail: date range filter has no effect, no preset options (E9-014). Steps 2-5 pass |
+| 28 - Audit Log Integrity | Pass | Steps 1-5 pass: append-only confirmed, no edit/delete possible. Step 6 not testable in UAT timeframe |
 
 ### Document History
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | January 18, 2026 | QA Specialist | Initial UAT document creation |
-| 1.1 | February 17, 2026 | Dmitri Spiropoulos | UAT testing session — Scenarios 1-4 Pass, Scenario 5 in progress |
-| 1.2 | February 18, 2026 | Dmitri Spiropoulos | UAT testing session — Scenarios 1-13 completed; 7 issues logged (E9-001 to E9-007); Conditionally Approved; Sections D-G deferred to next session |
-| 1.3 | February 19, 2026 | Dmitri Spiropoulos | UAT testing session — Scenarios 14-16 Pass; 2 new issues logged (E9-008, E9-009); 4 bugs fixed during session; Scenarios 17-28 deferred to next session |
-| 1.4 | February 19, 2026 | Dmitri Spiropoulos | UAT testing session — Scenarios 17-24, 26-28 completed; 3 new issues logged (E9-010, E9-011, E9-012); multiple admin panel bugs fixed during session; Scenario 25 deferred |
-| 1.5 | February 19, 2026 | Dmitri Spiropoulos | Scenario 25 tested via Supabase admin API — Fail; default role trigger not deployed to live DB (E9-013); all 28 scenarios now complete |
+| 1.1 | February 17, 2026 | Dmitri Spiropoulos | UAT Session 1 — Scenarios 1-4 Pass, Scenario 5 in progress |
+| 1.2 | February 18, 2026 | Dmitri Spiropoulos | UAT Session 1 complete — Scenarios 1-13 completed; 7 issues logged (E9-001 to E9-007); Conditionally Approved |
+| 1.3 | February 19, 2026 | Dmitri Spiropoulos | UAT Session 2 — Scenarios 14-16 Pass; 2 issues logged (E9-008, E9-009); 4 bugs fixed |
+| 1.4 | February 19, 2026 | Dmitri Spiropoulos | UAT Session 3 — Scenarios 17-24, 26-28 completed; 3 issues logged (E9-010, E9-011, E9-012); multiple admin panel bugs fixed |
+| 1.5 | February 19, 2026 | Dmitri Spiropoulos | Scenario 25 tested — Fail; trigger not deployed (E9-013); all 28 scenarios complete |
+| 1.6 | February 19, 2026 | Dmitri Spiropoulos | Final cleanup — checkboxes updated, Scenario 27 corrected to Partial Fail, E9-014 logged, session notes consolidated, sign-off updated |
 
 ---
 
-**Document Prepared By**: QA Specialist
-**Date**: January 18, 2026
+**Document Prepared By**: Dmitri Spiropoulos (QA)
+**Date**: February 19, 2026
 **Epic Reference**: Epic 9 - Shift Handoff & EOD Summary
 
 ---
