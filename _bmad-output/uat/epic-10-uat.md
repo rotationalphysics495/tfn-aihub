@@ -1,8 +1,10 @@
 # Bug Fixes & Data Quality - User Acceptance Testing
 
 **Epic**: 10
-**Version**: 1.0
+**Version**: 1.1
 **Generated**: 2026-02-11
+**Last Updated**: 2026-02-19
+**Status**: Testing In Progress
 **Stories Covered**: 3
 
 ---
@@ -68,9 +70,9 @@ A Plant Manager or Shift Supervisor who regularly uses the dashboard to monitor 
 
 **Success Criteria**: Safety alerts section displays active safety events with no errors.
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☑ Pass  ☐ Fail
 
-**Notes**: _________________________________
+**Notes**: All steps pass.
 
 ---
 
@@ -91,9 +93,9 @@ A Plant Manager or Shift Supervisor who regularly uses the dashboard to monitor 
 
 **Success Criteria**: A safety alert can be acknowledged successfully and the status persists after refresh.
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☑ Pass  ☐ Fail
 
-**Notes**: _________________________________
+**Notes**: All steps pass.
 
 ---
 
@@ -114,9 +116,9 @@ A Plant Manager or Shift Supervisor who regularly uses the dashboard to monitor 
 
 **Success Criteria**: The live pulse view loads successfully and shows production data for all assets.
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☑ Pass  ☐ Fail
 
-**Notes**: _________________________________
+**Notes**: All steps pass.
 
 ---
 
@@ -136,9 +138,9 @@ A Plant Manager or Shift Supervisor who regularly uses the dashboard to monitor 
 
 **Success Criteria**: OEE is shown gracefully (a default value or placeholder) and does not cause page errors.
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☑ Pass  ☐ Fail
 
-**Notes**: _________________________________
+**Notes**: All steps pass.
 
 ---
 
@@ -238,11 +240,10 @@ This epic is **successful** when a user can:
 
 ## Issues Log
 
-| # | Scenario | Issue Description | Severity | Screenshot |
-|---|----------|-------------------|----------|------------|
-| 1 | | | | |
-| 2 | | | | |
-| 3 | | | | |
+| # | Scenario | Issue Description | Severity | Status |
+|---|----------|-------------------|----------|--------|
+| E10-001 | 1, 2 | Live Pulse safety events always returned empty — API queried non-existent `acknowledged` column instead of `is_resolved`. Fixed in `live_pulse.py`. | Major | Fixed |
+| E10-002 | 3 | Live Pulse status classification used wrong enum values (`above_target`/`below_target`) vs DB values (`ahead`/`behind`), causing all assets to show as "running normally" regardless of actual status. Fixed in `live_pulse.py`. | Major | Fixed |
 
 ### Severity Definitions
 
@@ -258,11 +259,11 @@ This epic is **successful** when a user can:
 
 | Metric | Value |
 |--------|-------|
-| Scenarios Tested | \_\_ / 8 |
-| Scenarios Passed | \_\_ / 8 |
-| Critical Issues | |
-| Major Issues | |
-| Minor Issues | |
+| Scenarios Tested | 4 / 8 |
+| Scenarios Passed | 4 / 8 |
+| Critical Issues | 0 |
+| Major Issues | 2 (E10-001, E10-002 — both fixed) |
+| Minor Issues | 0 |
 
 ### Recommendation
 
@@ -274,9 +275,18 @@ This epic is **successful** when a user can:
 
 | Role | Name | Date | Signature |
 |------|------|------|-----------|
-| Tester | | | |
+| Tester | Dmitri Spiropoulos (QA) | 2026-02-19 | — In Progress |
 | Product Owner | | | |
 | Tech Lead | | | |
+
+---
+
+## Version History
+
+| Version | Date | Author | Changes |
+|---------|------|--------|---------|
+| 1.0 | 2026-02-11 | BMAD | Initial document generated |
+| 1.1 | 2026-02-19 | Dmitri Spiropoulos (QA) | Session 1: Scenarios 1–4 Pass; E10-001 and E10-002 found and fixed |
 
 ---
 

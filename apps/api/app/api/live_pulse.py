@@ -297,9 +297,9 @@ async def get_live_pulse_data(
 
             # Machine status based on snapshot status
             status_val = snapshot.get("status", "on_target")
-            if status_val == "above_target" or status_val == "on_target":
+            if status_val in ("ahead", "on_target", "above_target"):
                 running_count += 1
-            elif status_val == "below_target":
+            elif status_val in ("behind", "below_target"):
                 # Below target but still running
                 running_count += 1
             elif status_val == "idle":
@@ -348,8 +348,8 @@ async def get_live_pulse_data(
         # =====================================================================
 
         safety_response = client.table("safety_events").select(
-            "id, asset_id, event_timestamp, reason_code, severity, acknowledged"
-        ).eq("acknowledged", False).execute()
+            "id, asset_id, event_timestamp, reason_code, severity, is_resolved"
+        ).eq("is_resolved", False).execute()
 
         active_incidents = []
         for event in safety_response.data or []:
