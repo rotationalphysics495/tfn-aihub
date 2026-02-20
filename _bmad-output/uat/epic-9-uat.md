@@ -1,7 +1,7 @@
 # User Acceptance Testing Document
 # Epic 9: Shift Handoff & EOD Summary
 
-**Version:** 1.4
+**Version:** 1.5
 **Date:** January 18, 2026
 **Last Updated:** February 19, 2026
 **Prepared For:** Plant Managers, Supervisors, and Administrators
@@ -924,6 +924,7 @@ Screenshot: [Attached if available]
 | E9-010 | Scenario 17 Step 4: EOD reminder time preference does not save — reverts to default 5:00 PM after page reload. Blocks Scenarios 17–18. | High | Open | Next sprint |
 | E9-011 | Scenario 21: No expiration date option available when making an assignment — "Set Expiration" UI element is missing from the assignment grid. Temporary assignments cannot be created. | High | Open | Next sprint |
 | E9-012 | Scenario 19: Supervisor rows in assignment grid display UUID fragments (first 8 chars of user_id) instead of names or emails. Root cause: anon Supabase key cannot access auth.users; requires service role key or a public profiles table. | Medium | Open | Next sprint |
+| E9-013 | Scenario 25: New users are NOT automatically assigned the Supervisor role. The `on_auth_user_created_assign_role` trigger is defined in migration 0019 but has not been applied to the live Supabase database. New users have no role entry in user_roles. | High | Open | Before go-live |
 
 *Severity Levels: Critical / High / Medium / Low*
 *Status: Open / In Progress / Resolved / Deferred*
@@ -937,11 +938,11 @@ Screenshot: [Attached if available]
 | **Section C: Offline Capabilities** (Scenarios 11-13) | 3 | 0 | 3 | 0 |
 | **Section D: EOD Summary** (Scenarios 14-18) | 5 | 3 | 1 | 1 |
 | **Section E: Admin Asset Assignment** (Scenarios 19-21) | 3 | 2 | 1 | 0 |
-| **Section F: Admin Role Management** (Scenarios 22-25) | 4 | 3 | 0 | 1 |
+| **Section F: Admin Role Management** (Scenarios 22-25) | 4 | 3 | 1 | 0 |
 | **Section G: Admin Audit Logging** (Scenarios 26-28) | 3 | 2 | 0 | 1 |
-| **TOTAL** | **28** | **16** | **9** | **3** |
+| **TOTAL** | **28** | **16** | **10** | **2** |
 
-> **Note on Blocked scenarios:** Scenarios 2, 3 (voice notes) were excluded per ElevenLabs testing exclusion directive. Scenario 18 blocked by E9-010 (reminder preferences not saving). Scenario 25 (new user default role) not tested — requires IT to create a new account. Scenario 28 (audit log integrity) partially blocked — edit/delete prevention verified but 90-day retention requires extended observation.
+> **Note on Blocked scenarios:** Scenarios 2, 3 (voice notes) were excluded per ElevenLabs testing exclusion directive. Scenario 18 blocked by E9-010 (reminder preferences not saving). Scenario 28 (audit log integrity) partially blocked — edit/delete prevention verified but 90-day retention requires extended observation.
 
 ### Additional Notes
 
@@ -1049,7 +1050,7 @@ Scenario 25: Not tested — requires IT team to create a fresh user account.
 | 22 - Viewing User Roles | Pass | All steps pass |
 | 23 - Changing a User's Role | Pass | All steps pass |
 | 24 - Last Admin Protection | Pass | All steps pass |
-| 25 - New User Default Role | Not Tested | Requires IT to create a new test account |
+| 25 - New User Default Role | Fail | Test user created via Supabase admin API — no role assigned. Trigger `on_auth_user_created_assign_role` not deployed to live DB (E9-013) |
 | 26 - Viewing Audit Logs | Pass | All steps pass |
 | 27 - Filtering Audit Logs | Pass | All steps pass |
 | 28 - Audit Log Integrity | Pass | Edit/delete prevention confirmed. 90-day retention not verifiable in UAT timeframe |
@@ -1063,6 +1064,7 @@ Scenario 25: Not tested — requires IT team to create a fresh user account.
 | 1.2 | February 18, 2026 | Dmitri Spiropoulos | UAT testing session — Scenarios 1-13 completed; 7 issues logged (E9-001 to E9-007); Conditionally Approved; Sections D-G deferred to next session |
 | 1.3 | February 19, 2026 | Dmitri Spiropoulos | UAT testing session — Scenarios 14-16 Pass; 2 new issues logged (E9-008, E9-009); 4 bugs fixed during session; Scenarios 17-28 deferred to next session |
 | 1.4 | February 19, 2026 | Dmitri Spiropoulos | UAT testing session — Scenarios 17-24, 26-28 completed; 3 new issues logged (E9-010, E9-011, E9-012); multiple admin panel bugs fixed during session; Scenario 25 deferred |
+| 1.5 | February 19, 2026 | Dmitri Spiropoulos | Scenario 25 tested via Supabase admin API — Fail; default role trigger not deployed to live DB (E9-013); all 28 scenarios now complete |
 
 ---
 
