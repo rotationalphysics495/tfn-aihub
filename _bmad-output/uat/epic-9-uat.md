@@ -1,7 +1,7 @@
 # User Acceptance Testing Document
 # Epic 9: Shift Handoff & EOD Summary
 
-**Version:** 1.2
+**Version:** 1.4
 **Date:** January 18, 2026
 **Last Updated:** February 19, 2026
 **Prepared For:** Plant Managers, Supervisors, and Administrators
@@ -921,6 +921,9 @@ Screenshot: [Attached if available]
 | E9-007 | Scenario 13: Stale cache warning does not appear after cache timeout (simulated at 2 minutes for UAT purposes) | Medium | Open | Next sprint |
 | E9-008 | EOD morning briefing lookup uses in-memory store only — does not survive API server restarts; morning briefing must be re-run each session. Needs database persistence for production. | High | Open | Next sprint |
 | E9-009 | EOD morning briefing lookup hard-coded to reject briefings generated after 12:00 PM UTC, making afternoon comparison testing impossible. Resolved for UAT via fallback logic; root cause is using time-of-day heuristic instead of briefing type. | Medium | Open | Next sprint |
+| E9-010 | Scenario 17 Step 4: EOD reminder time preference does not save — reverts to default 5:00 PM after page reload. Blocks Scenarios 17–18. | High | Open | Next sprint |
+| E9-011 | Scenario 21: No expiration date option available when making an assignment — "Set Expiration" UI element is missing from the assignment grid. Temporary assignments cannot be created. | High | Open | Next sprint |
+| E9-012 | Scenario 19: Supervisor rows in assignment grid display UUID fragments (first 8 chars of user_id) instead of names or emails. Root cause: anon Supabase key cannot access auth.users; requires service role key or a public profiles table. | Medium | Open | Next sprint |
 
 *Severity Levels: Critical / High / Medium / Low*
 *Status: Open / In Progress / Resolved / Deferred*
@@ -932,13 +935,13 @@ Screenshot: [Attached if available]
 | **Section A: Handoff Creation** (Scenarios 1-5) | 5 | 3 | 0 | 2 |
 | **Section B: Handoff Review** (Scenarios 6-10) | 5 | 0 | 4 | 1 |
 | **Section C: Offline Capabilities** (Scenarios 11-13) | 3 | 0 | 3 | 0 |
-| **Section D: EOD Summary** (Scenarios 14-18) | 5 | 3 | 0 | 2 |
-| **Section E: Admin Asset Assignment** (Scenarios 19-21) | 3 | 0 | 0 | 3 |
-| **Section F: Admin Role Management** (Scenarios 22-25) | 4 | 0 | 0 | 4 |
-| **Section G: Admin Audit Logging** (Scenarios 26-28) | 3 | 0 | 0 | 3 |
-| **TOTAL** | **28** | **6** | **7** | **15** |
+| **Section D: EOD Summary** (Scenarios 14-18) | 5 | 3 | 1 | 1 |
+| **Section E: Admin Asset Assignment** (Scenarios 19-21) | 3 | 2 | 1 | 0 |
+| **Section F: Admin Role Management** (Scenarios 22-25) | 4 | 3 | 0 | 1 |
+| **Section G: Admin Audit Logging** (Scenarios 26-28) | 3 | 2 | 0 | 1 |
+| **TOTAL** | **28** | **16** | **9** | **3** |
 
-> **Note on Blocked scenarios:** Scenarios 2, 3 (voice notes) were excluded per ElevenLabs testing exclusion directive. Scenarios 17-18 (EOD push notifications) and Sections E-G (Scenarios 19-28) not yet reached — pending a future session.
+> **Note on Blocked scenarios:** Scenarios 2, 3 (voice notes) were excluded per ElevenLabs testing exclusion directive. Scenario 18 blocked by E9-010 (reminder preferences not saving). Scenario 25 (new user default role) not tested — requires IT to create a new account. Scenario 28 (audit log integrity) partially blocked — edit/delete prevention verified but 90-day retention requires extended observation.
 
 ### Additional Notes
 
@@ -988,6 +991,36 @@ Logging) not yet tested — to be scheduled for a follow-up session.
 
 ---
 
+```
+Testing session: 2026-02-19 (Session 3)
+Tester: Dmitri Spiropoulos (QA)
+
+Scenarios 17-24, 26-28 tested. Scenario 25 deferred (requires IT to create new user account).
+
+Admin panel required significant bug fixes before testing could proceed:
+- All admin pages (assignments, users, audit) used cookie-based auth instead of Bearer
+  token — all returned 401 Unauthorized (fixed)
+- Admin nav links had incorrect /admin/ prefix (Next.js route group strips it) — all
+  returned 404 (fixed)
+- require_admin dependency checked JWT role claim (always 'authenticated') instead of
+  user_roles table — all admin endpoints returned 403 Forbidden (fixed)
+- Assignment endpoint used unsupported cross-schema PostgREST join to auth.users (fixed)
+- SupervisorInfo model had non-nullable email field causing 500 errors (fixed)
+- AssetAssignmentGrid crashed on null email value (fixed)
+
+Scenario 17: EOD reminder toggle and time input work, but preference does not persist
+across page reloads — reverts to default 5:00 PM (E9-010). Blocks Scenario 18.
+
+Scenario 19: All functionality works correctly. Supervisor names display as UUID
+fragments (E9-012) — cosmetic issue only, not blocking.
+
+Scenario 21: No expiration date option exists in the assignment grid UI (E9-011).
+The grid only supports toggling assignments on/off; no temporary/expiring assignment
+workflow is available.
+
+Scenario 25: Not tested — requires IT team to create a fresh user account.
+```
+
 ### Testing Progress (2026-02-18 / 2026-02-19)
 
 | Scenario | Status | Notes |
@@ -1008,18 +1041,18 @@ Logging) not yet tested — to be scheduled for a follow-up session.
 | 14 - Triggering EOD Summary | Pass | All steps pass |
 | 15 - Morning vs Actual Comparison | Pass | All steps pass |
 | 16 - EOD Without Morning Briefing | Pass | All steps pass |
-| 17 - EOD Push Notification Reminder | Not Tested | Pending future session |
-| 18 - EOD Reminder - Already Viewed Skip | Not Tested | Pending future session |
-| 19 - Viewing Asset Assignment Grid | Not Tested | Pending future session |
-| 20 - Making Assignment Changes with Preview | Not Tested | Pending future session |
-| 21 - Setting Temporary Assignments | Not Tested | Pending future session |
-| 22 - Viewing User Roles | Not Tested | Pending future session |
-| 23 - Changing a User's Role | Not Tested | Pending future session |
-| 24 - Last Admin Protection | Not Tested | Pending future session |
-| 25 - New User Default Role | Not Tested | Pending future session |
-| 26 - Viewing Audit Logs | Not Tested | Pending future session |
-| 27 - Filtering Audit Logs | Not Tested | Pending future session |
-| 28 - Audit Log Integrity | Not Tested | Pending future session |
+| 17 - EOD Push Notification Reminder | Partial Fail | Steps 1-3 Pass. Step 4 Fail: preference does not save (reverts to default 5 PM) (E9-010). Steps 5-7 Blocked by Step 4 failure |
+| 18 - EOD Reminder - Already Viewed Skip | Blocked | Blocked by E9-010 — reminder preferences not saving |
+| 19 - Viewing Asset Assignment Grid | Pass | All steps pass. Note: supervisor names display as UUID fragments — not critical but noteworthy (E9-012) |
+| 20 - Making Assignment Changes with Preview | Pass | All steps pass |
+| 21 - Setting Temporary Assignments | Fail | No "Set Expiration" option available in UI (E9-011) |
+| 22 - Viewing User Roles | Pass | All steps pass |
+| 23 - Changing a User's Role | Pass | All steps pass |
+| 24 - Last Admin Protection | Pass | All steps pass |
+| 25 - New User Default Role | Not Tested | Requires IT to create a new test account |
+| 26 - Viewing Audit Logs | Pass | All steps pass |
+| 27 - Filtering Audit Logs | Pass | All steps pass |
+| 28 - Audit Log Integrity | Pass | Edit/delete prevention confirmed. 90-day retention not verifiable in UAT timeframe |
 
 ### Document History
 
@@ -1029,6 +1062,7 @@ Logging) not yet tested — to be scheduled for a follow-up session.
 | 1.1 | February 17, 2026 | Dmitri Spiropoulos | UAT testing session — Scenarios 1-4 Pass, Scenario 5 in progress |
 | 1.2 | February 18, 2026 | Dmitri Spiropoulos | UAT testing session — Scenarios 1-13 completed; 7 issues logged (E9-001 to E9-007); Conditionally Approved; Sections D-G deferred to next session |
 | 1.3 | February 19, 2026 | Dmitri Spiropoulos | UAT testing session — Scenarios 14-16 Pass; 2 new issues logged (E9-008, E9-009); 4 bugs fixed during session; Scenarios 17-28 deferred to next session |
+| 1.4 | February 19, 2026 | Dmitri Spiropoulos | UAT testing session — Scenarios 17-24, 26-28 completed; 3 new issues logged (E9-010, E9-011, E9-012); multiple admin panel bugs fixed during session; Scenario 25 deferred |
 
 ---
 
