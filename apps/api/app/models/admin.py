@@ -126,7 +126,7 @@ class SupervisorAssignment(BaseModel):
 class SupervisorInfo(BaseModel):
     """Basic supervisor information for grid display."""
     user_id: UUID = Field(..., description="User ID")
-    email: str = Field(..., description="User email")
+    email: Optional[str] = Field(None, description="User email")
     name: Optional[str] = Field(None, description="User display name")
 
 

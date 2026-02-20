@@ -23,8 +23,6 @@ import {
   FileText,
   UserCog,
   Upload,
-  Sun,
-  Moon,
   Target,
   Sunset,
 } from 'lucide-react'
@@ -76,9 +74,9 @@ const navGroups: NavGroup[] = [
   {
     label: 'Admin',
     items: [
-      { href: '/admin/assignments', label: 'Assignments', icon: <UserCog className="w-5 h-5" /> },
-      { href: '/admin/users', label: 'Users', icon: <Users className="w-5 h-5" /> },
-      { href: '/admin/audit', label: 'Audit Log', icon: <Shield className="w-5 h-5" /> },
+      { href: '/assignments', label: 'Assignments', icon: <UserCog className="w-5 h-5" /> },
+      { href: '/users', label: 'Users', icon: <Users className="w-5 h-5" /> },
+      { href: '/audit', label: 'Audit Log', icon: <Shield className="w-5 h-5" /> },
     ],
   },
 ]

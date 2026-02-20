@@ -14,6 +14,7 @@
 
 import { Suspense, useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { AuditLogTable, type AuditLogEntry } from '@/components/admin/AuditLogTable'
 import { AuditLogFilters, type AuditLogFiltersState } from '@/components/admin/AuditLogFilters'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -90,8 +91,12 @@ function AuditLogPageContent() {
       if (filters.actionType) params.set('action_type', filters.actionType)
       if (filters.targetUserId) params.set('target_user_id', filters.targetUserId)
 
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Not authenticated')
+
       const response = await fetch(`/api/v1/admin/audit-logs?${params.toString()}`, {
-        credentials: 'include',
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
       })
 
       if (!response.ok) {

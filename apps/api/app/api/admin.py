@@ -224,14 +224,16 @@ async def list_assignments(
 
     try:
         # Query all supervisors (users with role = 'supervisor')
+        # Note: cross-schema join to auth.users is not supported via PostgREST,
+        # so we select user_id only and leave email blank.
         supervisors_result = supabase.table("user_roles").select(
-            "user_id, auth.users(email)"
+            "user_id"
         ).eq("role", "supervisor").execute()
 
         supervisors = [
             SupervisorInfo(
                 user_id=UUID(row["user_id"]),
-                email=row.get("users", {}).get("email", ""),
+                email=None,
                 name=None,
             )
             for row in supervisors_result.data

@@ -24,7 +24,7 @@ import { Clock, Check } from 'lucide-react'
 
 export interface Supervisor {
   user_id: string
-  email: string
+  email?: string | null
   name?: string | null
 }
 
@@ -252,9 +252,9 @@ export function AssetAssignmentGrid({
               {/* Supervisor Name Cell */}
               <td className="sticky left-0 z-10 bg-white border-b border-r px-4 py-2 whitespace-nowrap">
                 <div className="font-medium text-slate-900">
-                  {supervisor.name || supervisor.email.split('@')[0]}
+                  {supervisor.name || supervisor.email?.split('@')[0] || supervisor.user_id.slice(0, 8)}
                 </div>
-                <div className="text-xs text-slate-500">{supervisor.email}</div>
+                <div className="text-xs text-slate-500">{supervisor.email ?? '—'}</div>
               </td>
               {/* Assignment Cells (Task 6.5) */}
               {areaGroups.flatMap((group) =>

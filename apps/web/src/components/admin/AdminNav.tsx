@@ -22,22 +22,22 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   {
-    href: '/admin/assignments',
+    href: '/assignments',
     label: 'Asset Assignments',
     icon: <ClipboardList className="h-5 w-5" />,
   },
   {
-    href: '/admin/users',
+    href: '/users',
     label: 'Role Management',
     icon: <Users className="h-5 w-5" />,
   },
   {
-    href: '/admin/audit',
+    href: '/audit',
     label: 'Audit Log',
     icon: <Shield className="h-5 w-5" />,
   },
   {
-    href: '/admin/settings',
+    href: '/settings',
     label: 'Settings',
     icon: <Settings className="h-5 w-5" />,
   },

@@ -247,6 +247,9 @@ async def require_admin(
 
     Story 5.8 AC#7: Cache stats endpoint is admin-only.
 
+    Checks the user_roles table in Supabase for the actual role,
+    since the JWT role claim is always 'authenticated' for regular users.
+
     Args:
         current_user: Authenticated user from get_current_user
 
@@ -256,10 +259,25 @@ async def require_admin(
     Raises:
         HTTPException: If user is not an admin
     """
-    admin_roles = {"service_role", "admin", "supabase_admin"}
-    if current_user.role not in admin_roles:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required for this endpoint",
-        )
-    return current_user
+    # JWT service_role tokens are always admin (used for service-to-service)
+    if current_user.role in {"service_role", "supabase_admin"}:
+        return current_user
+
+    # For regular users, check the user_roles table
+    settings = get_settings()
+    if settings.supabase_url and settings.supabase_key:
+        try:
+            from supabase import create_client
+            supabase = create_client(settings.supabase_url, settings.supabase_key)
+            result = supabase.table("user_roles").select("role").eq(
+                "user_id", str(current_user.id)
+            ).maybe_single().execute()
+            if result.data and result.data.get("role") == "admin":
+                return current_user
+        except Exception:
+            pass
+
+    raise HTTPException(
+        status_code=status.HTTP_403_FORBIDDEN,
+        detail="Admin access required for this endpoint",
+    )

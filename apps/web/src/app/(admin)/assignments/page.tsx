@@ -22,6 +22,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { AssetAssignmentGrid, type AssignmentChange, type Supervisor, type Asset, type Assignment } from '@/components/admin/AssetAssignmentGrid'
 import { AssignmentPreview } from '@/components/admin/AssignmentPreview'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -87,8 +88,13 @@ export default function AssignmentsPage() {
     setError(null)
 
     try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Not authenticated')
+      const authHeader = { 'Authorization': `Bearer ${session.access_token}` }
+
       const response = await fetch('/api/v1/admin/assignments', {
-        credentials: 'include',
+        headers: authHeader,
       })
 
       if (!response.ok) {
@@ -127,10 +133,16 @@ export default function AssignmentsPage() {
       setPreviewError(null)
 
       try {
+        const supabase = createClient()
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session?.access_token) throw new Error('Not authenticated')
+
         const response = await fetch('/api/v1/admin/assignments/preview', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
+          },
           body: JSON.stringify({ changes: pendingChanges }),
         })
 
@@ -173,10 +185,16 @@ export default function AssignmentsPage() {
     setSaveSuccess(false)
 
     try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Not authenticated')
+
       const response = await fetch('/api/v1/admin/assignments/batch', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
         body: JSON.stringify({ changes: pendingChanges }),
       })
 

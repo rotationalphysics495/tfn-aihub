@@ -15,6 +15,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { UserRoleTable, type UserWithRole, type UserRole } from '@/components/admin/UserRoleTable'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -55,8 +56,12 @@ export default function UsersPage() {
     setError(null)
 
     try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('Not authenticated')
+
       const response = await fetch('/api/v1/admin/users', {
-        credentials: 'include',
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
       })
 
       if (!response.ok) {
@@ -93,10 +98,16 @@ export default function UsersPage() {
 
   // Handle role change
   const handleRoleChange = useCallback(async (userId: string, newRole: UserRole) => {
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session?.access_token) throw new Error('Not authenticated')
+
     const response = await fetch(`/api/v1/admin/users/${userId}/role`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
       body: JSON.stringify({ role: newRole }),
     })
 
