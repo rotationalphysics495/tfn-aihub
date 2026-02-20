@@ -147,16 +147,21 @@ export default function EODSummaryPage() {
     setError(null);
 
     try {
-      // Note: user_id is included in request body for backwards compatibility
-      // The API also validates via auth token (get_current_user dependency)
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        throw new Error('Not authenticated');
+      }
+
       const response = await fetch('/api/v1/briefing/eod', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
         },
-        credentials: 'include', // Include auth cookies/tokens
         body: JSON.stringify({
-          user_id: 'current-user', // Placeholder - actual user comes from auth context
+          user_id: session.user.id,
           include_audio: true,
         }),
       });

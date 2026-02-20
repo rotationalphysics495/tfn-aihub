@@ -215,9 +215,9 @@ class EODService:
         start_time = _utcnow()
         summary_id = str(uuid.uuid4())
 
-        # Determine date and time range
+        # Determine date and time range (use UTC to match stored briefing timestamps)
         if summary_date is None:
-            summary_date = datetime.now().date()
+            summary_date = datetime.now(timezone.utc).date()
 
         # Time range: 06:00 AM to current time (or end of day)
         time_range_start = datetime.combine(
@@ -385,35 +385,47 @@ class EODService:
                 # In production, this would query a database table
                 from app.api.briefing import _active_briefings
 
-                # Find briefings from today that look like morning briefings
-                for briefing_id, briefing in _active_briefings.items():
-                    if briefing.metadata.generated_at.date() == summary_date:
-                        # Check if it's a morning briefing (generated before noon)
-                        gen_time = briefing.metadata.generated_at
-                        if gen_time.hour < 12:
-                            # Extract concerns and wins from sections
-                            concerns = []
-                            wins = []
-                            sections_data = []
+                # Find briefings from today. Prefer those generated before noon
+                # (true morning briefings); fall back to the earliest same-day
+                # briefing to support afternoon UAT testing.
+                today_briefings = [
+                    (bid, b)
+                    for bid, b in _active_briefings.items()
+                    if b.metadata.generated_at.date() == summary_date
+                ]
+                today_briefings.sort(key=lambda x: x[1].metadata.generated_at)
 
-                            for section in briefing.sections:
-                                sections_data.append({
-                                    "type": section.section_type,
-                                    "title": section.title,
-                                    "content": section.content,
-                                })
-                                if section.section_type == "concerns":
-                                    concerns.append(section.content)
-                                elif section.section_type == "wins":
-                                    wins.append(section.content)
+                am_briefings = [
+                    (bid, b) for bid, b in today_briefings
+                    if b.metadata.generated_at.hour < 12
+                ]
+                candidate = (am_briefings or today_briefings or [None])[0]
 
-                            return MorningBriefingRecord(
-                                id=briefing_id,
-                                generated_at=gen_time,
-                                concerns=concerns,
-                                wins=wins,
-                                sections=sections_data,
-                            )
+                if candidate:
+                    briefing_id, briefing = candidate
+                    gen_time = briefing.metadata.generated_at
+                    concerns = []
+                    wins = []
+                    sections_data = []
+
+                    for section in briefing.sections:
+                        sections_data.append({
+                            "type": section.section_type,
+                            "title": section.title,
+                            "content": section.content,
+                        })
+                        if section.section_type == "concerns":
+                            concerns.append(section.content)
+                        elif section.section_type == "wins":
+                            wins.append(section.content)
+
+                    return MorningBriefingRecord(
+                        id=briefing_id,
+                        generated_at=gen_time,
+                        concerns=concerns,
+                        wins=wins,
+                        sections=sections_data,
+                    )
 
                 logger.info(f"No morning briefing found for {summary_date}")
                 return None
@@ -1212,7 +1224,7 @@ class EODService:
             EODComparisonResult with comparisons and metrics
         """
         if summary_date is None:
-            summary_date = datetime.now().date()
+            summary_date = datetime.now(timezone.utc).date()
 
         logger.info(
             f"Comparing morning briefing to actual outcomes for user {user_id}, "

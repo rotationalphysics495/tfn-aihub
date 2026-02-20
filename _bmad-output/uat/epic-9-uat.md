@@ -3,7 +3,7 @@
 
 **Version:** 1.2
 **Date:** January 18, 2026
-**Last Updated:** February 18, 2026
+**Last Updated:** February 19, 2026
 **Prepared For:** Plant Managers, Supervisors, and Administrators
 **Test Environment:** TFN AI Hub - Shift Handoff & EOD System
 **Document Status:** Ready for Testing
@@ -919,6 +919,8 @@ Screenshot: [Attached if available]
 | E9-005 | Scenario 11 Steps 3-4: Handoff does not display when offline; no offline indicator banner shown | High | Open | Next sprint |
 | E9-006 | Scenario 12 Steps 4, 6-7: No pending sync indicator shown when offline; acknowledgment does not sync on reconnect; handoff status remains unchanged | High | Open | Next sprint |
 | E9-007 | Scenario 13: Stale cache warning does not appear after cache timeout (simulated at 2 minutes for UAT purposes) | Medium | Open | Next sprint |
+| E9-008 | EOD morning briefing lookup uses in-memory store only — does not survive API server restarts; morning briefing must be re-run each session. Needs database persistence for production. | High | Open | Next sprint |
+| E9-009 | EOD morning briefing lookup hard-coded to reject briefings generated after 12:00 PM UTC, making afternoon comparison testing impossible. Resolved for UAT via fallback logic; root cause is using time-of-day heuristic instead of briefing type. | Medium | Open | Next sprint |
 
 *Severity Levels: Critical / High / Medium / Low*
 *Status: Open / In Progress / Resolved / Deferred*
@@ -930,13 +932,13 @@ Screenshot: [Attached if available]
 | **Section A: Handoff Creation** (Scenarios 1-5) | 5 | 3 | 0 | 2 |
 | **Section B: Handoff Review** (Scenarios 6-10) | 5 | 0 | 4 | 1 |
 | **Section C: Offline Capabilities** (Scenarios 11-13) | 3 | 0 | 3 | 0 |
-| **Section D: EOD Summary** (Scenarios 14-18) | 5 | 0 | 0 | 5 |
+| **Section D: EOD Summary** (Scenarios 14-18) | 5 | 3 | 0 | 2 |
 | **Section E: Admin Asset Assignment** (Scenarios 19-21) | 3 | 0 | 0 | 3 |
 | **Section F: Admin Role Management** (Scenarios 22-25) | 4 | 0 | 0 | 4 |
 | **Section G: Admin Audit Logging** (Scenarios 26-28) | 3 | 0 | 0 | 3 |
-| **TOTAL** | **28** | **3** | **7** | **18** |
+| **TOTAL** | **28** | **6** | **7** | **15** |
 
-> **Note on Blocked scenarios:** Scenarios 2, 3 (voice notes) were excluded per ElevenLabs testing exclusion directive. Scenarios 14-28 (Sections D-G) were not reached in this testing session and remain pending a future session.
+> **Note on Blocked scenarios:** Scenarios 2, 3 (voice notes) were excluded per ElevenLabs testing exclusion directive. Scenarios 17-18 (EOD push notifications) and Sections E-G (Scenarios 19-28) not yet reached — pending a future session.
 
 ### Additional Notes
 
@@ -961,9 +963,32 @@ Sections D (EOD Summary), E (Admin Asset Assignment), F (Admin Role Management),
 and G (Admin Audit Logging) not yet tested — to be scheduled for a follow-up session.
 ```
 
+```
+Testing session: 2026-02-19
+Tester: Dmitri Spiropoulos (QA)
+
+Section D (EOD Summary) partially tested — Scenarios 14, 15, 16 pass. Scenarios 17-18
+(EOD push notification reminder and already-viewed skip) not tested this session as they
+require push notification configuration and timed trigger; deferred to future session.
+
+Bugs found and fixed during UAT session (committed to uat branch):
+- EOD page missing Authorization header — all users received 401 Unauthorized (fixed)
+- EOD page missing nav link — no way to reach /briefing/eod from the UI (fixed)
+- EOD morning briefing lookup used naive local datetime vs UTC-stored timestamps,
+  causing date mismatch and no comparison ever being found (fixed)
+- EOD morning briefing lookup hard-rejected any briefing after 12:00 PM UTC,
+  blocking afternoon testing; replaced with AM-preferred fallback logic (fixed, E9-009)
+
+Outstanding architectural issue: morning briefing is stored in-memory only (E9-008).
+Requires database persistence before production deployment.
+
+Sections E (Admin Asset Assignment), F (Admin Role Management), and G (Admin Audit
+Logging) not yet tested — to be scheduled for a follow-up session.
+```
+
 ---
 
-### Testing Progress (2026-02-18)
+### Testing Progress (2026-02-18 / 2026-02-19)
 
 | Scenario | Status | Notes |
 |----------|--------|-------|
@@ -980,9 +1005,9 @@ and G (Admin Audit Logging) not yet tested — to be scheduled for a follow-up s
 | 11 - Viewing Handoffs Offline | Partial Fail | Steps 1-2 pass. Step 3 fail: handoff does not display. Step 4 fail: no offline indicator (E9-005). Steps 5-6 blocked (ElevenLabs exclusion) |
 | 12 - Offline Acknowledgment Queuing | Partial Fail | Steps 1-3, 5 pass. Step 4 fail: no pending sync indicator. Steps 6-7 fail: sync never happens, status unchanged (E9-006) |
 | 13 - Stale Cache Warning | Fail | No stale warning displayed; cache timeout simulated at 2 minutes for UAT (E9-007) |
-| 14 - Triggering EOD Summary | Not Tested | Pending future session |
-| 15 - Morning vs Actual Comparison | Not Tested | Pending future session |
-| 16 - EOD Without Morning Briefing | Not Tested | Pending future session |
+| 14 - Triggering EOD Summary | Pass | All steps pass |
+| 15 - Morning vs Actual Comparison | Pass | All steps pass |
+| 16 - EOD Without Morning Briefing | Pass | All steps pass |
 | 17 - EOD Push Notification Reminder | Not Tested | Pending future session |
 | 18 - EOD Reminder - Already Viewed Skip | Not Tested | Pending future session |
 | 19 - Viewing Asset Assignment Grid | Not Tested | Pending future session |
@@ -1003,6 +1028,7 @@ and G (Admin Audit Logging) not yet tested — to be scheduled for a follow-up s
 | 1.0 | January 18, 2026 | QA Specialist | Initial UAT document creation |
 | 1.1 | February 17, 2026 | Dmitri Spiropoulos | UAT testing session — Scenarios 1-4 Pass, Scenario 5 in progress |
 | 1.2 | February 18, 2026 | Dmitri Spiropoulos | UAT testing session — Scenarios 1-13 completed; 7 issues logged (E9-001 to E9-007); Conditionally Approved; Sections D-G deferred to next session |
+| 1.3 | February 19, 2026 | Dmitri Spiropoulos | UAT testing session — Scenarios 14-16 Pass; 2 new issues logged (E9-008, E9-009); 4 bugs fixed during session; Scenarios 17-28 deferred to next session |
 
 ---
 
