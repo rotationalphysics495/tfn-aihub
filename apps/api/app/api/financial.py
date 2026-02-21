@@ -304,14 +304,14 @@ async def get_financial_summary(
         else:
             # Query daily_summaries
             query = client.table("daily_summaries").select(
-                "asset_id, downtime_minutes, waste_count, financial_loss"
+                "asset_id, downtime_minutes, waste_count, financial_loss_dollars"
             )
 
             if start_date == end_date:
-                query = query.eq("date", start_date.isoformat())
+                query = query.eq("report_date", start_date.isoformat())
             else:
-                query = query.gte("date", start_date.isoformat())
-                query = query.lte("date", end_date.isoformat())
+                query = query.gte("report_date", start_date.isoformat())
+                query = query.lte("report_date", end_date.isoformat())
 
             if asset_filter:
                 query = query.in_("asset_id", asset_filter)
@@ -479,10 +479,20 @@ async def get_cost_of_loss(
                     last_updated_ts = ts
 
         else:
-            # Query daily_summaries for T-1 data
+            # Query daily_summaries for most recent available date (T-1 intent)
+            # Use the latest report_date in the table rather than a fixed date offset
+            # to avoid timezone skew between server clock and seeded data dates.
+            latest_date_resp = client.table("daily_summaries").select(
+                "report_date"
+            ).order("report_date", desc=True).limit(1).execute()
+            if latest_date_resp.data:
+                query_date = latest_date_resp.data[0]["report_date"]
+            else:
+                query_date = yesterday.isoformat()
+
             query = client.table("daily_summaries").select(
-                "asset_id, downtime_minutes, waste_count, financial_loss, oee_percentage, created_at"
-            ).eq("date", yesterday.isoformat())
+                "asset_id, downtime_minutes, waste_count, financial_loss_dollars, oee_percentage, created_at"
+            ).eq("report_date", query_date)
 
             if asset_id:
                 query = query.eq("asset_id", asset_id)

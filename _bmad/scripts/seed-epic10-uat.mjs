@@ -217,20 +217,7 @@ async function seedOpenSafetyEvent() {
 // is covered so the morning report and cost-of-loss views have current data.
 
 async function seedTodayDailySummaries() {
-  console.log('📊 Checking daily_summaries for today...');
-
-  const today = daysAgo(0);
-  const { count } = await supabase
-    .from('daily_summaries')
-    .select('id', { count: 'exact', head: true })
-    .eq('report_date', today);
-
-  if (count && count >= 5) {
-    console.log(`  ✓ ${count} daily summary rows already exist for today (${today})`);
-    return true;
-  }
-
-  console.log(`  Only ${count || 0} rows for today — inserting today's summaries...`);
+  console.log('📊 Checking daily_summaries for today and yesterday...');
 
   // Asset profiles: [targetOutput, hourlyRate, baseOee]
   const profiles = [
@@ -250,23 +237,31 @@ async function seedTodayDailySummaries() {
     { id: ASSETS.PACKAGING_3, target: 5600, rate: 95,  oee: 87.5  },
   ];
 
-  const rows = profiles.map(p => {
-    const actualOutput = Math.round(p.target * (p.oee / 100));
-    const downtimeMinutes = Math.round((100 - p.oee) * 1.5);
-    const wasteCount = Math.max(1, Math.round(actualOutput * 0.015));
-    const financialLoss = Math.round((downtimeMinutes / 60) * p.rate * 100) / 100;
-    return {
-      asset_id: p.id,
-      report_date: today,
-      oee_percentage: p.oee,
-      actual_output: actualOutput,
-      target_output: p.target,
-      downtime_minutes: downtimeMinutes,
-      waste_count: wasteCount,
-      financial_loss_dollars: financialLoss,
-      smart_summary_text: `OEE at ${p.oee}% today. ${downtimeMinutes} minutes downtime, ${wasteCount} units waste.`,
-    };
-  });
+  // Seed both today (morning report) and yesterday (cost-of-loss widget queries T-1)
+  const datesToSeed = [daysAgo(0), daysAgo(1)];
+  const rows = [];
+
+  for (const reportDate of datesToSeed) {
+    for (const p of profiles) {
+      // Slightly vary OEE for yesterday vs today
+      const oee = reportDate === daysAgo(1) ? Math.max(70, p.oee - 3 + Math.random() * 6) : p.oee;
+      const actualOutput = Math.round(p.target * (oee / 100));
+      const downtimeMinutes = Math.round((100 - oee) * 1.5);
+      const wasteCount = Math.max(1, Math.round(actualOutput * 0.015));
+      const financialLoss = Math.round((downtimeMinutes / 60) * p.rate * 100) / 100;
+      rows.push({
+        asset_id: p.id,
+        report_date: reportDate,
+        oee_percentage: Math.round(oee * 10) / 10,
+        actual_output: actualOutput,
+        target_output: p.target,
+        downtime_minutes: downtimeMinutes,
+        waste_count: wasteCount,
+        financial_loss_dollars: financialLoss,
+        smart_summary_text: `OEE at ${oee.toFixed(1)}% on ${reportDate}. ${downtimeMinutes} min downtime, ${wasteCount} units waste.`,
+      });
+    }
+  }
 
   const { error } = await supabase.from('daily_summaries').upsert(rows, {
     onConflict: 'asset_id,report_date',
@@ -277,9 +272,10 @@ async function seedTodayDailySummaries() {
     return false;
   }
 
-  console.log(`  ✓ Inserted/updated ${rows.length} daily summary rows for ${today}`);
-  console.log('    - All rows have waste_count > 0');
-  console.log('    - All rows have financial_loss_dollars > 0');
+  console.log(`  ✓ Upserted ${rows.length} daily summary rows (today + yesterday)`);
+  console.log(`    - Today (${daysAgo(0)}): ${profiles.length} rows`);
+  console.log(`    - Yesterday (${daysAgo(1)}): ${profiles.length} rows (for cost-of-loss T-1 query)`);
+  console.log('    - All rows have waste_count > 0 and financial_loss_dollars > 0');
   return true;
 }
 

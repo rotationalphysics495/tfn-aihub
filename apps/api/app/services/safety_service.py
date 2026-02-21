@@ -67,7 +67,7 @@ class SafetyAlertService:
             return self._assets_cache
 
         response = self.client.table("assets").select(
-            "id, name, area, source_id, cost_center_id"
+            "id, name, area, source_id"
         ).execute()
 
         if response.data:
@@ -76,7 +76,6 @@ class SafetyAlertService:
                     "name": asset.get("name", "Unknown"),
                     "area": asset.get("area"),
                     "source_id": asset.get("source_id"),
-                    "cost_center_id": asset.get("cost_center_id"),
                 }
                 for asset in response.data
             }
@@ -85,21 +84,21 @@ class SafetyAlertService:
 
     async def _get_cost_centers_map(self) -> Dict[str, float]:
         """
-        Get a mapping of cost_center_id to standard_hourly_rate.
+        Get a mapping of asset_id to standard_hourly_rate.
 
         Returns:
-            Dict mapping cost_center_id to hourly rate
+            Dict mapping asset_id to hourly rate
         """
         if self._cost_centers_cache:
             return self._cost_centers_cache
 
         response = self.client.table("cost_centers").select(
-            "id, standard_hourly_rate"
+            "asset_id, standard_hourly_rate"
         ).execute()
 
         if response.data:
             self._cost_centers_cache = {
-                cc["id"]: float(cc.get("standard_hourly_rate", DEFAULT_HOURLY_RATE) or DEFAULT_HOURLY_RATE)
+                cc["asset_id"]: float(cc.get("standard_hourly_rate", DEFAULT_HOURLY_RATE) or DEFAULT_HOURLY_RATE)
                 for cc in response.data
             }
 
@@ -108,7 +107,7 @@ class SafetyAlertService:
     def _calculate_financial_impact(
         self,
         duration_minutes: Optional[int],
-        cost_center_id: Optional[str],
+        asset_id: Optional[str],
         cost_centers_map: Dict[str, float]
     ) -> Optional[float]:
         """
@@ -118,8 +117,8 @@ class SafetyAlertService:
 
         Args:
             duration_minutes: Duration of the safety event in minutes
-            cost_center_id: The cost center ID for the asset
-            cost_centers_map: Mapping of cost center IDs to hourly rates
+            asset_id: The asset ID to look up hourly rate
+            cost_centers_map: Mapping of asset_id to hourly rates
 
         Returns:
             Financial impact in dollars, or None if duration unknown
@@ -128,8 +127,8 @@ class SafetyAlertService:
             return None
 
         hourly_rate = DEFAULT_HOURLY_RATE
-        if cost_center_id and cost_center_id in cost_centers_map:
-            hourly_rate = cost_centers_map[cost_center_id]
+        if asset_id and asset_id in cost_centers_map:
+            hourly_rate = cost_centers_map[asset_id]
 
         return round((duration_minutes / 60.0) * hourly_rate, 2)
 
@@ -152,12 +151,11 @@ class SafetyAlertService:
         """
         asset_id = record.get("asset_id")
         asset_info = assets_map.get(asset_id, {"name": "Unknown", "area": None})
-        cost_center_id = asset_info.get("cost_center_id")
 
         # Calculate financial impact if duration is known
         duration_minutes = record.get("duration_minutes")
         financial_impact = self._calculate_financial_impact(
-            duration_minutes, cost_center_id, cost_centers_map
+            duration_minutes, asset_id, cost_centers_map
         )
 
         return SafetyEventResponse(
