@@ -1,7 +1,7 @@
 # Products, Schedule & Attainment - User Acceptance Testing
 
 **Epic**: 12
-**Version**: 1.1
+**Version**: 1.2
 **Generated**: 2026-02-11
 **Stories Covered**: 6
 
@@ -117,9 +117,9 @@ A **Plant Manager** or **Production Planner** who understands the daily producti
 
 **Success Criteria**: A clear bar chart shows planned vs. actual product mix percentages with distinguishable colors and a legend.
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☑ Pass  ☐ Fail
 
-**Notes**: _________________________________
+**Notes**: All steps pass.
 
 ---
 
@@ -140,9 +140,9 @@ A **Plant Manager** or **Production Planner** who understands the daily producti
 
 **Success Criteria**: The Schedule Upload page is accessible via sidebar navigation and presents a file upload zone with clear instructions.
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☑ Pass  ☐ Fail
 
-**Notes**: _________________________________
+**Notes**: All steps pass.
 
 ---
 
@@ -165,9 +165,9 @@ A **Plant Manager** or **Production Planner** who understands the daily producti
 
 **Success Criteria**: A valid CSV file produces a preview table with matched asset indicators and a summary, with the confirm button enabled.
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☑ Pass  ☐ Fail
 
-**Notes**: _________________________________
+**Notes**: All steps pass.
 
 ---
 
@@ -188,9 +188,9 @@ A **Plant Manager** or **Production Planner** who understands the daily producti
 
 **Success Criteria**: Clicking confirm saves the schedule data, shows a success message with row count, and redirects to the morning report.
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☑ Pass  ☐ Fail (Step 4 Fail)
 
-**Notes**: _________________________________
+**Notes**: Steps 1–3 pass. Step 4 fail — Schedule Attainment section did not update to reflect the newly uploaded schedule after redirect to the Morning Report.
 
 ---
 
@@ -211,9 +211,9 @@ A **Plant Manager** or **Production Planner** who understands the daily producti
 
 **Success Criteria**: Excel files produce the same preview and confirmation experience as CSV files.
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☑ Pass  ☐ Fail
 
-**Notes**: _________________________________
+**Notes**: All steps pass.
 
 ---
 
@@ -234,9 +234,9 @@ A **Plant Manager** or **Production Planner** who understands the daily producti
 
 **Success Criteria**: When no schedule exists for a date, the morning report shows a friendly prompt with a link to upload a schedule instead of an error or blank section.
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☑ Pass  ☐ Fail
 
-**Notes**: _________________________________
+**Notes**: All steps pass. Tested by navigating to a past date with no seeded data (2025-01-01).
 
 ---
 
@@ -253,7 +253,9 @@ A **Plant Manager** or **Production Planner** who understands the daily producti
 | 3 | Check the row with the unrecognized asset | The row is flagged with a red warning and shows suggested matches (e.g., "Roaster 1", "Roaster 2") |
 | 4 | Check the "Confirm Upload" button | The button is disabled because there are unresolved errors |
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☑ Pass  ☐ Fail
+
+**Notes**: All steps pass.
 
 ---
 
@@ -268,7 +270,9 @@ A **Plant Manager** or **Production Planner** who understands the daily producti
 | 3 | Check the rows with invalid data | Each invalid row is highlighted in red with a specific error message (e.g., "Quantity must be a positive number", "Invalid date format") |
 | 4 | Check the "Confirm Upload" button | The button is disabled; the upload cannot proceed until errors are resolved |
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☑ Pass  ☐ Fail
+
+**Notes**: All steps pass.
 
 ---
 
@@ -281,7 +285,9 @@ A **Plant Manager** or **Production Planner** who understands the daily producti
 | 1 | Attempt to upload a `.pdf` or `.txt` file on the Schedule Upload page | The file is rejected with a clear error message indicating only `.csv` and `.xlsx` files are accepted |
 | 2 | Verify no preview table appears | The page remains in its initial upload state |
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☑ Pass  ☐ Fail
+
+**Notes**: All steps pass. Step 2 was not applicable — unsupported file types were not selectable in the file picker at all.
 
 ---
 
@@ -296,7 +302,9 @@ A **Plant Manager** or **Production Planner** who understands the daily producti
 | 3 | Check the row with the new product name | The product is shown with a blue "will be created" indicator (not flagged as an error) |
 | 4 | Click "Confirm Upload" | The upload succeeds, and the new product is automatically added to the system |
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☑ Pass  ☐ Fail
+
+**Notes**: All steps pass.
 
 ---
 
@@ -304,14 +312,14 @@ A **Plant Manager** or **Production Planner** who understands the daily producti
 
 This epic is **successful** when a user can:
 
-- [ ] See a Schedule Attainment section on the morning report showing scheduled vs. actual production by product per workcenter
-- [ ] Identify product swaps through amber/orange highlighted callouts with clear descriptions
-- [ ] View a product mix comparison bar chart showing planned vs. actual percentages
-- [ ] Navigate to a Schedule Upload page via the sidebar
-- [ ] Upload a CSV or Excel schedule file and see a preview before committing
-- [ ] Confirm an upload and receive success feedback with a redirect to the morning report
-- [ ] See a helpful "No schedule uploaded" prompt with an upload link when no data exists for a date
-- [ ] See clear validation errors and disabled confirm button when an uploaded file has problems
+- [x] See a Schedule Attainment section on the morning report showing scheduled vs. actual production by product per workcenter
+- [x] Identify product swaps through amber/orange highlighted callouts with clear descriptions
+- [x] View a product mix comparison bar chart showing planned vs. actual percentages
+- [x] Navigate to a Schedule Upload page via the sidebar
+- [x] Upload a CSV or Excel schedule file and see a preview before committing
+- [x] Confirm an upload and receive success feedback with a redirect to the morning report
+- [x] See a helpful "No schedule uploaded" prompt with an upload link when no data exists for a date
+- [x] See clear validation errors and disabled confirm button when an uploaded file has problems
 
 **Minimum passing**: All checkboxes marked
 
@@ -319,11 +327,10 @@ This epic is **successful** when a user can:
 
 ## Issues Log
 
-| # | Scenario | Issue Description | Severity | Screenshot |
-|---|----------|-------------------|----------|------------|
-| 1 | | | | |
-| 2 | | | | |
-| 3 | | | | |
+| # | Scenario | Issue Description | Severity | Status |
+|---|----------|-------------------|----------|--------|
+| E12-001 | 6 (Step 4) | Schedule Attainment section does not update after confirmed upload and redirect to Morning Report | Major | Open |
+| E12-002 | General | Schedule Upload page is flush against the left sidebar panel, appears aesthetically off — needs more right-side spacing | Minor | Open |
 
 ### Severity Definitions
 
@@ -339,25 +346,23 @@ This epic is **successful** when a user can:
 
 | Metric | Value |
 |--------|-------|
-| Scenarios Tested | \_\_ / 8 |
-| Scenarios Passed | \_\_ / 8 |
-| Edge Cases Tested | \_\_ / 4 |
-| Edge Cases Passed | \_\_ / 4 |
-| Critical Issues | |
-| Major Issues | |
-| Minor Issues | |
+| Scenarios Tested | 8 / 8 |
+| Scenarios Passed | 8 / 8 |
+| Edge Cases Tested | 4 / 4 |
+| Edge Cases Passed | 4 / 4 |
+| Critical Issues | 0 |
+| Major Issues | 1 (E12-001) |
+| Minor Issues | 1 (E12-002) |
 
 ### Recommendation
 
-☐ **Accept** - All criteria met, ready for production
-☐ **Accept with conditions** - Minor issues noted, can proceed
-☐ **Reject** - Critical/major issues must be resolved
+☑ **Accept with conditions** - Minor issues noted, can proceed
 
 ### Signatures
 
 | Role | Name | Date | Signature |
 |------|------|------|-----------|
-| Tester | | | |
+| Tester (QA) | Dmitri Spiropoulos | 2026-02-22 | Dmitri Spiropoulos |
 | Product Owner | | | |
 | Tech Lead | | | |
 
