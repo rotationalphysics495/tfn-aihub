@@ -35,6 +35,7 @@ interface InsightEvidenceCardProps {
   onAcknowledge?: (actionId: string) => void
   followUp?: FollowUpData
   onFollowUpAssigned?: () => void
+  reportDate?: string
 }
 
 export function InsightEvidenceCard({
@@ -44,6 +45,7 @@ export function InsightEvidenceCard({
   onAcknowledge,
   followUp,
   onFollowUpAssigned,
+  reportDate: reportDateProp,
 }: InsightEvidenceCardProps) {
   const [isHovered, setIsHovered] = useState(false)
   const [assignDialogOpen, setAssignDialogOpen] = useState(false)
@@ -52,10 +54,10 @@ export function InsightEvidenceCard({
   const accentBg = getPriorityAccentBg(item.priority)
   const isItemAcknowledged = item.acknowledgment != null
 
-  // Derive report date from item timestamp (fallback to yesterday)
-  const reportDate = item.timestamp
-    ? item.timestamp.split('T')[0]
-    : new Date(Date.now() - 86400000).toISOString().split('T')[0]
+  // Use the authoritative report date from the API response if provided;
+  // fall back to deriving from item timestamp (which is created_at, not the report date)
+  const reportDate = reportDateProp
+    ?? (item.timestamp ? item.timestamp.split('T')[0] : new Date(Date.now() - 86400000).toISOString().split('T')[0])
 
   return (
     <>

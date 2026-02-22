@@ -109,6 +109,7 @@ export function InsightEvidenceCardList({ className, reportDate: reportDateProp,
         onAcknowledge={acknowledge}
         followUps={followUps}
         onFollowUpAssigned={refetchFollowUps}
+        reportDate={reportDate ?? undefined}
       />
     </div>
   )

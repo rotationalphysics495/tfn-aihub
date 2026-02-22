@@ -5,9 +5,10 @@ import { ChevronDown, ChevronRight, AlertCircle, RefreshCw, ClipboardList } from
 import { Card, CardHeader, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { useMyFollowUps, type FollowUpItem } from '@/hooks/useMyFollowUps'
+import { useMyFollowUps, useAssignedToMe, type FollowUpItem } from '@/hooks/useMyFollowUps'
 import { FollowUpEntry } from './FollowUpEntry'
 import { FollowUpDetailDialog } from './FollowUpDetailDialog'
+import { UpdateFollowUpDialog } from './UpdateFollowUpDialog'
 
 const STATUS_GROUPS = [
   { key: 'assigned' as const, label: 'Assigned', variant: 'info' as const },
@@ -17,11 +18,13 @@ const STATUS_GROUPS = [
 
 export function MyAssignmentsPanel() {
   const { isLoading, error, grouped, totalCount, hasFollowUps, refetch } = useMyFollowUps()
+  const { isLoading: assignedLoading, grouped: assignedGrouped, hasFollowUps: hasAssigned, refetch: refetchAssigned } = useAssignedToMe()
   const [isExpanded, setIsExpanded] = useState<boolean | null>(null)
   const [selectedFollowUp, setSelectedFollowUp] = useState<FollowUpItem | null>(null)
+  const [updateFollowUp, setUpdateFollowUp] = useState<FollowUpItem | null>(null)
 
   // Default: expanded if loading, error, or has follow-ups; collapsed if empty
-  const expanded = isExpanded !== null ? isExpanded : (isLoading || !!error || hasFollowUps)
+  const expanded = isExpanded !== null ? isExpanded : (isLoading || assignedLoading || !!error || hasFollowUps || hasAssigned)
 
   return (
     <Card>
@@ -112,11 +115,72 @@ export function MyAssignmentsPanel() {
         </CardContent>
       )}
 
+      {/* Assigned to Me section */}
+      {expanded && (hasAssigned || assignedLoading) && (
+        <CardContent className="pt-0">
+          <div className="border-t pt-4">
+            <div className="flex items-center gap-2 mb-3">
+              <h4 className="text-sm font-semibold text-foreground">Assigned to Me</h4>
+              {hasAssigned && (
+                <Badge variant="secondary" className="text-xs">
+                  {assignedGrouped.assigned.length + assignedGrouped.in_progress.length + assignedGrouped.resolved.length}
+                </Badge>
+              )}
+            </div>
+
+            {assignedLoading && (
+              <div className="space-y-2">
+                <div className="h-10 rounded-md bg-muted animate-pulse" />
+                <div className="h-10 rounded-md bg-muted animate-pulse" />
+              </div>
+            )}
+
+            {!assignedLoading && hasAssigned && (
+              <div className="space-y-4">
+                {STATUS_GROUPS.map(({ key, label, variant }) => {
+                  const items = assignedGrouped[key]
+                  if (items.length === 0) return null
+                  return (
+                    <div key={key}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <Badge variant={variant}>{label}</Badge>
+                        <span className="text-xs text-muted-foreground">({items.length})</span>
+                      </div>
+                      <div className="space-y-1">
+                        {items.map((followUp) => (
+                          <FollowUpEntry
+                            key={followUp.id}
+                            followUp={followUp}
+                            onSelect={setUpdateFollowUp}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </CardContent>
+      )}
+
       {selectedFollowUp && (
         <FollowUpDetailDialog
           followUp={selectedFollowUp}
           open={!!selectedFollowUp}
           onClose={() => setSelectedFollowUp(null)}
+        />
+      )}
+
+      {updateFollowUp && (
+        <UpdateFollowUpDialog
+          followUp={updateFollowUp}
+          open={!!updateFollowUp}
+          onOpenChange={(open) => { if (!open) setUpdateFollowUp(null) }}
+          onUpdated={() => {
+            refetchAssigned()
+            refetch()
+          }}
         />
       )}
     </Card>

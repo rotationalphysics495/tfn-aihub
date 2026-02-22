@@ -60,8 +60,9 @@ async def create_followup(
     user_token = credentials.credentials
 
     try:
-        # Use user-scoped client for RLS enforcement (assigned_by = auth.uid())
-        client = create_client(settings.supabase_url, user_token)
+        # Use service role client with user JWT for RLS enforcement
+        client = create_client(settings.supabase_url, settings.supabase_key)
+        client.postgrest.auth(user_token)
 
         insert_data = {
             "action_item_id": body.action_item_id,
@@ -322,7 +323,8 @@ async def get_followup_messages(
     user_token = credentials.credentials
 
     try:
-        client = create_client(settings.supabase_url, user_token)
+        client = create_client(settings.supabase_url, settings.supabase_key)
+        client.postgrest.auth(user_token)
 
         # Fetch the follow-up record for context and access control
         followup_result = (
@@ -407,7 +409,8 @@ async def mark_followup_viewed(
     user_token = credentials.credentials
 
     try:
-        client = create_client(settings.supabase_url, user_token)
+        client = create_client(settings.supabase_url, settings.supabase_key)
+        client.postgrest.auth(user_token)
 
         # Fetch the follow-up for access control
         followup_result = (

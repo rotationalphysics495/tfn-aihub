@@ -153,3 +153,106 @@ export function useMyFollowUps(options: UseMyFollowUpsOptions = {}): UseMyFollow
     hasFollowUps,
   }
 }
+
+/**
+ * Hook for the assignee's view: follow-ups assigned TO the current user.
+ * Queries Supabase directly (RLS ensures only the assignee's rows are returned).
+ */
+export function useAssignedToMe(): UseMyFollowUpsReturn {
+  const [followups, setFollowups] = useState<FollowUpItem[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const mountedRef = useRef(true)
+
+  const fetchAssigned = useCallback(async () => {
+    if (!mountedRef.current) return
+    setIsLoading(true)
+    setError(null)
+
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.user?.id) {
+        setIsLoading(false)
+        setError(ERROR_MESSAGES.AUTH_ERROR)
+        return
+      }
+
+      const { data, error: qError } = await supabase
+        .from('action_followups')
+        .select('id, action_item_id, action_summary, asset_name, category, assigned_to, assigned_by, note, status, report_date, created_at, updated_at')
+        .eq('assigned_to', session.user.id)
+        .order('created_at', { ascending: false })
+
+      if (!mountedRef.current) return
+
+      if (qError) {
+        setError(ERROR_MESSAGES.SERVER_ERROR)
+        setIsLoading(false)
+        return
+      }
+
+      setFollowups((data ?? []) as FollowUpItem[])
+      setIsLoading(false)
+    } catch {
+      if (!mountedRef.current) return
+      setError(ERROR_MESSAGES.SERVER_ERROR)
+      setIsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    mountedRef.current = true
+    fetchAssigned()
+    return () => { mountedRef.current = false }
+  }, [fetchAssigned])
+
+  const grouped = groupByStatus(followups)
+  const totalCount = followups.length
+  const hasFollowUps = totalCount > 0
+
+  return {
+    followups,
+    isLoading,
+    error,
+    refetch: fetchAssigned,
+    grouped,
+    totalCount,
+    hasFollowUps,
+  }
+}
+
+/**
+ * Update a follow-up status and/or note via PATCH /api/v1/actions/followups/{id}.
+ */
+export async function updateFollowUp(
+  followupId: string,
+  status: 'assigned' | 'in_progress' | 'resolved',
+  note?: string
+): Promise<void> {
+  const supabase = createClient()
+  const { data: { session } } = await supabase.auth.getSession()
+
+  if (!session?.access_token) {
+    throw new Error('Session expired. Please log in again.')
+  }
+
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+  const body: Record<string, string> = { status }
+  if (note !== undefined) body.note = note
+
+  const response = await fetch(`${apiUrl}/api/v1/actions/followups/${followupId}`, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  })
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}))
+    throw new Error(errData.detail || `Failed to update follow-up (${response.status})`)
+  }
+}

@@ -407,7 +407,8 @@ async def list_followups(
     user_token = credentials.credentials
 
     try:
-        client = create_client(settings.supabase_url, user_token)
+        client = create_client(settings.supabase_url, settings.supabase_key)
+        client.postgrest.auth(user_token)
 
         # Resolve assigned_by
         assigner_id = current_user.id if assigned_by == "me" else assigned_by
@@ -538,7 +539,8 @@ async def update_followup(
             raise HTTPException(status_code=404, detail="Follow-up not found")
 
         # User-scoped client: UPDATE with RLS enforcement
-        user_client = create_client(settings.supabase_url, user_token)
+        user_client = create_client(settings.supabase_url, settings.supabase_key)
+        user_client.postgrest.auth(user_token)
         result = (
             user_client.table("action_followups")
             .update(update_data)

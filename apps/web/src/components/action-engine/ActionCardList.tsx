@@ -34,6 +34,7 @@ interface ActionCardListProps {
   onAcknowledge?: (actionId: string) => void
   followUps?: Map<string, FollowUpData>
   onFollowUpAssigned?: () => void
+  reportDate?: string
   className?: string
 }
 
@@ -152,6 +153,7 @@ export function ActionCardList({
   onAcknowledge,
   followUps,
   onFollowUpAssigned,
+  reportDate,
   className,
 }: ActionCardListProps) {
   // Sort items by priority (AC #4)
@@ -215,6 +217,7 @@ export function ActionCardList({
               onAcknowledge={onAcknowledge}
               followUp={followUps?.get(item.id)}
               onFollowUpAssigned={onFollowUpAssigned}
+              reportDate={reportDate}
             />
           </div>
         ))}
