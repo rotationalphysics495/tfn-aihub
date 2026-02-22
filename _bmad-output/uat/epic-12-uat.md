@@ -1,7 +1,7 @@
 # Products, Schedule & Attainment - User Acceptance Testing
 
 **Epic**: 12
-**Version**: 1.0
+**Version**: 1.1
 **Generated**: 2026-02-11
 **Stories Covered**: 6
 
@@ -70,9 +70,9 @@ A **Plant Manager** or **Production Planner** who understands the daily producti
 
 **Success Criteria**: The morning report shows a Schedule Attainment section with per-workcenter, per-product breakdown of scheduled vs. actual production including attainment percentages.
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☑ Pass  ☐ Fail
 
-**Notes**: _________________________________
+**Notes**: Schedule Attainment section visible with workcenter cards (Roasting, Grinding, Filling). Per-product breakdown and overall attainment percentages display correctly.
 
 ---
 
@@ -93,9 +93,9 @@ A **Plant Manager** or **Production Planner** who understands the daily producti
 
 **Success Criteria**: Product swaps are highlighted in amber/orange with a clear, human-readable description of what was scheduled vs. what was actually produced.
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☑ Pass  ☐ Fail
 
-**Notes**: _________________________________
+**Notes**: Amber callout visible in Roasting section showing Roaster 1 ran Brazilian Santos instead of scheduled Colombian Single Origin. Callout is visually distinct with amber styling.
 
 ---
 

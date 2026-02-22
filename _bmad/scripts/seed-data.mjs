@@ -19,7 +19,11 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
 const daysAgo = (days) => {
   const d = new Date();
   d.setDate(d.getDate() - days);
-  return d.toISOString().split('T')[0];
+  // Use local date to match the browser's "yesterday" calculation
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
 };
 
 const hoursAgo = (hours) => {
