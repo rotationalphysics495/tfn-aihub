@@ -40,12 +40,13 @@ class AssetDetail(BaseModel):
 class WorkcenterEntry(BaseModel):
     """Aggregated production data for one workcenter."""
 
-    workcenter: str = Field(..., description="Workcenter name (e.g., Grinding)")
-    total_actual: int = Field(..., ge=0, description="Sum of units_produced across assets")
-    total_target: int = Field(..., ge=0, description="Sum of target_units across assets")
-    attainment_pct: float = Field(..., ge=0, description="total_actual / total_target * 100")
-    assets_hit: int = Field(..., ge=0, description="Count of assets meeting target")
+    workcenter_name: str = Field(..., description="Workcenter name (e.g., Grinding)")
+    total_actual: int = Field(..., ge=0, description="Sum of actual_output across assets")
+    total_target: int = Field(..., ge=0, description="Sum of target_output across assets")
+    attainment_percentage: float = Field(..., ge=0, description="total_actual / total_target * 100")
+    assets_on_target: int = Field(..., ge=0, description="Count of assets meeting target")
     assets_missed: int = Field(..., ge=0, description="Count of assets below target")
+    total_assets: int = Field(..., ge=0, description="Total asset count (on_target + missed)")
     assets: List[AssetDetail] = Field(default_factory=list, description="Per-asset breakdown")
     shift_breakdown: Optional[List[ShiftBreakdown]] = Field(
         default=None, description="Per-shift breakdown when shift data is available"
@@ -56,7 +57,7 @@ class WorkcenterSummaryResponse(BaseModel):
     """Response model for workcenter production summary."""
 
     workcenters: List[WorkcenterEntry] = Field(default_factory=list)
-    report_date: date = Field(..., description="The date for this summary")
+    date: str = Field(..., description="The date for this summary (YYYY-MM-DD)")
     message: Optional[str] = Field(None, description="Status message (e.g., no data available)")
 
 

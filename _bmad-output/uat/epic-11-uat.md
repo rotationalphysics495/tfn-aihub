@@ -1,7 +1,7 @@
 # Workcenter Production Scorecard - User Acceptance Testing
 
 **Epic**: 11
-**Version**: 1.0
+**Version**: 1.1
 **Generated**: 2026-02-11
 **Stories Covered**: 3
 
@@ -67,9 +67,9 @@ A Plant Manager or Operations Lead who regularly reviews the Morning Report. No 
 
 **Success Criteria**: The Production Scorecard section is visible with all 4 workcenters listed, positioned between the Morning Summary and Action Items.
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☑ Pass  ☐ Fail
 
-**Notes**: _________________________________
+**Notes**: All 4 workcenter rows (Roasting, Grinding, Filling, Packaging) visible and correctly positioned.
 
 ---
 
@@ -91,9 +91,9 @@ A Plant Manager or Operations Lead who regularly reviews the Morning Report. No 
 
 **Success Criteria**: All 4 workcenter rows display their name, actual vs. target output, attainment percentage, and how many assets hit vs. missed target.
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☑ Pass  ☐ Fail
 
-**Notes**: _________________________________
+**Notes**: All fields present and correctly formatted across all 4 workcenter rows.
 
 ---
 
@@ -114,9 +114,9 @@ A Plant Manager or Operations Lead who regularly reviews the Morning Report. No 
 
 **Success Criteria**: Color coding correctly matches performance — green for 95%+, yellow for 85–94%, red for below 85% — and the colors are immediately noticeable.
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☑ Pass  ☐ Fail
 
-**Notes**: _________________________________
+**Notes**: Color coding correct and immediately distinguishable across all rows.
 
 ---
 
@@ -138,9 +138,9 @@ A Plant Manager or Operations Lead who regularly reviews the Morning Report. No 
 
 **Success Criteria**: Clicking a workcenter row toggles the asset detail table open and closed. The table shows per-asset performance with green/red color coding for hit/miss.
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☑ Pass  ☐ Fail
 
-**Notes**: _________________________________
+**Notes**: Expand/collapse works correctly. Asset detail table displays all columns with correct green/red row tinting.
 
 ---
 
@@ -162,9 +162,9 @@ A Plant Manager or Operations Lead who regularly reviews the Morning Report. No 
 
 **Success Criteria**: Asset detail data is present, correctly formatted, and the number of assets matches the workcenter header count.
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☑ Pass  ☐ Fail
 
-**Notes**: _________________________________
+**Notes**: Asset names, formatted numbers, OEE %, and downtime all display correctly. Asset counts match workcenter header.
 
 ---
 
@@ -186,9 +186,9 @@ A Plant Manager or Operations Lead who regularly reviews the Morning Report. No 
 
 **Success Criteria**: Key scorecard numbers (especially attainment percentages and workcenter names) are readable from 3 feet away on a tablet, and touch interactions work reliably.
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☑ Pass  ☐ Fail
 
-**Notes**: _________________________________
+**Notes**: Large attainment % numbers and bold workcenter names readable at arm's length. Touch targets adequate.
 
 ---
 
@@ -203,7 +203,9 @@ A Plant Manager or Operations Lead who regularly reviews the Morning Report. No 
 | 1 | If possible, navigate to the Morning Report for a date with no data (e.g., a future date or a date before the system was set up) | The scorecard section displays an empty state message (e.g., "No production data available") instead of crashing or showing a blank area |
 | 2 | Verify the rest of the Morning Report page still works | Other sections (Morning Summary, Action Items) are not affected |
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☑ Pass  ☐ Fail
+
+**Notes**: Navigated to ?date=2024-01-01. Scorecard displayed "No production data available for this date." Other page sections unaffected.
 
 ---
 
@@ -216,7 +218,9 @@ A Plant Manager or Operations Lead who regularly reviews the Morning Report. No 
 | 1 | Refresh the Morning Report page (or simulate a slow connection using browser dev tools) | A loading skeleton or placeholder appears in the scorecard area while data loads |
 | 2 | Wait for data to finish loading | The loading indicator is replaced by the actual scorecard data |
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☑ Pass  ☐ Fail
+
+**Notes**: Loading skeleton visible on page refresh before data populates.
 
 ---
 
@@ -230,7 +234,9 @@ A Plant Manager or Operations Lead who regularly reviews the Morning Report. No 
 | 2 | Refresh the page | The same 4 workcenters appear with the same attainment percentages |
 | 3 | Refresh again | Data remains consistent |
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☑ Pass  ☐ Fail
+
+**Notes**: Attainment percentages consistent across multiple page refreshes.
 
 ---
 
@@ -238,12 +244,12 @@ A Plant Manager or Operations Lead who regularly reviews the Morning Report. No 
 
 This epic is **successful** when a user can:
 
-- [ ] See a Production Scorecard on the Morning Report with all 4 workcenters (Roasting, Grinding, Filling, Packaging)
-- [ ] Read actual output vs. target and attainment percentage for each workcenter at a glance
-- [ ] Instantly distinguish good, borderline, and poor performance through green/yellow/red color coding
-- [ ] Click any workcenter to expand and see individual asset (machine) performance details
-- [ ] View the scorecard comfortably on a tablet from about 3 feet away
-- [ ] See a helpful empty state message when no data is available instead of errors or blank space
+- [x] See a Production Scorecard on the Morning Report with all 4 workcenters (Roasting, Grinding, Filling, Packaging)
+- [x] Read actual output vs. target and attainment percentage for each workcenter at a glance
+- [x] Instantly distinguish good, borderline, and poor performance through green/yellow/red color coding
+- [x] Click any workcenter to expand and see individual asset (machine) performance details
+- [x] View the scorecard comfortably on a tablet from about 3 feet away
+- [x] See a helpful empty state message when no data is available instead of errors or blank space
 
 **Minimum passing**: All checkboxes marked
 
@@ -251,11 +257,10 @@ This epic is **successful** when a user can:
 
 ## Issues Log
 
-| # | Scenario | Issue Description | Severity | Screenshot |
-|---|----------|-------------------|----------|------------|
-| 1 | | | | |
-| 2 | | | | |
-| 3 | | | | |
+| # | Scenario | Issue Description | Severity | Status |
+|---|----------|-------------------|----------|--------|
+| E11-001 | 4 (pre-fix) | Clicking workcenter row rendered error card instead of expanding asset detail (field name mismatch: `actual`/`target` vs `actual_output`/`target_output`) | Major | Fixed |
+| E11-002 | General (pre-fix) | Production Scorecard not rendering due to wrong DB column names in API and schema/frontend field name mismatches | Critical | Fixed |
 
 ### Severity Definitions
 
@@ -271,23 +276,21 @@ This epic is **successful** when a user can:
 
 | Metric | Value |
 |--------|-------|
-| Scenarios Tested | \_\_ / 9 |
-| Scenarios Passed | \_\_ / 9 |
-| Critical Issues | |
-| Major Issues | |
-| Minor Issues | |
+| Scenarios Tested | 9 / 9 |
+| Scenarios Passed | 9 / 9 |
+| Critical Issues | 1 (E11-002, fixed during session) |
+| Major Issues | 1 (E11-001, fixed during session) |
+| Minor Issues | 0 |
 
 ### Recommendation
 
-☐ **Accept** - All criteria met, ready for production
-☐ **Accept with conditions** - Minor issues noted, can proceed
-☐ **Reject** - Critical/major issues must be resolved
+☑ **Accept** - All criteria met, ready for production
 
 ### Signatures
 
 | Role | Name | Date | Signature |
 |------|------|------|-----------|
-| Tester | | | |
+| Tester (QA) | Dmitri Spiropoulos | 2026-02-21 | Dmitri Spiropoulos |
 | Product Owner | | | |
 | Tech Lead | | | |
 

@@ -393,9 +393,24 @@ async def get_workcenter_summary(
     Story 17.4 AC#2: Optional shift filter parameter
     """
     try:
-        # AC#3: Default to yesterday if no date provided
+        # AC#3: Default to most recent available report_date if no date provided.
+        # Uses the latest date in daily_summaries rather than date.today()-1 to avoid
+        # timezone skew between the server clock and seeded/ingested data dates.
+        client = await get_supabase_client()
+
         if report_date is None:
-            report_date = date.today() - timedelta(days=1)
+            latest_resp = (
+                client.table("daily_summaries")
+                .select("report_date")
+                .order("report_date", desc=True)
+                .limit(1)
+                .execute()
+            )
+            if latest_resp.data:
+                from datetime import date as date_type
+                report_date = date_type.fromisoformat(latest_resp.data[0]["report_date"])
+            else:
+                report_date = date.today() - timedelta(days=1)
 
         # Validate shift parameter if provided
         valid_shifts = {"morning", "afternoon", "night"}
@@ -405,16 +420,14 @@ async def get_workcenter_summary(
                 detail=f"Invalid shift value '{shift}'. Must be one of: {', '.join(sorted(valid_shifts))}",
             )
 
-        client = await get_supabase_client()
-
         # Query 1: Fetch all assets
         assets_response = client.table("assets").select("id, name, area").execute()
 
         # Query 2: Fetch daily_summaries for the requested date
         summaries_response = (
             client.table("daily_summaries")
-            .select("asset_id, units_produced, oee, downtime_minutes")
-            .eq("date", report_date.isoformat())
+            .select("asset_id, actual_output, oee_percentage, downtime_minutes")
+            .eq("report_date", report_date.isoformat())
             .execute()
         )
 
@@ -422,18 +435,19 @@ async def get_workcenter_summary(
         if not summaries_response.data:
             return WorkcenterSummaryResponse(
                 workcenters=[],
-                report_date=report_date,
+                date=report_date.isoformat(),
                 message=f"No data available for {report_date.isoformat()}",
             )
 
         # Query 3: Fetch all shift_targets
         targets_response = (
             client.table("shift_targets")
-            .select("asset_id, target_units")
+            .select("asset_id, target_output")
             .execute()
         )
 
         # Query 4 (Story 17.4): Fetch shift_summaries for shift breakdown
+        # shift_summaries columns: oee (not oee_percentage), units_produced (not actual_output), date (not report_date)
         shift_query = (
             client.table("shift_summaries")
             .select("asset_id, shift, oee, downtime_minutes, units_produced")
@@ -464,7 +478,7 @@ async def get_workcenter_summary(
         targets_map: Dict[str, int] = {}
         for target in (targets_response.data or []):
             asset_id = target["asset_id"]
-            targets_map[asset_id] = targets_map.get(asset_id, 0) + (target.get("target_units") or 0)
+            targets_map[asset_id] = targets_map.get(asset_id, 0) + (target.get("target_output") or 0)
 
         # Shift summaries: asset_id -> list of shift records
         shift_data_map: Dict[str, List[dict]] = {}
@@ -482,8 +496,8 @@ async def get_workcenter_summary(
                         sr = shift_rows[0]  # One row per shift per asset
                         summaries_map[asset_id] = {
                             "asset_id": asset_id,
-                            "units_produced": sr.get("units_produced") or 0,
-                            "oee": sr.get("oee"),
+                            "actual_output": sr.get("units_produced") or 0,
+                            "oee_percentage": sr.get("oee"),
                             "downtime_minutes": sr.get("downtime_minutes"),
                         }
             else:
@@ -492,8 +506,8 @@ async def get_workcenter_summary(
                 for asset_id in list(summaries_map.keys()):
                     summaries_map[asset_id] = {
                         "asset_id": asset_id,
-                        "units_produced": 0,
-                        "oee": None,
+                        "actual_output": 0,
+                        "oee_percentage": None,
                         "downtime_minutes": None,
                     }
 
@@ -505,9 +519,9 @@ async def get_workcenter_summary(
                 continue  # Skip if asset not found or has no area
 
             area = asset_info["area"]
-            actual = summary.get("units_produced") or 0
+            actual = summary.get("actual_output") or 0
             target = targets_map.get(asset_id, 0)
-            oee_val = summary.get("oee")
+            oee_val = summary.get("oee_percentage")
             downtime = summary.get("downtime_minutes")
 
             asset_detail = AssetDetail(
@@ -582,12 +596,13 @@ async def get_workcenter_summary(
                     wc_shift_breakdown = breakdown_list if breakdown_list else None
 
             entry = WorkcenterEntry(
-                workcenter=area_name,
+                workcenter_name=area_name,
                 total_actual=total_actual,
                 total_target=total_target,
-                attainment_pct=calculate_percentage(total_actual, total_target),
-                assets_hit=assets_hit,
+                attainment_percentage=calculate_percentage(total_actual, total_target),
+                assets_on_target=assets_hit,
                 assets_missed=assets_missed,
+                total_assets=len(asset_details),
                 assets=asset_details,
                 shift_breakdown=wc_shift_breakdown,
             )
@@ -595,7 +610,7 @@ async def get_workcenter_summary(
 
         return WorkcenterSummaryResponse(
             workcenters=workcenter_entries,
-            report_date=report_date,
+            date=report_date.isoformat(),
         )
 
     except HTTPException:

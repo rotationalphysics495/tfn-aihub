@@ -175,9 +175,12 @@ export function MorningReportClient() {
             onDateChange={handleDateChange}
             selectedDate={selectedDate}
           />
+          <ShiftTabs value={selectedShift} onValueChange={handleShiftChange} />
+          <WorkcenterScorecard date={reportDate} selectedShift={selectedShift} />
+          <ScheduleAttainment date={reportDate} />
           <div className="rounded-lg border p-12 text-center">
             <p className="text-base text-muted-foreground">
-              No production data available for {formattedDateDisplay}.
+              No action items available for {formattedDateDisplay}.
             </p>
           </div>
         </div>

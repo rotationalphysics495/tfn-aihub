@@ -20,7 +20,7 @@ export function AssetDetailTable({ assets }: AssetDetailTableProps) {
       </thead>
       <tbody>
         {assets.map(asset => {
-          const hitTarget = asset.actual >= asset.target
+          const hitTarget = asset.actual_output >= asset.target_output
 
           return (
             <tr
@@ -34,7 +34,7 @@ export function AssetDetailTable({ assets }: AssetDetailTableProps) {
             >
               <td className="py-2 pr-4">{asset.asset_name}</td>
               <td className="py-2 pr-4 tabular-nums">
-                {asset.actual.toLocaleString()} / {asset.target.toLocaleString()}
+                {asset.actual_output.toLocaleString()} / {asset.target_output.toLocaleString()}
               </td>
               <td className="py-2 pr-4 tabular-nums">
                 {asset.oee != null ? `${asset.oee.toFixed(1)}%` : '\u2014'}

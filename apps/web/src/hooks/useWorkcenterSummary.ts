@@ -5,8 +5,8 @@ import { createClient } from '@/lib/supabase/client'
 
 export interface AssetDetail {
   asset_name: string
-  actual: number
-  target: number
+  actual_output: number
+  target_output: number
   oee: number | null
   downtime_minutes: number | null
 }
