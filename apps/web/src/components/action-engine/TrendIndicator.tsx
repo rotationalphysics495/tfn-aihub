@@ -108,14 +108,12 @@ export function TrendIndicator({
           className={cn('flex items-center gap-1', TREND_TEXT_CLASSES[direction])}
           aria-label={getAriaLabel(direction, priority, weekOverWeekChange)}
         >
-          {direction === 'improving' && (
-            <TrendingUp className="w-4 h-4" aria-hidden="true" />
-          )}
-          {direction === 'worsening' && (
-            <TrendingDown className="w-4 h-4" aria-hidden="true" />
-          )}
-          {direction === 'stable' && (
+          {direction === 'stable' ? (
             <ArrowRight className="w-4 h-4" aria-hidden="true" />
+          ) : weekOverWeekChange !== null && weekOverWeekChange > 0 ? (
+            <TrendingUp className="w-4 h-4" aria-hidden="true" />
+          ) : (
+            <TrendingDown className="w-4 h-4" aria-hidden="true" />
           )}
           {weekOverWeekChange !== null && !Number.isNaN(weekOverWeekChange) && (
             <span className="text-xs font-medium">

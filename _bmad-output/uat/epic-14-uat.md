@@ -68,9 +68,9 @@ A **Plant Manager** or **Operations Lead** who regularly reviews the daily actio
 
 **Success Criteria**: Every action card with historical data displays a trend arrow with percentage change and a 7-day sparkline chart.
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☒ Pass  ☐ Fail
 
-**Notes**: _________________________________
+**Notes**: Trend arrows and sparklines confirmed on OEE and Financial cards. Financial cards correctly show upward arrow in red for cost increases (e.g., Roaster 1 +95.7% WoW). Safety cards show no arrow as expected. Required seed data extension (daysAgo 8–9) and icon direction bug fix for Financial items.
 
 ---
 
@@ -91,9 +91,9 @@ A **Plant Manager** or **Operations Lead** who regularly reviews the daily actio
 
 **Success Criteria**: Repeat offender badges (amber) appear on cards with 3+ consecutive days on the report, and "New" badges (blue) appear on first-time items.
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☒ Pass  ☐ Fail
 
-**Notes**: _________________________________
+**Notes**: Grinder 5 confirmed showing "4th day in a row" amber badge. First-time items show blue "New" badge. Badge layout correct, no overlapping with priority badge.
 
 ---
 
@@ -295,13 +295,13 @@ This epic is **successful** when a user can:
 
 | Metric | Value |
 |--------|-------|
-| Scenarios Tested | \_\_ / 7 |
-| Scenarios Passed | \_\_ / 7 |
-| Edge Cases Tested | \_\_ / 3 |
-| Edge Cases Passed | \_\_ / 3 |
-| Critical Issues | |
-| Major Issues | |
-| Minor Issues | |
+| Scenarios Tested | 2 / 7 |
+| Scenarios Passed | 2 / 7 |
+| Edge Cases Tested | 0 / 3 |
+| Edge Cases Passed | 0 / 3 |
+| Critical Issues | 0 |
+| Major Issues | 0 |
+| Minor Issues | 1 (icon direction bug for Financial items — fixed during session) |
 
 ### Recommendation
 
@@ -313,7 +313,7 @@ This epic is **successful** when a user can:
 
 | Role | Name | Date | Signature |
 |------|------|------|-----------|
-| Tester | | | |
+| Tester | Dmitri Spiropoulos | 2026-02-22 | Dmitri Spiropoulos, QA |
 | Product Owner | | | |
 | Tech Lead | | | |
 
