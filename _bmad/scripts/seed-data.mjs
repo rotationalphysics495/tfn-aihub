@@ -256,14 +256,14 @@ async function seed() {
     {
       asset_id: 'a0000001-0000-0000-0000-000000000014',
       report_date: daysAgo(2),
-      oee_percentage: 88.30,
-      actual_output: 1722,
+      oee_percentage: 83.50,
+      actual_output: 1628,
       target_output: 1950,
-      downtime_minutes: 45,
-      waste_count: 28,
-      financial_loss_dollars: 131.25,
-      downtime_reasons: { "Mechanical Failure": 25, "Operator Break": 20 },
-      smart_summary_text: 'Grinder 5 running better. Minor mechanical adjustment needed mid-shift.'
+      downtime_minutes: 62,
+      waste_count: 38,
+      financial_loss_dollars: 180.83,
+      downtime_reasons: { "Mechanical Failure": 35, "Material Shortage": 17, "Operator Break": 10 },
+      smart_summary_text: 'Grinder 5 still struggling. Burr assembly vibration worsening, material shortages adding to downtime.'
     },
     {
       asset_id: 'a0000001-0000-0000-0000-000000000014',
@@ -280,14 +280,14 @@ async function seed() {
     {
       asset_id: 'a0000001-0000-0000-0000-000000000014',
       report_date: daysAgo(4),
-      oee_percentage: 91.20,
-      actual_output: 1778,
+      oee_percentage: 81.20,
+      actual_output: 1583,
       target_output: 1950,
-      downtime_minutes: 32,
-      waste_count: 22,
-      financial_loss_dollars: 93.33,
-      downtime_reasons: { "Changeover": 18, "Operator Break": 14 },
-      smart_summary_text: 'Solid performance on Grinder 5. Standard changeover for medium roast batch.'
+      downtime_minutes: 68,
+      waste_count: 42,
+      financial_loss_dollars: 198.33,
+      downtime_reasons: { "Mechanical Failure": 40, "Changeover": 18, "Operator Break": 10 },
+      smart_summary_text: 'Grinder 5 mechanical issues continuing. Burr housing inspection ordered.'
     },
     {
       asset_id: 'a0000001-0000-0000-0000-000000000014',
@@ -1442,6 +1442,191 @@ async function seed() {
       financial_loss_dollars: 87.08,
       downtime_reasons: { "Case Erector": 35, "Changeover": 20 },
       smart_summary_text: 'Some case erector issues at start of shift.'
+    },
+
+    // ============ WEEK AGO (daysAgo(8)) - Required for week-over-week trend arrows (Epic 14) ============
+    // These values are compared against daysAgo(1) to compute weekOverWeekChange.
+    // Grinder 5: 87.1% → daysAgo(1) 82.5% = -5.3% (worsening, red arrow)
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000014',
+      report_date: daysAgo(8),
+      oee_percentage: 87.10,
+      actual_output: 1698,
+      target_output: 1950,
+      downtime_minutes: 52,
+      waste_count: 28,
+      financial_loss_dollars: 151.67,
+      downtime_reasons: { "Mechanical Failure": 32, "Operator Break": 20 },
+      smart_summary_text: 'Steady performance with minor mechanical hiccups.'
+    },
+    // Grinder 1: 86.5% → daysAgo(1) 91.2% = +5.4% (improving, green arrow)
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000004',
+      report_date: daysAgo(8),
+      oee_percentage: 86.50,
+      actual_output: 1687,
+      target_output: 1950,
+      downtime_minutes: 55,
+      waste_count: 30,
+      financial_loss_dollars: 160.42,
+      downtime_reasons: { "Material Issue": 35, "Changeover": 20 },
+      smart_summary_text: 'Grinder 1 with some material flow issues last week.'
+    },
+    // Grinder 2: 93.5% → daysAgo(1) high, good baseline
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000005',
+      report_date: daysAgo(8),
+      oee_percentage: 93.50,
+      actual_output: 1823,
+      target_output: 1950,
+      downtime_minutes: 20,
+      waste_count: 12,
+      financial_loss_dollars: 58.33,
+      downtime_reasons: { "Changeover": 20 },
+      smart_summary_text: 'Grinder 2 strong performance last week.'
+    },
+    // Roaster 1: 90.5% → daysAgo(1) 87.5% = -3.3% (worsening)
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000001',
+      report_date: daysAgo(8),
+      oee_percentage: 90.50,
+      actual_output: 129,
+      target_output: 143,
+      downtime_minutes: 18,
+      waste_count: 2,
+      financial_loss_dollars: 95.83,
+      downtime_reasons: { "Changeover": 12, "Cleanup": 6 },
+      smart_summary_text: 'Roaster 1 running well with clean drum profile.'
+    },
+    // Roaster 2: 95.1% → daysAgo(1) 96.1% = +1.0% (stable, gray arrow)
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000002',
+      report_date: daysAgo(8),
+      oee_percentage: 95.10,
+      actual_output: 136,
+      target_output: 143,
+      downtime_minutes: 10,
+      waste_count: 0,
+      financial_loss_dollars: 41.67,
+      downtime_reasons: { "Cleanup": 10 },
+      smart_summary_text: 'Roaster 2 consistent performance.'
+    },
+    // Roaster 3: 90.8% → daysAgo(1) 87.18% = -3.9% (worsening)
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000007',
+      report_date: daysAgo(8),
+      oee_percentage: 90.80,
+      actual_output: 1771,
+      target_output: 1950,
+      downtime_minutes: 38,
+      waste_count: 22,
+      financial_loss_dollars: 93.33,
+      downtime_reasons: { "Changeover": 25, "Cleanup": 13 },
+      smart_summary_text: 'Roaster 3 solid run last week.'
+    },
+    // Filler Line A: 89.8% → daysAgo(1) 72.5% = -19.2% (strongly worsening)
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000008',
+      report_date: daysAgo(8),
+      oee_percentage: 89.80,
+      actual_output: 4131,
+      target_output: 4600,
+      downtime_minutes: 35,
+      waste_count: 18,
+      financial_loss_dollars: 79.17,
+      downtime_reasons: { "Changeover": 22, "Cleanup": 13 },
+      smart_summary_text: 'Filler Line A running cleanly last week.'
+    },
+    // Filler Line B: 88.9% → daysAgo(1) 89.2% = +0.3% (stable)
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000009',
+      report_date: daysAgo(8),
+      oee_percentage: 88.90,
+      actual_output: 4089,
+      target_output: 4600,
+      downtime_minutes: 38,
+      waste_count: 22,
+      financial_loss_dollars: 83.33,
+      downtime_reasons: { "Changeover": 25, "Cleanup": 13 },
+      smart_summary_text: 'Filler Line B consistent performance.'
+    },
+    // Filler Line C: 83.5% → daysAgo(1) 80.0% = -4.2% (worsening)
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000010',
+      report_date: daysAgo(8),
+      oee_percentage: 83.50,
+      actual_output: 3340,
+      target_output: 4000,
+      downtime_minutes: 55,
+      waste_count: 32,
+      financial_loss_dollars: 130.00,
+      downtime_reasons: { "Material Shortage": 30, "Changeover": 25 },
+      smart_summary_text: 'Filler Line C material issues persisting.'
+    },
+    // Pack Line A: 88.9% → daysAgo(1) 89.5% = +0.7% (stable)
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000011',
+      report_date: daysAgo(8),
+      oee_percentage: 88.90,
+      actual_output: 5512,
+      target_output: 6200,
+      downtime_minutes: 40,
+      waste_count: 55,
+      financial_loss_dollars: 71.25,
+      downtime_reasons: { "Changeover": 25, "Label Issue": 15 },
+      smart_summary_text: 'Pack Line A consistent throughout shift.'
+    },
+    // Pack Line B: 87.5% → daysAgo(1) 88.9% = +1.6% (stable)
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000012',
+      report_date: daysAgo(8),
+      oee_percentage: 87.50,
+      actual_output: 5425,
+      target_output: 6200,
+      downtime_minutes: 48,
+      waste_count: 62,
+      financial_loss_dollars: 76.00,
+      downtime_reasons: { "Changeover": 30, "Label Issue": 18 },
+      smart_summary_text: 'Pack Line B good run with standard changeovers.'
+    },
+    // Pack Line C: 86.4% → daysAgo(1) 87.5% = +1.3% (stable)
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000013',
+      report_date: daysAgo(8),
+      oee_percentage: 86.40,
+      actual_output: 4838,
+      target_output: 5600,
+      downtime_minutes: 55,
+      waste_count: 78,
+      financial_loss_dollars: 87.08,
+      downtime_reasons: { "Case Erector": 35, "Changeover": 20 },
+      smart_summary_text: 'Pack Line C modest performance last week.'
+    },
+    // Filler Line D (asset 6): 88.4% → daysAgo(1) 84.2% = -4.7% (worsening)
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000006',
+      report_date: daysAgo(8),
+      oee_percentage: 88.40,
+      actual_output: 1724,
+      target_output: 1950,
+      downtime_minutes: 42,
+      waste_count: 28,
+      financial_loss_dollars: 131.25,
+      downtime_reasons: { "Changeover": 28, "Cleanup": 14 },
+      smart_summary_text: 'Filler Line D good performance last week.'
+    },
+    // Roaster 4 (asset 3): 87.4% → daysAgo(1) 89.0% = +1.8% (stable)
+    {
+      asset_id: 'a0000001-0000-0000-0000-000000000003',
+      report_date: daysAgo(8),
+      oee_percentage: 87.40,
+      actual_output: 125,
+      target_output: 143,
+      downtime_minutes: 22,
+      waste_count: 3,
+      financial_loss_dollars: 175.00,
+      downtime_reasons: { "Changeover": 15, "Cleanup": 7 },
+      smart_summary_text: 'Roaster 4 steady performance last week.'
     },
 
     // ============ TODAY (daysAgo(0)) - Partial day data for all key assets ============
