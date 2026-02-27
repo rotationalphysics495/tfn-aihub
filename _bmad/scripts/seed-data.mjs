@@ -1554,13 +1554,13 @@ async function seed() {
     {
       asset_id: 'a0000001-0000-0000-0000-000000000010',
       report_date: daysAgo(8),
-      oee_percentage: 83.50,
-      actual_output: 3340,
+      oee_percentage: 80.80,
+      actual_output: 3232,
       target_output: 4000,
-      downtime_minutes: 55,
+      downtime_minutes: 72,
       waste_count: 32,
       financial_loss_dollars: 130.00,
-      downtime_reasons: { "Material Shortage": 30, "Changeover": 25 },
+      downtime_reasons: { "Material Shortage": 45, "Changeover": 27 },
       smart_summary_text: 'Filler Line C material issues persisting.'
     },
     // Pack Line A: 88.9% → daysAgo(1) 89.5% = +0.7% (stable)

@@ -72,13 +72,13 @@ class DowntimeAnalysisService:
         Get a mapping of asset_id to asset info with caching.
 
         Returns:
-            Dict mapping asset_id to {name, area, source_id, cost_center_id}
+            Dict mapping asset_id to {name, area, source_id}
         """
         if self._assets_cache:
             return self._assets_cache
 
         response = self.client.table("assets").select(
-            "id, name, area, source_id, cost_center_id"
+            "id, name, area, source_id"
         ).execute()
 
         if response.data:
@@ -87,7 +87,6 @@ class DowntimeAnalysisService:
                     "name": asset.get("name", "Unknown"),
                     "area": asset.get("area"),
                     "source_id": asset.get("source_id"),
-                    "cost_center_id": asset.get("cost_center_id"),
                 }
                 for asset in response.data
             }
@@ -96,21 +95,21 @@ class DowntimeAnalysisService:
 
     async def get_cost_centers_map(self) -> Dict[str, float]:
         """
-        Get a mapping of cost_center_id to standard_hourly_rate.
+        Get a mapping of asset_id to standard_hourly_rate.
 
         Returns:
-            Dict mapping cost_center_id to hourly rate
+            Dict mapping asset_id to hourly rate
         """
         if self._cost_centers_cache:
             return self._cost_centers_cache
 
         response = self.client.table("cost_centers").select(
-            "id, standard_hourly_rate"
+            "asset_id, standard_hourly_rate"
         ).execute()
 
         if response.data:
             self._cost_centers_cache = {
-                cc["id"]: float(cc.get("standard_hourly_rate", DEFAULT_HOURLY_RATE) or DEFAULT_HOURLY_RATE)
+                cc["asset_id"]: float(cc.get("standard_hourly_rate", DEFAULT_HOURLY_RATE) or DEFAULT_HOURLY_RATE)
                 for cc in response.data
             }
 
@@ -135,7 +134,7 @@ class DowntimeAnalysisService:
     def calculate_financial_impact(
         self,
         downtime_minutes: int,
-        cost_center_id: Optional[str],
+        asset_id: Optional[str],
         cost_centers_map: Dict[str, float]
     ) -> float:
         """
@@ -145,15 +144,15 @@ class DowntimeAnalysisService:
 
         Args:
             downtime_minutes: Duration of downtime in minutes
-            cost_center_id: The cost center ID for the asset
-            cost_centers_map: Mapping of cost center IDs to hourly rates
+            asset_id: The asset ID (used to look up hourly rate via cost_centers)
+            cost_centers_map: Mapping of asset IDs to hourly rates
 
         Returns:
             Financial impact in dollars
         """
         hourly_rate = DEFAULT_HOURLY_RATE
-        if cost_center_id and cost_center_id in cost_centers_map:
-            hourly_rate = cost_centers_map[cost_center_id]
+        if asset_id and asset_id in cost_centers_map:
+            hourly_rate = cost_centers_map[asset_id]
 
         return round((downtime_minutes / 60.0) * hourly_rate, 2)
 
@@ -274,9 +273,8 @@ class DowntimeAnalysisService:
             is_planned = record.get("is_planned", False)
             event_date = record.get("event_date", date.today().isoformat())
 
-            cost_center_id = asset_info.get("cost_center_id")
             financial_impact = self.calculate_financial_impact(
-                duration_minutes, cost_center_id, cost_centers_map
+                duration_minutes, asset_id, cost_centers_map
             )
 
             is_safety = self.is_safety_related(reason_code)
@@ -423,9 +421,8 @@ class DowntimeAnalysisService:
                 continue
 
             # Calculate financial impact
-            cost_center_id = asset_info.get("cost_center_id")
             financial_impact = self.calculate_financial_impact(
-                downtime_minutes, cost_center_id, cost_centers_map
+                downtime_minutes, asset_id, cost_centers_map
             )
 
             # Check if safety-related
