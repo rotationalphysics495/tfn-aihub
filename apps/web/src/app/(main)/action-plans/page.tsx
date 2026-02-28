@@ -77,6 +77,8 @@ function ActionPlansDashboardContent() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [selectedPlan, setSelectedPlan] = useState<ActionPlanWithUpdates | null>(null)
+  const planQueryParam = searchParams.get('plan')
+  const openedPlanRef = useRef<string | null>(null)
 
   const fetchPlans = useCallback(async (
     status: string,
@@ -148,6 +150,52 @@ function ActionPlansDashboardContent() {
     return () => { mountedRef.current = false }
   }, [fetchPlans, statusFilter, priorityFilter, assetFilter, ownerFilter])
 
+  const handleCardClick = useCallback(async (plan: ActionPlan) => {
+    // Show dialog immediately with plan data, then fetch updates
+    setSelectedPlan({ ...plan, updates: [] } as ActionPlanWithUpdates)
+
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) return
+
+      const response = await fetch(`${API_BASE_URL}/api/v1/action-plans/${plan.id}/updates`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (response.ok) {
+        const updates = await response.json()
+        if (mountedRef.current) {
+          setSelectedPlan(prev => prev?.id === plan.id ? { ...prev, updates: updates || [] } : prev)
+        }
+      }
+    } catch {
+      // Silently fail — updates just won't load
+    }
+  }, [])
+
+  // Auto-open plan detail when ?plan=<id> query param is present (e.g. from badge click)
+  useEffect(() => {
+    if (!planQueryParam || isLoading || openedPlanRef.current === planQueryParam) return
+    const target = plans.find((p) => p.id === planQueryParam)
+    if (target) {
+      openedPlanRef.current = planQueryParam
+      handleCardClick(target)
+    }
+  }, [planQueryParam, plans, isLoading, handleCardClick])
+
+  const clearFilters = useCallback(() => {
+    setStatusFilter('all')
+    setPriorityFilter('all')
+    setAssetFilter('all')
+    setOwnerFilter('all')
+    router.replace('/action-plans')
+  }, [router])
+
   const updateFilter = useCallback((key: string, value: string) => {
     // Compute new filter values (including the change being made)
     const newStatus = key === 'status' ? value : statusFilter
@@ -178,34 +226,6 @@ function ActionPlansDashboardContent() {
   const grouped = groupPlans(plans)
   const totalCount = plans.length
   const activeCount = grouped.open.length + grouped.in_progress.length
-
-  const handleCardClick = useCallback(async (plan: ActionPlan) => {
-    // Show dialog immediately with plan data, then fetch updates
-    setSelectedPlan({ ...plan, updates: [] } as ActionPlanWithUpdates)
-
-    try {
-      const supabase = createClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.access_token) return
-
-      const response = await fetch(`${API_BASE_URL}/api/v1/action-plans/${plan.id}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        if (mountedRef.current) {
-          setSelectedPlan(prev => prev?.id === plan.id ? { ...prev, updates: data.updates || [] } : prev)
-        }
-      }
-    } catch {
-      // Silently fail — updates just won't load
-    }
-  }, [])
 
   const handleDetailClose = () => {
     setSelectedPlan(null)
@@ -244,24 +264,9 @@ function ActionPlansDashboardContent() {
     )
   }
 
-  // Empty state
-  if (totalCount === 0) {
-    return (
-      <div className="p-6 space-y-6">
-        <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold">Action Plans</h1>
-        </div>
-        <div className="flex flex-col items-center justify-center py-12 space-y-3">
-          <ClipboardList className="w-10 h-10 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">
-            No action plans found. Create action plans from follow-up investigations.
-          </p>
-        </div>
-      </div>
-    )
-  }
+  const hasActiveFilters = statusFilter !== 'all' || priorityFilter !== 'all' || assetFilter !== 'all' || ownerFilter !== 'all'
 
-  // Data loaded with plans
+  // Data loaded (with or without plans)
   return (
     <div className="p-6 space-y-6">
       {/* Page Header with active count badge */}
@@ -328,31 +333,49 @@ function ActionPlansDashboardContent() {
         </div>
       </div>
 
-      {/* Grouped Plans */}
-      <div className="space-y-6">
-        {STATUS_SECTIONS.map(({ key, label }) => {
-          const sectionPlans = grouped[key]
-          if (sectionPlans.length === 0) return null
+      {/* Grouped Plans or Empty State */}
+      {totalCount === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 space-y-3">
+          <ClipboardList className="w-10 h-10 text-muted-foreground" />
+          {hasActiveFilters ? (
+            <>
+              <p className="text-sm text-muted-foreground">No action plans match the current filters.</p>
+              <Button variant="outline" size="sm" onClick={clearFilters}>
+                Clear Filters
+              </Button>
+            </>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              No action plans found. Create action plans from follow-up investigations.
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {STATUS_SECTIONS.map(({ key, label }) => {
+            const sectionPlans = grouped[key]
+            if (sectionPlans.length === 0) return null
 
-          return (
-            <div key={key}>
-              <h2 className="text-lg font-medium mb-3">
-                {label} ({sectionPlans.length})
-              </h2>
-              <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                {sectionPlans.map((plan) => (
-                  <ActionPlanCard
-                    key={plan.id}
-                    plan={plan}
-                    onClick={handleCardClick}
-                    hideStatusBadge
-                  />
-                ))}
+            return (
+              <div key={key}>
+                <h2 className="text-lg font-medium mb-3">
+                  {label} ({sectionPlans.length})
+                </h2>
+                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                  {sectionPlans.map((plan) => (
+                    <ActionPlanCard
+                      key={plan.id}
+                      plan={plan}
+                      onClick={handleCardClick}
+                      hideStatusBadge
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
+      )}
 
       {/* Detail Dialog */}
       {selectedPlan && (

@@ -46,7 +46,7 @@ export function ActivePlanBadge({ assetId, className }: ActivePlanBadgeProps) {
         aria-label={`Action plan: ${plan.title}, ${formatStatus(plan.status)}, due ${plan.due_date}`}
         onClick={(e) => {
           e.stopPropagation()
-          router.push(`/action-plans/${plan.id}`)
+          router.push(`/action-plans?plan=${plan.id}`)
         }}
       >
         <ClipboardList className="w-3 h-3 flex-shrink-0" aria-hidden="true" />
@@ -86,7 +86,7 @@ export function ActivePlanBadge({ assetId, className }: ActivePlanBadgeProps) {
                   className="w-full text-left px-2 py-1 rounded hover:bg-muted text-popover-foreground"
                   onClick={(e) => {
                     e.stopPropagation()
-                    router.push(`/action-plans/${plan.id}`)
+                    router.push(`/action-plans?plan=${plan.id}`)
                   }}
                 >
                   {plan.title}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { ExternalLink, Loader2 } from 'lucide-react'
 import {
   Dialog,
@@ -59,8 +59,14 @@ export function ActionPlanDetail({ plan, open, onClose, onStatusChange }: Action
   const [statusChange, setStatusChange] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [localUpdates, setLocalUpdates] = useState<ActionPlanUpdate[]>(plan.updates || [])
 
   const statusConfig = STATUS_DISPLAY[plan.status]
+
+  // Sync localUpdates when the plan prop refreshes (e.g. after status change refetch)
+  useEffect(() => {
+    setLocalUpdates(plan.updates || [])
+  }, [plan.updates])
 
   const getAuthToken = useCallback(async (): Promise<string | null> => {
     const supabase = createClient()
@@ -101,7 +107,24 @@ export function ActionPlanDetail({ plan, open, onClose, onStatusChange }: Action
 
       setUpdateText('')
       setStatusChange('')
-      onStatusChange?.()
+
+      // Fetch updated timeline so it appears immediately without closing the dialog
+      try {
+        const updatesResponse = await fetch(`${API_BASE_URL}/api/v1/action-plans/${plan.id}/updates`, {
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        })
+        if (updatesResponse.ok) {
+          const updatesData = await updatesResponse.json()
+          setLocalUpdates(updatesData)
+        }
+      } catch {
+        // Non-fatal — timeline just won't refresh
+      }
+
+      // If status changed, notify parent to refresh the card list
+      if (statusChange) {
+        onStatusChange?.()
+      }
     } catch {
       setError('Failed to add update.')
     } finally {
@@ -265,7 +288,7 @@ export function ActionPlanDetail({ plan, open, onClose, onStatusChange }: Action
           {/* Progress Updates Timeline */}
           <div>
             <h4 className="text-sm font-medium text-muted-foreground mb-2">Progress Updates</h4>
-            <UpdateTimeline updates={plan.updates || []} />
+            <UpdateTimeline updates={localUpdates} />
           </div>
 
           {/* Add Update Form */}

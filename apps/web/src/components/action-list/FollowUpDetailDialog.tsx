@@ -181,7 +181,7 @@ export function FollowUpDetailDialog({ followUp, open, onClose }: FollowUpDetail
             {linkedPlan && (
               <div className="border-t pt-3">
                 <a
-                  href={`/action-plans/${linkedPlan.id}`}
+                  href={`/action-plans?plan=${linkedPlan.id}`}
                   className="flex items-center gap-2 text-sm text-info-blue hover:underline"
                   role="link"
                 >

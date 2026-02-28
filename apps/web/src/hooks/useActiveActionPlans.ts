@@ -44,33 +44,32 @@ export function useActiveActionPlans(assetId?: string): UseActiveActionPlansRetu
         return
       }
 
-      const params = new URLSearchParams()
-      params.set('asset_id', assetId)
-      params.set('status', 'open,in_progress')
-
-      const url = `${API_BASE_URL}/api/v1/action-plans?${params.toString()}`
-
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-        },
-      })
-
-      if (!mountedRef.current) return
-
-      if (!response.ok) {
-        setIsLoading(false)
-        setError('Failed to fetch action plans')
-        return
+      // Fetch open and in_progress plans separately and merge
+      const fetchForStatus = async (status: string) => {
+        const params = new URLSearchParams()
+        params.set('asset_id', assetId)
+        params.set('status', status)
+        params.set('page_size', '100')
+        const response = await fetch(`${API_BASE_URL}/api/v1/action-plans?${params.toString()}`, {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+        if (!response.ok) return []
+        const data = await response.json()
+        return data.items || []
       }
 
-      const data = await response.json()
+      const [openPlans, inProgressPlans] = await Promise.all([
+        fetchForStatus('open'),
+        fetchForStatus('in_progress'),
+      ])
 
       if (!mountedRef.current) return
 
       // Client-side filter as safety net
-      const activePlans: ActiveActionPlan[] = (Array.isArray(data) ? data : [])
+      const activePlans: ActiveActionPlan[] = [...openPlans, ...inProgressPlans]
         .filter((plan: { status: string }) => ACTIVE_STATUSES.has(plan.status))
         .map((plan: { id: string; title: string; due_date: string; status: string }) => ({
           id: plan.id,

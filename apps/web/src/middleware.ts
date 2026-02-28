@@ -38,7 +38,7 @@ export async function middleware(request: NextRequest) {
   // Protected routes - redirect to login if not authenticated
   // Story 3.3 AC#9: Added /morning-report as protected path
   // Story 9.13 AC#1: Added /admin as protected path
-  const protectedPaths = ['/dashboard', '/morning-report', '/api/protected', '/admin']
+  const protectedPaths = ['/dashboard', '/morning-report', '/api/protected', '/admin', '/action-plans']
   const isProtectedPath = protectedPaths.some((path) =>
     request.nextUrl.pathname.startsWith(path)
   )

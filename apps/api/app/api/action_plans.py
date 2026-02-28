@@ -113,7 +113,7 @@ def _sort_plans(plans: list) -> list:
 # =============================================================================
 
 
-@router.post("/", response_model=ActionPlanResponse, status_code=201)
+@router.post("", response_model=ActionPlanResponse, status_code=201)
 async def create_action_plan(
     plan: ActionPlanCreate,
     current_user: CurrentUser = Depends(get_current_user),
@@ -161,7 +161,7 @@ async def create_action_plan(
 # =============================================================================
 
 
-@router.get("/", response_model=ActionPlanListResponse)
+@router.get("", response_model=ActionPlanListResponse)
 async def list_action_plans(
     status: Optional[ActionPlanStatus] = Query(None, description="Filter by status"),
     asset_id: Optional[str] = Query(None, description="Filter by asset ID"),
@@ -264,14 +264,12 @@ async def update_action_plan(
     plan_id: str,
     update: ActionPlanUpdate,
     current_user: CurrentUser = Depends(get_current_user),
-    credentials: HTTPAuthorizationCredentials = Depends(security),
 ):
     """
     Update an action plan with change logging (AC#3).
 
-    Uses two-client pattern:
-    - Service-role client for existence check
-    - User-scoped client for update (RLS enforcement)
+    Uses service-role client so any authenticated team member can update any plan
+    (e.g. status transitions by non-owners). Change is logged with the acting user's ID.
     Auto-generates an action_plan_updates record describing the changes.
     """
     # Validate at least one field is provided
@@ -282,11 +280,10 @@ async def update_action_plan(
             detail="At least one field must be provided for update",
         )
 
-    user_token = credentials.credentials
-
     try:
-        # Service-role client: check existence
         service_client = _get_supabase_client()
+
+        # Check existence
         existence_check = (
             service_client.table("action_plans")
             .select("*")
@@ -299,21 +296,16 @@ async def update_action_plan(
 
         old_record = existence_check.data[0]
 
-        # User-scoped client: UPDATE with RLS enforcement
-        user_client = _get_user_client(user_token)
+        # Service-role UPDATE — any authenticated user can update
         result = (
-            user_client.table("action_plans")
+            service_client.table("action_plans")
             .update(update_data)
             .eq("id", plan_id)
             .execute()
         )
 
         if not result.data:
-            # RLS blocked the update — user is not authorized
-            raise HTTPException(
-                status_code=403,
-                detail="Not authorized to update this action plan",
-            )
+            raise HTTPException(status_code=500, detail="Failed to update action plan")
 
         updated_record = result.data[0]
 
