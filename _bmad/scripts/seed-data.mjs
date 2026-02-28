@@ -1768,6 +1768,18 @@ async function seed() {
   if (shiftErr) console.error('  Shift summaries error:', shiftErr.message);
   else console.log(`  ✓ Shift summaries inserted (${shiftSummaries.length} records for ${dailySummaries.length} daily records)`);
 
+  // Epic 17 UAT: Override Grinder 5 daysAgo(1) night shift to have >60% of total downtime
+  // so Scenario 8 Step 2 shows a shift attribution badge. Total downtime = 72 min.
+  // Night: 50 min (69%), Morning: 12 min (17%), Afternoon: 10 min (14%)
+  const shiftAttrOverrides = [
+    { asset_id: 'a0000001-0000-0000-0000-000000000014', date: daysAgo(1), shift: 'morning',   oee: 84.20, availability: 93.50, performance: 91.20, quality: 98.50, downtime_minutes: 12, units_produced: 563 },
+    { asset_id: 'a0000001-0000-0000-0000-000000000014', date: daysAgo(1), shift: 'afternoon', oee: 85.10, availability: 94.00, performance: 91.80, quality: 98.60, downtime_minutes: 10, units_produced: 537 },
+    { asset_id: 'a0000001-0000-0000-0000-000000000014', date: daysAgo(1), shift: 'night',     oee: 71.30, availability: 82.10, performance: 88.30, quality: 98.40, downtime_minutes: 50, units_produced: 508 },
+  ];
+  const { error: overrideErr } = await supabase.from('shift_summaries').upsert(shiftAttrOverrides, { onConflict: 'asset_id,date,shift' });
+  if (overrideErr) console.error('  Shift attribution override error:', overrideErr.message);
+  else console.log('  ✓ Grinder 5 daysAgo(1) night shift override applied (shift attribution: 50/72 min = 69%)');
+
   // 3a. Downtime Events (Story 14.1: Individual downtime event records for Pareto analysis)
   console.log('🔧 Inserting downtime events...');
 

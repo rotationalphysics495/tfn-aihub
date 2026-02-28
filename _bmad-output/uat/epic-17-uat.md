@@ -69,9 +69,9 @@ A Plant Manager or Operations Lead who regularly uses the Morning Report to revi
 
 **Success Criteria**: The Morning Report loads with yesterday's data by default, the date picker is visible, and all report sections display correctly.
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☒ Pass
 
-**Notes**: _________________________________
+**Notes**: All steps pass.
 
 ---
 
@@ -93,9 +93,9 @@ A Plant Manager or Operations Lead who regularly uses the Morning Report to revi
 
 **Success Criteria**: Selecting a historical date reloads all report sections with that date's data, updates the badge text, and updates the URL.
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☒ Pass
 
-**Notes**: _________________________________
+**Notes**: All steps pass.
 
 ---
 
@@ -118,9 +118,9 @@ A Plant Manager or Operations Lead who regularly uses the Morning Report to revi
 
 **Success Criteria**: Arrow buttons navigate one day at a time, and the "next" arrow is disabled when viewing yesterday's date.
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☒ Pass
 
-**Notes**: _________________________________
+**Notes**: All steps pass.
 
 ---
 
@@ -142,9 +142,9 @@ A Plant Manager or Operations Lead who regularly uses the Morning Report to revi
 
 **Success Criteria**: A URL with a `?date=` parameter loads the correct historical report when opened directly.
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☒ Pass
 
-**Notes**: _________________________________
+**Notes**: All steps pass.
 
 ---
 
@@ -166,9 +166,9 @@ A Plant Manager or Operations Lead who regularly uses the Morning Report to revi
 
 **Success Criteria**: Users can generate smart summaries on demand for historical dates, and generated summaries are saved for future visits.
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☒ Fail
 
-**Notes**: _________________________________
+**Notes**: Steps 1–4 pass. Step 5 fails — **Issue #1**: After navigating away and returning to the same date, the generated summary carries over from the most recently generated date. For example, a summary generated on 2/27 appears on 2/26, 2/25, and so on until the summary is manually regenerated for each date. The system does not correctly scope the displayed summary to the selected date. See Issues Log.
 
 ---
 
@@ -189,9 +189,9 @@ A Plant Manager or Operations Lead who regularly uses the Morning Report to revi
 
 **Success Criteria**: Existing summaries can be regenerated on demand and the refreshed version replaces the old one.
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☒ Pass
 
-**Notes**: _________________________________
+**Notes**: All steps pass.
 
 ---
 
@@ -214,9 +214,9 @@ A Plant Manager or Operations Lead who regularly uses the Morning Report to revi
 
 **Success Criteria**: Shift tabs filter the workcenter scorecard to show per-shift or aggregate data as selected.
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☒ Pass
 
-**Notes**: _________________________________
+**Notes**: All steps pass.
 
 ---
 
@@ -238,9 +238,9 @@ A Plant Manager or Operations Lead who regularly uses the Morning Report to revi
 
 **Success Criteria**: Action items correctly show shift attribution when one shift is primarily responsible and omit it for systemic issues. Shift tab filtering applies to both the scorecard and action items.
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☒ Fail
 
-**Notes**: _________________________________
+**Notes**: Steps 1–3 pass (shift attribution badge visible on Grinder 5 — night shift 50 min). Step 4 fails — **Issue #2**: Clicking a shift tab (e.g., "Afternoon") does not filter the action items list; all items remain visible regardless of the selected shift tab. Step 5 is dependent on Step 4 and could not be meaningfully verified.
 
 ---
 
@@ -256,7 +256,9 @@ A Plant Manager or Operations Lead who regularly uses the Morning Report to revi
 | 2 | Verify the date picker and arrow buttons still work | The date picker and arrows remain interactive — you can navigate to other dates |
 | 3 | Navigate back to yesterday using the arrow buttons or date picker | The report loads normally with yesterday's data |
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☒ Pass
+
+**Notes**: All steps pass.
 
 ---
 
@@ -270,7 +272,9 @@ A Plant Manager or Operations Lead who regularly uses the Morning Report to revi
 | 2 | Try a future date in the URL: `/morning-report?date=2027-01-01` | The page loads with yesterday's data (cannot view future dates) |
 | 3 | Try an empty date parameter: `/morning-report?date=` | The page loads with yesterday's data |
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☒ Pass
+
+**Notes**: All steps pass.
 
 ---
 
@@ -286,7 +290,9 @@ A Plant Manager or Operations Lead who regularly uses the Morning Report to revi
 | 4 | Reconnect to the network and click "Retry" | The summary generates successfully |
 | 5 | Verify the page remained functional throughout the error | Date picker, arrows, and other sections still work during and after the error |
 
-**Result**: ☐ Pass  ☐ Fail
+**Result**: ☒ Fail
+
+**Notes**: Step 3 fails — **Issue #3**: After disconnecting from the network and clicking "Generate Summary", the page displayed "No production data available for yesterday" instead of the expected "Failed to generate summary" error message with a retry option. The error state is misleading — the absence of network connectivity manifests as an empty state message rather than a distinct generation failure error. Steps 4–5 could not be verified. The page itself remained navigable throughout.
 
 ---
 
@@ -294,16 +300,16 @@ A Plant Manager or Operations Lead who regularly uses the Morning Report to revi
 
 This epic is **successful** when a user can:
 
-- [ ] View any historical date's Morning Report by selecting a date from the date picker
-- [ ] Navigate day-by-day using prev/next arrow buttons, with the "next" arrow disabled at yesterday
-- [ ] Share a report URL (with `?date=` parameter) and have it load the correct date when opened
-- [ ] See an empty state message when a selected date has no production data
-- [ ] Generate a smart summary on demand for a historical date that does not have one
-- [ ] Regenerate an existing smart summary
-- [ ] Switch between shift views (All, Morning, Afternoon, Night) on the workcenter scorecard
-- [ ] See shift attribution on action items when one shift is primarily responsible for a miss
-- [ ] See no shift attribution for systemic issues affecting all shifts
-- [ ] Use shift tab filtering to view both the scorecard and action items for a specific shift
+- [x] View any historical date's Morning Report by selecting a date from the date picker
+- [x] Navigate day-by-day using prev/next arrow buttons, with the "next" arrow disabled at yesterday
+- [x] Share a report URL (with `?date=` parameter) and have it load the correct date when opened
+- [x] See an empty state message when a selected date has no production data
+- [ ] Generate a smart summary on demand for a historical date that does not have one *(Issue #1 — summary carries over across dates)*
+- [x] Regenerate an existing smart summary
+- [x] Switch between shift views (All, Morning, Afternoon, Night) on the workcenter scorecard
+- [x] See shift attribution on action items when one shift is primarily responsible for a miss
+- [x] See no shift attribution for systemic issues affecting all shifts
+- [ ] Use shift tab filtering to view both the scorecard and action items for a specific shift *(Issue #2 — action item filtering does not apply)*
 
 **Minimum passing**: All checkboxes marked
 
@@ -311,11 +317,11 @@ This epic is **successful** when a user can:
 
 ## Issues Log
 
-| # | Scenario | Issue Description | Severity | Screenshot |
-|---|----------|-------------------|----------|------------|
-| 1 | | | | |
-| 2 | | | | |
-| 3 | | | | |
+| # | Scenario | Issue Description | Severity |
+|---|----------|-------------------|----------|
+| 1 | Scenario 5 | **Summary carryover across dates**: A generated summary persists across all other historical dates until each is individually regenerated. Navigating from 2/27 to 2/26, 2/25, etc. displays the 2/27 summary instead of the correct date's summary or the "Generate" prompt. The `useSmartSummary` hook receives `reportDate` correctly but the displayed summary does not re-scope when the date changes. | Major |
+| 2 | Scenario 8 Step 4 | **Shift tab does not filter action items**: Clicking "Morning", "Afternoon", or "Night" shift tabs filters the workcenter scorecard correctly but has no effect on the action items (insight cards) list — all cards remain visible regardless of shift selection. | Major |
+| 3 | Edge Case 3 Step 3 | **Incorrect error message on network failure during summary generation**: When the network is disconnected and "Generate Summary" is clicked, the page shows "No production data available for yesterday" instead of a generation failure error with retry option. The error state does not distinguish between a missing-data empty state and a network/generation failure. | Minor |
 
 ### Severity Definitions
 
@@ -331,25 +337,27 @@ This epic is **successful** when a user can:
 
 | Metric | Value |
 |--------|-------|
-| Scenarios Tested | \_\_ / 8 |
-| Scenarios Passed | \_\_ / 8 |
-| Edge Cases Tested | \_\_ / 3 |
-| Edge Cases Passed | \_\_ / 3 |
-| Critical Issues | |
-| Major Issues | |
-| Minor Issues | |
+| Scenarios Tested | 8 / 8 |
+| Scenarios Passed | 6 / 8 |
+| Edge Cases Tested | 3 / 3 |
+| Edge Cases Passed | 2 / 3 |
+| Critical Issues | 0 |
+| Major Issues | 2 |
+| Minor Issues | 1 |
 
 ### Recommendation
 
 ☐ **Accept** - All criteria met, ready for production
-☐ **Accept with conditions** - Minor issues noted, can proceed
+☒ **Accept with conditions** - Minor issues noted, can proceed
 ☐ **Reject** - Critical/major issues must be resolved
+
+> **Conditions**: Issues #1 (summary carryover) and #2 (shift tab action item filtering) must be resolved before production release. Issue #3 (misleading error message) to be addressed in a follow-up. Core date navigation, scorecard shift filtering, URL sharing, and shift attribution badge are all functioning correctly.
 
 ### Signatures
 
 | Role | Name | Date | Signature |
 |------|------|------|-----------|
-| Tester | | | |
+| Tester | Dmitri Spiropoulos | 2026-02-28 | QA |
 | Product Owner | | | |
 | Tech Lead | | | |
 
@@ -364,6 +372,7 @@ This epic is **successful** when a user can:
 - **Date range with seed data**: Past 7 days plus today
 - **Shift distribution pattern**: Morning ~35-40% output, Afternoon ~30-35%, Night ~25-30%
 - **Shift attribution threshold**: A single shift must account for >60% of total downtime to receive attribution
+- **UAT override**: Grinder 5 daysAgo(1) seeded with night shift at 50/72 min downtime (69%) to ensure attribution badge is visible in Scenario 8
 
 ### Environment Details
 
