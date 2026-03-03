@@ -139,7 +139,8 @@ export function MorningSummarySection({ className, reportDate: reportDateProp, o
                     if (e.metaKey || e.ctrlKey) {
                       const actionId = assetNameToId.get(assetName.toLowerCase())
                       if (actionId) {
-                        window.open(`/morning-report/action/${actionId}`, '_blank')
+                        const date = reportDateProp || new Date(Date.now() - 86400000).toISOString().split('T')[0]
+                        window.open(`/morning-report?date=${date}`, '_blank')
                       }
                     } else {
                       scrollToAsset(assetName)
